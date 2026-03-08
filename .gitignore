@@ -1,0 +1,12 @@
+# Personal memory data — do not share
+# These files accumulate your private job search data, career goals, and session history.
+# They are gitignored by default so you can share your customizations without leaking personal info.
+memory/job-search.md
+memory/ideas.md
+memory/corrections.md
+memory/profile.md
+memory/dsa-patterns.md
+memory/progress.md
+memory/system-design.md
+
+# memory/README.md is NOT gitignored — it documents the schema for collaborators
