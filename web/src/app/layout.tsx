@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Sidebar, MobileSidebar } from "@/components/layout/Sidebar";
 import "./globals.css";
 
 const inter = Inter({
@@ -33,7 +34,13 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${geist.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <Sidebar />
+        <MobileSidebar />
+        <main className="md:ml-56 min-h-screen pt-14 md:pt-0">
+          <div className="p-6">
+            {children}
+          </div>
+        </main>
       </body>
     </html>
   );
