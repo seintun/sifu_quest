@@ -1,0 +1,122 @@
+import { readMemoryFile } from './memory'
+import { parseDSAPatterns, parseProblemHistory } from './parsers/dsa-patterns'
+import { parseJobApplications } from './parsers/job-search'
+import { parsePlan } from './parsers/plan-parser'
+import { parseSystemDesign } from './parsers/system-design'
+import { getDay } from 'date-fns'
+
+export interface DashboardMetrics {
+  dsaPatternsTotal: number
+  dsaPatternsMastered: number
+  dsaPatternsInProgress: number
+  dsaProblemsCompleted: number
+  jobApplicationsTotal: number
+  jobApplicationsByStatus: Record<string, number>
+  systemDesignConceptsCovered: number
+  planItemsTotal: number
+  planItemsCompleted: number
+  currentStreak: number
+  todayFocus: { day: string; focus: string; time: string } | null
+  weeklyRhythm: Array<{ day: string; focus: string; time: string }>
+  currentMonth: number
+}
+
+export async function computeMetrics(): Promise<DashboardMetrics> {
+  const [dsaContent, jobContent, planContent, sysDesignContent] = await Promise.all([
+    readMemoryFile('dsa-patterns.md'),
+    readMemoryFile('job-search.md'),
+    readMemoryFile('plan.md'),
+    readMemoryFile('system-design.md'),
+  ])
+
+  // DSA metrics
+  const patterns = parseDSAPatterns(dsaContent)
+  const problems = parseProblemHistory(dsaContent)
+
+  const dsaPatternsTotal = patterns.length
+  const dsaPatternsMastered = patterns.filter(p => p.mastery === '🟢').length
+  const dsaPatternsInProgress = patterns.filter(p => p.mastery === '🟡').length
+
+  // Job metrics
+  const applications = parseJobApplications(jobContent)
+  const jobApplicationsByStatus: Record<string, number> = {}
+  for (const app of applications) {
+    jobApplicationsByStatus[app.status] = (jobApplicationsByStatus[app.status] || 0) + 1
+  }
+
+  // Plan metrics
+  const plan = parsePlan(planContent)
+  let planItemsTotal = 0
+  let planItemsCompleted = 0
+  for (const month of plan.months) {
+    for (const items of Object.values(month.categories)) {
+      planItemsTotal += items.length
+      planItemsCompleted += items.filter(item => item.checked).length
+    }
+  }
+  planItemsTotal += plan.immediateSteps.length
+  planItemsCompleted += plan.immediateSteps.filter(item => item.checked).length
+
+  // System design metrics
+  const sysDesign = parseSystemDesign(sysDesignContent)
+
+  // Today's focus from weekly rhythm
+  const dayIndex = getDay(new Date()) // 0=Sunday, 1=Monday, ...
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const todayName = dayNames[dayIndex]
+  const todayFocus = plan.weeklyRhythm.find(r =>
+    r.day.toLowerCase() === todayName.toLowerCase()
+  ) || null
+
+  // Calculate current streak from problem history dates
+  const currentStreak = computeStreak(problems.map(p => p.date))
+
+  // Determine which month we're in based on plan start
+  const now = new Date()
+  const month = now.getMonth() // 0-indexed
+  let currentMonth = 1
+  if (month >= 3 && month <= 4) currentMonth = 2 // April
+  if (month >= 4) currentMonth = 3 // May+
+
+  return {
+    dsaPatternsTotal,
+    dsaPatternsMastered,
+    dsaPatternsInProgress,
+    dsaProblemsCompleted: problems.length,
+    jobApplicationsTotal: applications.length,
+    jobApplicationsByStatus,
+    systemDesignConceptsCovered: sysDesign.concepts.length,
+    planItemsTotal,
+    planItemsCompleted,
+    currentStreak,
+    todayFocus,
+    weeklyRhythm: plan.weeklyRhythm,
+    currentMonth,
+  }
+}
+
+function computeStreak(dates: string[]): number {
+  if (dates.length === 0) return 0
+
+  const uniqueDates = [...new Set(dates)].sort().reverse()
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  let streak = 0
+  const checkDate = new Date(today)
+
+  for (let i = 0; i < 365; i++) {
+    const dateStr = checkDate.toISOString().split('T')[0]
+    if (uniqueDates.includes(dateStr)) {
+      streak++
+      checkDate.setDate(checkDate.getDate() - 1)
+    } else if (i === 0) {
+      // Today hasn't been logged yet, check from yesterday
+      checkDate.setDate(checkDate.getDate() - 1)
+    } else {
+      break
+    }
+  }
+
+  return streak
+}
