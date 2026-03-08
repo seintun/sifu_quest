@@ -113,3 +113,41 @@ export function parseSystemDesign(content: string): ParsedSystemDesign {
 
   return { concepts, discussions, gaps, referenceTopics }
 }
+
+export function addConceptToTable(
+  content: string,
+  concept: { concept: string; depthCovered: string; date: string; notes: string }
+): string {
+  const row = `| ${concept.concept} | ${concept.depthCovered} | ${concept.date} | ${concept.notes} |`
+
+  // Replace placeholder row if it exists
+  const placeholderRegex = /\| — \| — \| — \| — \|/
+  if (placeholderRegex.test(content)) {
+    return content.replace(placeholderRegex, row)
+  }
+
+  // Append after the last row of the Concepts Covered table
+  const lines = content.split('\n')
+  let lastTableRow = -1
+  let inConceptTable = false
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes('| Concept |') && lines[i].includes('| Depth')) {
+      inConceptTable = true
+      continue
+    }
+    if (inConceptTable && lines[i].startsWith('|')) {
+      lastTableRow = i
+    }
+    if (inConceptTable && !lines[i].startsWith('|') && lines[i].trim() !== '') {
+      break
+    }
+  }
+
+  if (lastTableRow !== -1) {
+    lines.splice(lastTableRow + 1, 0, row)
+    return lines.join('\n')
+  }
+
+  return content
+}
