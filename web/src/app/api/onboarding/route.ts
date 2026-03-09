@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { writeMemoryFile } from '@/lib/memory'
+import { getPlanTimelineMeta } from '@/lib/profile-timeline'
 import Anthropic from '@anthropic-ai/sdk'
 
 export const runtime = 'nodejs'
@@ -178,6 +179,11 @@ ${data.weaknesses.split(',').map(s => `- ${s.trim()}`).join('\n')}
 - (none yet)
 `
 
+    const timelineMeta = getPlanTimelineMeta(data.timeline)
+    const timelineStructureInstruction = timelineMeta.durationMonths
+      ? `Build exactly ${timelineMeta.durationMonths} monthly phases labeled "## Month 1 — ...", "## Month 2 — ...", up to Month ${timelineMeta.durationMonths}.`
+      : `Build phased milestones that explicitly align to the stated timeline: "${data.timeline}".`
+
     const client = new Anthropic()
     const planResponse = await client.messages.create({
       model: 'claude-sonnet-4-6',
@@ -196,6 +202,7 @@ ${data.weaknesses.split(',').map(s => `- ${s.trim()}`).join('\n')}
 
 Write a detailed plan with a # title reflecting the timeline, phase breakdowns (months/weeks),
 concrete weekly actions for DSA, system design, and job search. Include markdown links to resources.
+${timelineStructureInstruction}
 Format as clean markdown suitable for rendering.`
       }]
     })

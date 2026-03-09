@@ -29,7 +29,7 @@ const FILE_META: Record<string, { icon: React.ElementType; color: string; accent
   'dsa-patterns.md':  { icon: Code2,         color: 'text-dsa',     accent: 'border-dsa/30 bg-dsa/5',       label: 'DSA Patterns' },
   'job-search.md':    { icon: Briefcase,     color: 'text-jobs',    accent: 'border-jobs/30 bg-jobs/5',     label: 'Job Search' },
   'system-design.md': { icon: Network,       color: 'text-design',  accent: 'border-design/30 bg-design/5', label: 'System Design' },
-  'plan.md':          { icon: ClipboardList,  color: 'text-plan',    accent: 'border-plan/30 bg-plan/5',     label: '3-Month Plan' },
+  'plan.md':          { icon: ClipboardList,  color: 'text-plan',    accent: 'border-plan/30 bg-plan/5',     label: 'Plan' },
   'corrections.md':   { icon: AlertCircle,   color: 'text-warning', accent: 'border-warning/30 bg-warning/5', label: 'Corrections' },
   'ideas.md':         { icon: Lightbulb,     color: 'text-coach',   accent: 'border-coach/30 bg-coach/5',   label: 'Ideas' },
 }

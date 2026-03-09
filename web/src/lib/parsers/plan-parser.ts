@@ -73,8 +73,8 @@ export function parsePlan(content: string): ParsedPlan {
       }
     }
 
-    // Month headers: ## Month N —
-    const monthMatch = line.match(/^## Month (\d+)\s*[—–-]\s*(.+)\((\w+)\)/)
+    // Month headers: ## Month N — ...
+    const monthMatch = line.match(/^## Month (\d+)\s*[—–-]\s*(.+)$/i)
     if (monthMatch) {
       currentMonth = {
         month: parseInt(monthMatch[1]),

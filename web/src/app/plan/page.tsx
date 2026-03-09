@@ -162,6 +162,7 @@ export default function PlanPage() {
   }
 
   const title = extractTitle(rawContent)
+  const firstMonthValue = plan.months[0] ? `month${plan.months[0].month}` : ''
 
   // AI-generated plan: fall back to markdown rendering
   if (!hasStructuredContent(plan)) {
@@ -217,53 +218,55 @@ export default function PlanPage() {
       )}
 
       {/* Month Tabs */}
-      <Tabs defaultValue="month1">
-        <TabsList className="bg-elevated">
-          {plan.months.map(month => (
-            <TabsTrigger key={month.month} value={`month${month.month}`}>
-              Month {month.month}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      {plan.months.length > 0 && (
+        <Tabs defaultValue={firstMonthValue}>
+          <TabsList className="bg-elevated">
+            {plan.months.map(month => (
+              <TabsTrigger key={month.month} value={`month${month.month}`}>
+                Month {month.month}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-        {plan.months.map(month => {
-          const allItems = Object.values(month.categories).flat()
-          return (
-            <TabsContent key={month.month} value={`month${month.month}`} className="space-y-4 mt-4">
-              <div>
-                <h2 className="font-display text-lg font-semibold">{month.title}</h2>
-                {month.theme && <p className="text-sm text-muted-foreground">{month.theme}</p>}
-              </div>
+          {plan.months.map(month => {
+            const allItems = Object.values(month.categories).flat()
+            return (
+              <TabsContent key={month.month} value={`month${month.month}`} className="space-y-4 mt-4">
+                <div>
+                  <h2 className="font-display text-lg font-semibold">{month.title}</h2>
+                  {month.theme && <p className="text-sm text-muted-foreground">{month.theme}</p>}
+                </div>
 
-              <MonthProgress items={allItems} />
+                <MonthProgress items={allItems} />
 
-              {Object.entries(month.categories).map(([category, items]) => {
-                const domain = CATEGORY_DOMAINS[category] || 'streak'
-                const colors = DOMAIN_COLORS[domain]
+                {Object.entries(month.categories).map(([category, items]) => {
+                  const domain = CATEGORY_DOMAINS[category] || 'streak'
+                  const colors = DOMAIN_COLORS[domain]
 
-                return (
-                  <Card key={category} className={`${colors.bg} border ${colors.border}`}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className={`text-sm font-medium ${colors.text} flex items-center gap-2`}>
-                        <CheckCircle2 className="h-4 w-4" />
-                        {category}
-                        <Badge variant="outline" className="ml-auto text-xs">
-                          {items.filter(i => i.checked).length}/{items.length}
-                        </Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-0.5">
-                      {items.map(item => (
-                        <PlanCheckItem key={item.id} item={item} onToggle={handleToggle} />
-                      ))}
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </TabsContent>
-          )
-        })}
-      </Tabs>
+                  return (
+                    <Card key={category} className={`${colors.bg} border ${colors.border}`}>
+                      <CardHeader className="pb-2">
+                        <CardTitle className={`text-sm font-medium ${colors.text} flex items-center gap-2`}>
+                          <CheckCircle2 className="h-4 w-4" />
+                          {category}
+                          <Badge variant="outline" className="ml-auto text-xs">
+                            {items.filter(i => i.checked).length}/{items.length}
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-0.5">
+                        {items.map(item => (
+                          <PlanCheckItem key={item.id} item={item} onToggle={handleToggle} />
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </TabsContent>
+            )
+          })}
+        </Tabs>
+      )}
 
       {/* Immediate Steps */}
       {plan.immediateSteps.length > 0 && (

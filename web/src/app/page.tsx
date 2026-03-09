@@ -28,7 +28,9 @@ interface DashboardMetrics {
   currentStreak: number
   todayFocus: { day: string; focus: string; time: string } | null
   weeklyRhythm: Array<{ day: string; focus: string; time: string }>
+  planLabel: string
   currentMonth: number
+  currentPlanPeriodLabel: string
 }
 
 function MetricCard({
@@ -167,7 +169,7 @@ export default function DashboardPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-plan" />
-            3-Month Plan Progress
+            {metrics.planLabel} Progress
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -216,7 +218,7 @@ export default function DashboardPage() {
           <Card className="border-border bg-surface hover:border-plan/30 hover:shadow-glow-plan transition-all duration-200 cursor-pointer">
             <CardContent className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-plan border-plan/30">Month {metrics.currentMonth}</Badge>
+                <Badge variant="outline" className="text-plan border-plan/30">{metrics.currentPlanPeriodLabel}</Badge>
                 <span className="text-sm">View Plan</span>
               </div>
               <ArrowRight className="h-4 w-4 text-muted-foreground" />

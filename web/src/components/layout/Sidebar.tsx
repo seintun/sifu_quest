@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { getPlanTimelineMeta, parseProfileSnapshot } from '@/lib/profile-timeline'
 import {
   LayoutDashboard,
   Calendar,
@@ -15,7 +16,7 @@ import {
   Menu,
   X,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
 
 const NAV_ITEMS = [
@@ -24,7 +25,7 @@ const NAV_ITEMS = [
   { href: '/dsa',           label: 'DSA Tracker',    icon: Code2,           color: 'dsa' },
   { href: '/system-design', label: 'System Design',  icon: Network,         color: 'design' },
   { href: '/jobs',          label: 'Job Search',     icon: Briefcase,       color: 'jobs' },
-  { href: '/plan',          label: '3-Month Plan',   icon: ClipboardList,   color: 'plan' },
+  { href: '/plan',          label: 'Plan',           icon: ClipboardList,   color: 'plan' },
   { href: '/memory',        label: 'Memory',         icon: BookOpen,        color: 'streak' },
   { href: '/coach',         label: 'Coach Chat',     icon: MessageCircle,   color: 'coach' },
 ] as const
@@ -40,10 +41,29 @@ const COLOR_CLASSES: Record<string, { active: string; border: string }> = {
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
+  const [planLabel, setPlanLabel] = useState('Plan')
+
+  useEffect(() => {
+    let active = true
+
+    fetch('/api/memory?file=profile.md')
+      .then(res => res.json())
+      .then(data => {
+        if (!active) return
+        const profile = parseProfileSnapshot(typeof data.content === 'string' ? data.content : '')
+        setPlanLabel(getPlanTimelineMeta(profile.timeline).planLabel)
+      })
+      .catch(() => {})
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   return (
     <nav className="flex flex-col gap-1">
       {NAV_ITEMS.map((item) => {
+        const label = item.href === '/plan' ? planLabel : item.label
         const isActive = pathname === item.href
         const colors = COLOR_CLASSES[item.color]
         const Icon = item.icon
@@ -61,7 +81,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             )}
           >
             <Icon className="h-4 w-4" />
-            {item.label}
+            {label}
           </Link>
         )
       })}

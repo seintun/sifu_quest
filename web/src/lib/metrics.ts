@@ -3,6 +3,7 @@ import { parseDSAPatterns, parseProblemHistory } from './parsers/dsa-patterns'
 import { parseJobApplications } from './parsers/job-search'
 import { parsePlan } from './parsers/plan-parser'
 import { parseSystemDesign } from './parsers/system-design'
+import { getPlanProgressMeta, getPlanTimelineMeta, parseProfileSnapshot } from './profile-timeline'
 import { getDay } from 'date-fns'
 
 export interface DashboardMetrics {
@@ -18,15 +19,18 @@ export interface DashboardMetrics {
   currentStreak: number
   todayFocus: { day: string; focus: string; time: string } | null
   weeklyRhythm: Array<{ day: string; focus: string; time: string }>
+  planLabel: string
   currentMonth: number
+  currentPlanPeriodLabel: string
 }
 
 export async function computeMetrics(): Promise<DashboardMetrics> {
-  const [dsaContent, jobContent, planContent, sysDesignContent] = await Promise.all([
+  const [dsaContent, jobContent, planContent, sysDesignContent, profileContent] = await Promise.all([
     readMemoryFile('dsa-patterns.md'),
     readMemoryFile('job-search.md'),
     readMemoryFile('plan.md'),
     readMemoryFile('system-design.md'),
+    readMemoryFile('profile.md'),
   ])
 
   // DSA metrics
@@ -71,12 +75,10 @@ export async function computeMetrics(): Promise<DashboardMetrics> {
   // Calculate current streak from problem history dates
   const currentStreak = computeStreak(problems.map(p => p.date))
 
-  // Determine which month we're in based on plan start
-  const now = new Date()
-  const month = now.getMonth() // 0-indexed
-  let currentMonth = 1
-  if (month >= 3 && month <= 4) currentMonth = 2 // April
-  if (month >= 4) currentMonth = 3 // May+
+  // Timeline-driven plan labels/progress from profile metadata
+  const profile = parseProfileSnapshot(profileContent)
+  const timelineMeta = getPlanTimelineMeta(profile.timeline)
+  const progressMeta = getPlanProgressMeta(timelineMeta, profile.workspaceInitialized)
 
   return {
     dsaPatternsTotal,
@@ -91,7 +93,9 @@ export async function computeMetrics(): Promise<DashboardMetrics> {
     currentStreak,
     todayFocus,
     weeklyRhythm: plan.weeklyRhythm,
-    currentMonth,
+    planLabel: timelineMeta.planLabel,
+    currentMonth: progressMeta.currentMonth,
+    currentPlanPeriodLabel: progressMeta.currentPeriodLabel,
   }
 }
 
