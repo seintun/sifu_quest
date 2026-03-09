@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (isGreeting) {
-      systemPrompt += '\n\n---\n## Greeting Instruction\n\nThe user just opened this coaching mode. Write a warm, concise welcome (2-4 sentences). Reference their past progress from memory if relevant. End with one open question to kick off the session.'
+      systemPrompt += '\n\n---\n## Greeting Instruction\n\nThe user just opened this coaching mode. Write a warm, concise welcome (2-4 sentences). Do not use a canned opener like "Hey [Name]! Welcome back." Use the user\'s name only if it is explicitly present in memory; otherwise use a neutral greeting. Reference their past progress from memory if relevant. End with one open question to kick off the session.'
     }
 
     const client = new Anthropic({ apiKey })

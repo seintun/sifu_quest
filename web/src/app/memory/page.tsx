@@ -117,7 +117,8 @@ export default function MemoryPage() {
     fetch('/api/memory')
       .then(res => res.json())
       .then(data => {
-        const fileList = data.files || []
+        // plan.md has its own dedicated page — exclude it from the memory browser
+        const fileList = (data.files || []).filter((f: string) => f !== 'plan.md')
         setFiles(fileList)
         if (fileList.length > 0 && !selectedFile) {
           setSelectedFile(fileList[0])
