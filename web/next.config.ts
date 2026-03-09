@@ -14,9 +14,9 @@ const nextConfig: NextConfig = {
 export default withSentryConfig(nextConfig, {
   // For all available options, see:
   // https://github.com/getsentry/sentry-webpack-plugin#options
-  org: "claude-thinking-buddy",
-  project: "web",
-  silent: !process.env.CI,
+  org: process.env.SENTRY_ORG || "claude-thinking-buddy",
+  project: process.env.SENTRY_PROJECT || "web",
+  silent: process.env.NODE_ENV === 'production',
   widenClientFileUpload: true,
   disableLogger: true,
   automaticVercelMonitors: true,

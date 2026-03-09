@@ -81,7 +81,7 @@ export default function SettingsPage() {
     const { error } = await supabase.auth.linkIdentity({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/api/auth/callback/google`
+        redirectTo: `${window.location.origin}/api/link-google/callback`
       }
     })
     
