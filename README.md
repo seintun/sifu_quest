@@ -45,6 +45,23 @@ A visual dashboard shows your current streak, DSA patterns mastered, system desi
 
 ---
 
+## Security & Compliance
+
+Sifu Quest was designed from day one with data privacy and security as non-negotiable requirements.
+
+| Layer | How It's Protected |
+|-------|-------------------|
+| **API Key Storage** | User-provided Anthropic API keys are encrypted with **AES-256-CBC** using a unique random initialization vector (IV) per key before being stored. Plaintext keys are **never logged or persisted**. |
+| **Data Isolation** | Every database table uses Supabase **Row Level Security (RLS)**, guaranteeing that User A can never access User B's data — even through direct database queries. |
+| **Authentication** | Google OAuth 2.0 via NextAuth.js with JWT-based sessions. Tokens carry only the user's UUID — no sensitive data in the session payload. |
+| **Guest Guardrails** | Anonymous sessions are strictly sandboxed: **5 messages max** and a **30-minute TTL**, both enforced server-side. Guests cannot access other users' data. |
+| **GDPR Compliance** | One-click account deletion wipes **all** user data across every table (profile, chat history, memory files, progress, audit logs) and removes the authentication record entirely. |
+| **Audit Trail** | Sensitive operations — API key changes, account deletions, plan generation — are logged to a tamper-evident `audit_log` table for full traceability. |
+| **Error Monitoring** | Sentry captures errors across client, server, and edge runtimes with configurable sampling rates, providing observability without exposing user data. |
+| **Transport Security** | All traffic is served over **HTTPS** via Vercel's automatic TLS. Supabase connections use encrypted channels. |
+
+> For the full technical breakdown of the security model, see [TECHNICAL_DOCS.md](./TECHNICAL_DOCS.md#security-model).
+
 ## How It Works
 
 ```
