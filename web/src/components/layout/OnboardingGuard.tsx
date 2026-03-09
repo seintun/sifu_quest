@@ -9,22 +9,25 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const [checked, setChecked] = useState(false)
 
   useEffect(() => {
-    // Skip check for onboarding page and API routes
     if (pathname === '/onboarding' || pathname.startsWith('/api')) {
       setChecked(true)
       return
     }
 
-    fetch('/api/memory?file=profile.md')
-      .then(res => res.json())
-      .then(data => {
-        if (!data.content || !data.content.includes('**Name:**')) {
-          router.replace('/onboarding')
-        } else {
-          setChecked(true)
-        }
-      })
-      .catch(() => setChecked(true))
+    Promise.all([
+      fetch('/api/setup').then(r => r.json()),
+      fetch('/api/memory?file=profile.md').then(r => r.json()),
+    ]).then(([setup, profile]) => {
+      const ready =
+        setup.hasApiKey &&
+        profile.content &&
+        profile.content.includes('**Name:**')
+      if (!ready) {
+        router.replace('/onboarding')
+      } else {
+        setChecked(true)
+      }
+    }).catch(() => setChecked(true))
   }, [pathname, router])
 
   if (!checked && pathname !== '/onboarding') {

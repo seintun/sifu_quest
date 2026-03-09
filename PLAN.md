@@ -2,7 +2,7 @@
 
 ## Context
 
-Ricky's thinking-buddy repo is a markdown-based Claude Code coaching workspace (no existing code). The goal is to build a local web app (Next.js) that serves as a visual diary and dashboard for the job search journey — showing progress metrics, a calendar, domain-specific trackers, an interactive 3-month plan, and an integrated coaching chat. All data lives in the existing `/memory/*.md` files, which the app reads and selectively updates through structured UI interactions. The Memory Viewer page is **read-only** — no freeform editing. Updates to memory happen only through structured UI actions (plan checkboxes, DSA problem logging, job app forms) and the coaching chat.
+Thinking-buddy repo is a markdown-based Claude Code coaching workspace (no existing code). The goal is to build a local web app (Next.js) that serves as a visual diary and dashboard for the job search journey — showing progress metrics, a calendar, domain-specific trackers, an interactive 3-month plan, and an integrated coaching chat. All data lives in the existing `/memory/*.md` files, which the app reads and selectively updates through structured UI interactions. The Memory Viewer page is **read-only** — no freeform editing. Updates to memory happen only through structured UI actions (plan checkboxes, DSA problem logging, job app forms) and the coaching chat.
 
 ---
 

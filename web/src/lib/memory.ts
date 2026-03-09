@@ -2,7 +2,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
 
-const MEMORY_DIR = path.resolve(process.cwd(), process.env.MEMORY_DIR || '../memory')
+const getMemoryDir = () => path.resolve(process.cwd(), process.env.MEMORY_DIR || '../memory')
 const MODES_DIR = path.resolve(process.cwd(), process.env.MODES_DIR || '../modes')
 
 const ALLOWED_MEMORY_FILES = [
@@ -38,7 +38,7 @@ function validateModeFile(filename: string): void {
 
 export async function readMemoryFile(filename: string): Promise<string> {
   validateMemoryFile(filename)
-  const filePath = path.join(MEMORY_DIR, filename)
+  const filePath = path.join(getMemoryDir(), filename)
   try {
     return await fs.readFile(filePath, 'utf-8')
   } catch {
@@ -61,11 +61,12 @@ const writeLocks = new Map<string, Promise<void>>()
 
 export async function writeMemoryFile(filename: string, content: string): Promise<void> {
   validateMemoryFile(filename)
-  const filePath = path.join(MEMORY_DIR, filename)
+  const filePath = path.join(getMemoryDir(), filename)
 
   // Queue writes per file
   const existing = writeLocks.get(filename) || Promise.resolve()
   const writePromise = existing.then(async () => {
+    await fs.mkdir(getMemoryDir(), { recursive: true })
     // Atomic write: write to temp file then rename
     const tmpPath = path.join(os.tmpdir(), `memory-${filename}-${Date.now()}`)
     await fs.writeFile(tmpPath, content, 'utf-8')
@@ -88,7 +89,7 @@ export async function listMemoryFiles(): Promise<string[]> {
   const files: string[] = []
   for (const f of ALLOWED_MEMORY_FILES) {
     try {
-      await fs.access(path.join(MEMORY_DIR, f))
+      await fs.access(path.join(getMemoryDir(), f))
       files.push(f)
     } catch {
       // file doesn't exist, skip

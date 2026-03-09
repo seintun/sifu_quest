@@ -54,6 +54,11 @@ function serializeEnvFile(vars) {
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────
+// --check mode: called by `npm run dev` via predev hook.
+// Creates .env.local and memory dir if missing, then exits.
+// Only runs the full interview if no profile exists yet.
+const CHECK_MODE = process.argv.includes('--check')
+
 async function main() {
   const rl = createInterface({ input, output })
 
@@ -114,6 +119,11 @@ async function main() {
   } catch {}
 
   if (profileExists) {
+    if (CHECK_MODE) {
+      // predev hook: env and memory dir are ready, profile exists — nothing to do
+      rl.close()
+      process.exit(0)
+    }
     console.log(c('  A profile already exists at this memory location.', YELLOW))
     const ans = await rl.question(c('  Redo setup and overwrite? [y/N]: ', BOLD))
     if (!ans.trim().toLowerCase().startsWith('y')) {

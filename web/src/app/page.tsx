@@ -143,7 +143,7 @@ export default function DashboardPage() {
         <MetricCard
           title="Applications"
           value={metrics.jobApplicationsTotal}
-          subtitle={Object.entries(metrics.jobApplicationsByStatus).map(([k, v]) => `${v} ${k}`).join(', ') || 'None yet'}
+          subtitle={Object.entries(metrics.jobApplicationsByStatus ?? {}).map(([k, v]) => `${v} ${k}`).join(', ') || 'None yet'}
           icon={Briefcase}
           domain="jobs"
         />
