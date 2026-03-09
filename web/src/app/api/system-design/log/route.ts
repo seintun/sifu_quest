@@ -1,11 +1,19 @@
 import { readMemoryFile, writeMemoryFile } from '@/lib/memory'
 import { addConceptToTable } from '@/lib/parsers/system-design'
+import { logAuditEvent, logProgressEvent } from '@/lib/progress'
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '../../auth/[...nextauth]/route'
 
 export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const userId = session.user.id
+
     const body = await request.json()
     const { concept, depthCovered, notes } = body
 
@@ -16,7 +24,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const content = await readMemoryFile('system-design.md')
+    const content = await readMemoryFile(userId, 'system-design.md')
     const date = new Date().toISOString().split('T')[0]
     const updated = addConceptToTable(content, {
       concept,
@@ -25,7 +33,10 @@ export async function POST(request: NextRequest) {
       notes: notes || '',
     })
 
-    await writeMemoryFile('system-design.md', updated)
+    await writeMemoryFile(userId, 'system-design.md', updated, 'sys_design')
+
+    await logProgressEvent(userId, 'system_design_logged', 'system-design', { concept, depthCovered })
+    await logAuditEvent(userId, 'update_memory', 'system-design.md', { action: 'logged_sys_design' })
 
     return NextResponse.json({ success: true })
   } catch (error) {

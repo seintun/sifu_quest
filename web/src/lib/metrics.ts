@@ -1,10 +1,10 @@
+import { getDay } from 'date-fns'
 import { readMemoryFile } from './memory'
 import { parseDSAPatterns, parseProblemHistory } from './parsers/dsa-patterns'
 import { parseJobApplications } from './parsers/job-search'
 import { parsePlan } from './parsers/plan-parser'
 import { parseSystemDesign } from './parsers/system-design'
 import { getPlanProgressMeta, getPlanTimelineMeta, parseProfileSnapshot } from './profile-timeline'
-import { getDay } from 'date-fns'
 
 export interface DashboardMetrics {
   dsaPatternsTotal: number
@@ -24,13 +24,13 @@ export interface DashboardMetrics {
   currentPlanPeriodLabel: string
 }
 
-export async function computeMetrics(): Promise<DashboardMetrics> {
+export async function computeMetrics(userId: string): Promise<DashboardMetrics> {
   const [dsaContent, jobContent, planContent, sysDesignContent, profileContent] = await Promise.all([
-    readMemoryFile('dsa-patterns.md'),
-    readMemoryFile('job-search.md'),
-    readMemoryFile('plan.md'),
-    readMemoryFile('system-design.md'),
-    readMemoryFile('profile.md'),
+    readMemoryFile(userId, 'dsa-patterns.md'),
+    readMemoryFile(userId, 'job-search.md'),
+    readMemoryFile(userId, 'plan.md'),
+    readMemoryFile(userId, 'system-design.md'),
+    readMemoryFile(userId, 'profile.md'),
   ])
 
   // DSA metrics
@@ -72,8 +72,28 @@ export async function computeMetrics(): Promise<DashboardMetrics> {
     r.day.toLowerCase() === todayName.toLowerCase()
   ) || null
 
-  // Calculate current streak from problem history dates
-  const currentStreak = computeStreak(problems.map(p => p.date))
+  // Calculate current streak from progress_events
+  const supabase = await import('./supabase').then(m => m.createClient())
+  const db = await supabase
+  const { data: events } = await db
+    .from('progress_events')
+    .select('occurred_at')
+    .eq('user_id', userId)
+
+  const eventDates = (events || []).map(e => {
+    // occurred_at is a TIMESTAMPTZ, so convert to YYYY-MM-DD
+    return new Date(e.occurred_at).toISOString().split('T')[0]
+  })
+
+  // We should also include any dates parsed from files *before* the DB migration
+  // to preserve old streaks, combining them into one Set
+  const legacyDates = [
+    ...problems.map(p => p.date),
+    ...applications.map(a => a.dateApplied || ''),
+    ...sysDesign.concepts.map(c => c.date || '')
+  ].filter(d => Boolean(d) && d !== '—')
+
+  const currentStreak = computeStreak([...legacyDates, ...eventDates])
 
   // Timeline-driven plan labels/progress from profile metadata
   const profile = parseProfileSnapshot(profileContent)

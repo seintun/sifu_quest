@@ -61,7 +61,8 @@ export default function CalendarPage() {
       fetch('/api/memory?file=dsa-patterns.md').then(r => r.json()),
       fetch('/api/memory?file=job-search.md').then(r => r.json()),
       fetch('/api/memory?file=system-design.md').then(r => r.json()),
-    ]).then(([dsaData, jobData, sdData]) => {
+      fetch('/api/progress/events').then(r => r.json())
+    ]).then(([dsaData, jobData, sdData, progressEvents]) => {
       const problems: ProblemAttempt[] = parseProblemHistory(dsaData.content || '')
       const apps: JobApplication[] = parseJobApplications(jobData.content || '')
       const sdParsed = parseSystemDesign(sdData.content || '')
@@ -99,6 +100,27 @@ export default function CalendarPage() {
         }
       }
 
+      // Merge progress_events data
+      if (Array.isArray(progressEvents)) {
+        for (const ev of progressEvents) {
+          const dateStr = new Date(ev.occurred_at).toISOString().split('T')[0]
+          const existing = actMap.get(dateStr) || emptyActivity(new Date(dateStr))
+          
+          if (ev.domain === 'dsa') {
+            existing.dsa++
+            existing.dsaEntries.push(ev.payload?.problem || 'Problem')
+          } else if (ev.domain === 'jobs') {
+            existing.jobs++
+            existing.jobEntries.push(`${ev.payload?.company || ''} — ${ev.payload?.role || 'Application'}`)
+          } else if (ev.domain === 'system-design') {
+            existing.design++
+            existing.designEntries.push(ev.payload?.concept || 'Concept')
+          }
+          
+          actMap.set(dateStr, existing)
+        }
+      }
+
       setActivities(actMap)
 
       // Compute streak
@@ -120,7 +142,9 @@ export default function CalendarPage() {
         }
       }
       setStreak(s)
-    }).catch(() => {})
+    }).catch(err => {
+      console.error('Failed to load calendar data', err)
+    })
   }, [])
 
   const monthStart = startOfMonth(currentMonth)
