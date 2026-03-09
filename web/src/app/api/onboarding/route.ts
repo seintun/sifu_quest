@@ -226,6 +226,10 @@ Format as clean markdown suitable for rendering.`
       writeMemoryFile(userId, 'plan.md', planContent, 'onboarding'),
     ])
 
+    const { logProgressEvent, logAuditEvent } = await import('@/lib/progress')
+    await logProgressEvent(userId, 'onboarding_complete', 'onboarding')
+    await logAuditEvent(userId, 'account', 'profile', { action: 'onboarding_completed' })
+
     return NextResponse.json({ success: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
