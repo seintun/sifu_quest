@@ -3,13 +3,14 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { useChat, type ChatMessage } from '@/hooks/useChat'
 import 'highlight.js/styles/github-dark.css'
 import { MessageCircle, Send, Square, Trash2 } from 'lucide-react'
@@ -121,7 +122,7 @@ function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreamin
 export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
   const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
-  const { messages, isStreaming, isLoaded, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
+  const { messages, isStreaming, isLoaded, upgradeRequired, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
   const hasGreetedRef = useRef<string | null>(null)
   const [input, setInput] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -200,9 +201,15 @@ export default function CoachPage() {
       {/* Chat Area */}
       <Card className="flex-1 border-border bg-background overflow-hidden flex flex-col min-h-0">
         <CardContent className="p-0 flex-1 flex flex-col min-h-0">
-          {/* Scrollable messages */}
-          <div
-            ref={scrollContainerRef}
+          {upgradeRequired ? (
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-center min-h-0">
+               <UpgradePrompt />
+            </div>
+          ) : (
+            <>
+              {/* Scrollable messages */}
+              <div
+                ref={scrollContainerRef}
             className="flex-1 overflow-y-auto p-4 min-h-0"
           >
             <div className="space-y-4">
@@ -263,6 +270,8 @@ export default function CoachPage() {
               )}
             </div>
           </div>
+          </>
+          )}
         </CardContent>
       </Card>
     </div>
