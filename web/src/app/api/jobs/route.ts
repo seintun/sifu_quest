@@ -2,7 +2,7 @@ import { readMemoryFile, writeMemoryFile } from '@/lib/memory'
 import { addApplication, updateApplicationStatus } from '@/lib/parsers/job-search'
 import { logAuditEvent, logProgressEvent } from '@/lib/progress'
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '../auth/[...nextauth]/route'
+import { auth } from '@/auth'
 
 export const runtime = 'nodejs'
 

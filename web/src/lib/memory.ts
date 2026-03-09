@@ -53,22 +53,13 @@ export async function readMemoryFile(userId: string, filename: string): Promise<
 export async function readModeFile(filename: string): Promise<string> {
   validateModeFile(filename)
   
-  // They have been moved to src/modes/ but Next.js server components can dynamically read them 
-  // via fs at runtime *if* they are in the project root. However, Vercel edge/serverless 
-  // can lose track of raw dynamic fs reads unless specifically bundled. 
-  // The safest pattern is to import them as static strings via webpack, but since 
-  // this is a nodejs runtime API route, we can fetch from process.cwd() IF we ensure 
-  // the files exist in the build output. For now, we will use a hardcoded lookup map:
-  
   try {
-    const rawModeFiles: Record<string, string> = {
-      'dsa.md': require('../modes/dsa.md').default,
-      'interview-prep.md': require('../modes/interview-prep.md').default,
-      'system-design.md': require('../modes/system-design.md').default,
-      'job-search.md': require('../modes/job-search.md').default,
-      'business-ideas.md': require('../modes/business-ideas.md').default,
-    }
-    return rawModeFiles[filename] || ''
+    const { readFile } = await import('fs/promises')
+    const { join } = await import('path')
+    
+    const filePath = join(process.cwd(), 'src', 'modes', filename)
+    const content = await readFile(filePath, 'utf-8')
+    return content
   } catch (error) {
     console.warn(`Failed to read mode file matching ${filename}:`, error)
     return ''

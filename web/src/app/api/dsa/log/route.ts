@@ -4,7 +4,7 @@ import { appendProblemToHistory, parseDSAPatterns, updatePatternMastery } from '
 import { logAuditEvent, logProgressEvent } from '@/lib/progress'
 import type { MasteryLevel } from '@/lib/theme'
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '../../auth/[...nextauth]/route'
+import { auth } from '@/auth'
 
 export const runtime = 'nodejs'
 

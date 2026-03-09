@@ -1,7 +1,7 @@
 import { encryptKey } from '@/lib/apikey'
 import { createClient } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '../[...nextauth]/route'
+import { auth } from '@/auth'
 
 export const runtime = 'nodejs'
 

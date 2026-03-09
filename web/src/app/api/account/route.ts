@@ -1,6 +1,6 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '../auth/[...nextauth]/route'
+import { auth } from '@/auth'
 
 export const runtime = 'nodejs'
 
