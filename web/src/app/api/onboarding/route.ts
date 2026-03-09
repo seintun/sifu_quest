@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { writeMemoryFile } from '@/lib/memory'
+import Anthropic from '@anthropic-ai/sdk'
 
 export const runtime = 'nodejs'
+export const maxDuration = 60
 
 interface OnboardingData {
   name: string
   situation: string
+  experience: string
+  techStack: string
+  goals: string
   targetRoles: string
-  language: string
   targetCompanies: string
   timeline: string
+  hoursPerWeek: string
+  language: string
+  learningStyle: string
   strengths: string
   weaknesses: string
 }
@@ -27,11 +34,15 @@ export async function POST(request: NextRequest) {
 ## Career Context & Goals
 
 - **Name:** ${data.name}
-- **Focus:** ${data.situation}
+- **Situation:** ${data.situation}
+- **Experience:** ${data.experience}
+- **Tech stack:** ${data.techStack}
+- **Goals:** ${data.goals}
 - **Target roles:** ${data.targetRoles}
-- **Interview language:** ${data.language}
 - **Target companies:** ${data.targetCompanies}
 - **Timeline:** ${data.timeline}
+- **Hours/week:** ${data.hoursPerWeek}
+- **Interview language:** ${data.language}
 
 ---
 
@@ -49,8 +60,7 @@ ${data.weaknesses.split(',').map(s => `- ${s.trim()}`).join('\n')}
 
 ## Learning Style
 
-- Prefers: thinking out loud together, collaborative exploration
-- Hints before full answers
+- ${data.learningStyle}
 
 ---
 
@@ -100,9 +110,106 @@ ${data.weaknesses.split(',').map(s => `- ${s.trim()}`).join('\n')}
 - Sessions completed: 0
 `
 
+    const dsaPatternsContent = `# DSA Patterns
+
+> Auto-maintained by Claude.
+
+---
+
+## Mastered
+- (none yet)
+
+## In Progress
+- Getting started
+
+## Suggested Next
+- Arrays & Hashing
+`
+
+    const jobSearchContent = `# Job Search
+
+> Auto-maintained by Claude.
+
+---
+
+## Status
+- ${data.situation}
+
+## Target Roles
+- ${data.targetRoles}
+
+## Target Companies
+- ${data.targetCompanies}
+
+## Applications
+- (none yet)
+`
+
+    const systemDesignContent = `# System Design
+
+> Auto-maintained by Claude.
+
+---
+
+## Concepts Covered
+- (none yet)
+
+## Suggested Next
+- Fundamentals: scalability, load balancing, databases
+`
+
+    const ideasContent = `# Ideas
+
+> Auto-maintained by Claude.
+
+---
+
+## Explored
+- (none yet)
+`
+
+    const correctionsContent = `# Corrections
+
+> Auto-maintained by Claude.
+
+---
+
+## Log
+- (none yet)
+`
+
+    const client = new Anthropic()
+    const planResponse = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2048,
+      messages: [{
+        role: 'user',
+        content: `Generate a personalized interview prep game plan in markdown for:
+- Name: ${data.name}
+- Timeline: ${data.timeline}
+- Goals: ${data.goals}
+- Experience: ${data.experience}
+- Hours/week: ${data.hoursPerWeek}
+- Tech stack: ${data.techStack}
+- Strengths: ${data.strengths}
+- Weaknesses: ${data.weaknesses}
+
+Write a detailed plan with a # title reflecting the timeline, phase breakdowns (months/weeks),
+concrete weekly actions for DSA, system design, and job search. Include markdown links to resources.
+Format as clean markdown suitable for rendering.`
+      }]
+    })
+    const planContent = (planResponse.content[0] as { type: 'text'; text: string }).text
+
     await Promise.all([
       writeMemoryFile('profile.md', profileContent),
       writeMemoryFile('progress.md', progressContent),
+      writeMemoryFile('dsa-patterns.md', dsaPatternsContent),
+      writeMemoryFile('job-search.md', jobSearchContent),
+      writeMemoryFile('system-design.md', systemDesignContent),
+      writeMemoryFile('ideas.md', ideasContent),
+      writeMemoryFile('corrections.md', correctionsContent),
+      writeMemoryFile('plan.md', planContent),
     ])
 
     return NextResponse.json({ success: true })

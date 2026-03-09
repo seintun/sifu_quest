@@ -42,20 +42,29 @@ export async function POST(request: NextRequest) {
       }
 
       const memoryParts: string[] = []
+      let profileContent = ''
       for (const memFile of modeConfig.memory) {
         const content = await readMemoryFile(memFile)
         if (content) {
           memoryParts.push(`### ${memFile}\n${content}`)
+          if (memFile === 'profile.md') profileContent = content
         }
       }
 
       if (memoryParts.length > 0) {
         systemPrompt += '\n\n---\n## Current Memory Context\n\n' + memoryParts.join('\n\n')
       }
-    }
 
-    if (isGreeting) {
-      systemPrompt += '\n\n---\n## Greeting Instruction\n\nThe user just opened this coaching mode. Write a warm, concise welcome (2-4 sentences). Do not use a canned opener like "Hey [Name]! Welcome back." Use the user\'s name only if it is explicitly present in memory; otherwise use a neutral greeting. Reference their past progress from memory if relevant. End with one open question to kick off the session.'
+      if (isGreeting) {
+        const nameMatch = profileContent.match(/\*\*Name:\*\*\s*(.+)/)
+        const userName = nameMatch ? nameMatch[1].trim() : null
+        const nameInstruction = userName
+          ? `Greet the user as "${userName}" — this name comes directly from their memory profile.`
+          : 'No name found in memory — use a neutral greeting without fabricating a name.'
+        systemPrompt += `\n\n---\n## Greeting Instruction\n\nThe user just opened this coaching mode. Write a warm, concise welcome (2-4 sentences). ${nameInstruction} Reference their past progress from memory if relevant. End with one open question to kick off the session.`
+      }
+    } else if (isGreeting) {
+      systemPrompt += '\n\n---\n## Greeting Instruction\n\nThe user just opened this coaching mode. Write a warm, concise welcome (2-4 sentences). Use a neutral greeting. End with one open question to kick off the session.'
     }
 
     const client = new Anthropic({ apiKey })

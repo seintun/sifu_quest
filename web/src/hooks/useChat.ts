@@ -33,6 +33,7 @@ export function useChat(mode: string) {
   useEffect(() => {
     if (typeof window === 'undefined') return
     abortRef.current?.abort()
+    setIsStreaming(false)
     try {
       const stored = localStorage.getItem(`${STORAGE_PREFIX}${mode}`)
       setMessages(stored ? JSON.parse(stored) : [])
@@ -119,8 +120,10 @@ export function useChat(mode: string) {
         setMessages([...newMessages, { role: 'assistant', content: `Error: ${err.message}` }])
       }
     } finally {
-      setIsStreaming(false)
-      abortRef.current = null
+      if (abortRef.current === controller) {
+        setIsStreaming(false)
+        abortRef.current = null
+      }
     }
   }, [messages, mode])
 
@@ -191,8 +194,10 @@ export function useChat(mode: string) {
         setMessages([{ role: 'assistant', content: `Error: ${err.message}` }])
       }
     } finally {
-      setIsStreaming(false)
-      abortRef.current = null
+      if (abortRef.current === controller) {
+        setIsStreaming(false)
+        abortRef.current = null
+      }
     }
   }, [isStreaming, mode])
 
