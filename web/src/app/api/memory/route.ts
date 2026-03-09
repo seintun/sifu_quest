@@ -1,19 +1,26 @@
+import { auth } from '@/auth'
+import { listMemoryFiles, readMemoryFile } from '@/lib/memory'
 import { NextRequest, NextResponse } from 'next/server'
-import { readMemoryFile, listMemoryFiles } from '@/lib/memory'
 
 export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const userId = session.user.id
+
   const file = request.nextUrl.searchParams.get('file')
 
   if (!file) {
     // Return list of available files
-    const files = await listMemoryFiles()
+    const files = await listMemoryFiles(userId)
     return NextResponse.json({ files })
   }
 
   try {
-    const content = await readMemoryFile(file)
+    const content = await readMemoryFile(userId, file)
     return NextResponse.json({ file, content })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

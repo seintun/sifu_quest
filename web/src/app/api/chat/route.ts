@@ -3,7 +3,7 @@ import { readMemoryFile, readModeFile } from '@/lib/memory'
 import { createClient } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest } from 'next/server'
-import { auth } from '../auth/[...nextauth]/route'
+import { auth } from '@/auth'
 
 export const runtime = 'nodejs'
 

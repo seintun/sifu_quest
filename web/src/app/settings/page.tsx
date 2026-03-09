@@ -74,9 +74,9 @@ export default function SettingsPage() {
 
   const handleLinkGoogle = async () => {
     // We need to use the actual Supabase client here directly as NextAuth doesn't natively 
-    // expose linkIdentity. We'll load it dynamically to keep the bundle small.
-    const { createClient } = await import('@/lib/supabase')
-    const supabase = await createClient()
+    // expose linkIdentity.
+    const { createClientBrowser } = await import('@/lib/supabase-browser')
+    const supabase = createClientBrowser()
     
     const { error } = await supabase.auth.linkIdentity({
       provider: 'google',

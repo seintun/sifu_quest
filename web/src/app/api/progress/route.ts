@@ -1,6 +1,6 @@
 import { computeMetrics } from '@/lib/metrics'
 import { NextResponse } from 'next/server'
-import { auth } from '../auth/[...nextauth]/route'
+import { auth } from '@/auth'
 
 export const runtime = 'nodejs'
 
