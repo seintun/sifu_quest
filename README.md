@@ -1,167 +1,117 @@
-# Sifu Quest — Your Path to Mastery
+# Sifu Quest
 
-An AI-powered job search and interview prep workspace built on top of Claude Code. Clone it, run `/start`, and you have a personalized coaching system that remembers your strengths, tracks your progress, and adapts to how you learn.
-
----
-
-## What Is This?
-
-A structured Claude Code workspace that turns Claude into your dedicated interview prep partner. It supports:
-
-- **DSA coaching** — Socratic hints-first approach, pattern tracking, calibrated scaffolding
-- **Mock interviews** — Behavioral (STAR), system design, and technical rounds
-- **System design** — Whiteboarding partner with trade-off analysis
-- **Job search management** — Application tracking, company research, fit analysis
-- **Resume review** — Bullet rewrites, impact framing, tailoring to specific JDs
-- **Business ideas** — Brainstorming and validation thinking
-
-Claude reads your profile and memory files at the start of each session, so it always knows where you left off.
+**Your path to mastery.** An AI-powered career coaching platform that remembers where you left off, tracks your growth, and adapts to how you learn — so you never prep alone again.
 
 ---
 
-## Prerequisites
+## The Problem
 
-- [Claude Code](https://docs.anthropic.com/claude-code) installed (`npm install -g @anthropic-ai/claude-code`)
-- A Claude subscription (Pro or higher recommended)
+Breaking into top-tier tech companies is brutal. You're juggling LeetCode grinding, system design prep, behavioral interview practice, job applications, and resume tailoring — all at once. Most people end up with a messy spreadsheet, 47 browser tabs, and zero sense of whether they're actually making progress.
+
+Existing tools don't help much either:
+
+- **LeetCode** tracks _problems solved_, not _patterns mastered_
+- **ChatGPT/Claude** are powerful but stateless — every session starts from scratch
+- **Notion/spreadsheets** require constant manual upkeep that falls apart under stress
+- **Paid coaching** costs $200+/hr and doesn't scale to daily practice
+
+You need a system that **knows you** — your strengths, your gaps, your timeline — and coaches you through the entire journey without losing context between sessions.
 
 ---
 
-## Quick Setup
+## What Sifu Quest Does
 
-```bash
-# 1. Clone the repo
-git clone https://github.com/seintun/sifu-quest.git
-cd sifu-quest
+Sifu Quest is an AI career coach powered by Claude that **remembers everything**. It turns scattered interview prep into a structured, trackable path to mastery.
 
-# 2. Open Claude Code
-claude
+### 🧠 It Remembers You
+Your profile, learning style, career goals, and technical strengths are stored persistently. Every session picks up exactly where you left off — no re-explaining, no wasted time.
 
-# 3. Run the onboarding command
-/start
-```
+### 📊 It Tracks Your Progress
+A visual dashboard shows your current streak, DSA patterns mastered, system design concepts covered, job applications submitted, and daily focus schedule — all auto-updated as you work.
 
-That's it. The `/start` command interviews you, then writes your personal profile into the memory files. From that point on, every session is context-aware.
+### 🎯 Five Coaching Modes
+| Mode | What It Does |
+|------|-------------|
+| **DSA & LeetCode** | Socratic hints-first coaching with pattern tracking across problems |
+| **System Design** | Whiteboarding partner with trade-off analysis and concept tracking |
+| **Interview Prep** | Mock behavioral rounds using the STAR method |
+| **Job Search** | Application tracking, company research, and strategy |
+| **Business Ideas** | Brainstorming and validation for side projects |
+
+### 🔒 Your Data, Your Keys
+- **Guest users** can try the app with 5 free messages — no signup required
+- **Logged-in users** bring their own Anthropic API key — your data stays encrypted and private
+- **GDPR compliant** — delete your account and all data with one click
 
 ---
 
 ## How It Works
 
-### Directory Structure
-
 ```
-sifu-quest/
-├── CLAUDE.md                    # Master instructions for Claude (routing, rules)
-├── modes/                       # Mode-specific coaching prompts
-│   ├── dsa.md                   # DSA/LeetCode coaching rules
-│   ├── interview-prep.md        # Mock interview framework
-│   ├── system-design.md         # System design coaching
-│   ├── job-search.md            # Job search strategy
-│   └── business-ideas.md        # Idea brainstorming
-├── .claude/
-│   ├── agents/                  # Subagents for one-shot tasks
-│   │   ├── resume-reviewer.md
-│   │   ├── job-fit-analyzer.md
-│   │   └── problem-generator.md
-│   └── commands/
-│       └── start.md             # /start onboarding command
-└── memory/                      # Your personal data (gitignored)
-    ├── README.md                # Memory schema reference
-    ├── profile.md               # Who you are + career goals
-    ├── progress.md              # What's mastered, in progress, next
-    ├── dsa-patterns.md          # Pattern mastery tracking
-    ├── job-search.md            # Applications + decisions
-    ├── system-design.md         # Concepts covered
-    ├── ideas.md                 # Business ideas explored
-    └── corrections.md           # Claude's mistakes + fixes
+You ←→ Sifu Quest (Next.js on Vercel) ←→ Claude AI (Anthropic)
+                    ↕
+              Supabase (PostgreSQL)
+           Your profile, progress, chat history
 ```
 
-### Session Modes
+1. **Sign in** with Google or try as a Guest
+2. **Complete onboarding** — Sifu asks a few questions and builds your personalized coaching profile
+3. **Pick a mode** (DSA, System Design, Interview, Job Search, or Business Ideas)
+4. **Start learning** — Sifu reads your profile and memory files to give you context-aware coaching
+5. **Track progress** — your dashboard updates automatically as you log problems, toggle plan items, and chat
 
-Say any of these to Claude at the start of a session:
-
-| What you say | What Claude activates |
-|---|---|
-| "Let's do DSA" / "LeetCode practice" | DSA coaching mode — hints-first, pattern tracking |
-| "Mock interview" / "Behavioral prep" | Interview prep mode — STAR method, question bank |
-| "System design" / "Let's design X" | System design mode — whiteboarding partner |
-| "Job search" / "Application help" | Job search mode — tracking, research, strategy |
-| "Business idea" / "Startup thinking" | Business ideas mode — brainstorming, validation |
-
-Claude reads the relevant mode file + your memory files automatically.
-
-### Subagents (Auto-Triggered)
-
-These fire automatically when you use the right phrases — no manual activation needed:
-
-| Agent | Trigger phrases |
-|---|---|
-| **resume-reviewer** | "review this bullet", "improve my resume", "rewrite this for [company]" |
-| **job-fit-analyzer** | "does this job fit me", "analyze this JD", sharing a job URL |
-| **problem-generator** | "give me a problem", "what should I practice", "quiz me" |
-
-### Memory System (Self-Learning Loop)
-
-After each substantive session, Claude updates the relevant memory files:
-
-- Your **profile** is updated when career goals or learning preferences change
-- **DSA patterns** are updated after every problem (mastery level, problem history)
-- **Progress** is updated to reflect what's been covered and what's next
-- **Job search** is updated with new applications, decisions, or company research
-- **Corrections** logs any mistakes Claude made so it doesn't repeat them
-
-You can also edit memory files manually at any time — Claude treats them as ground truth.
+Everything is saved in the cloud. Close your laptop, come back tomorrow, and Sifu picks up right where you left off.
 
 ---
 
-## Your First Session
+## Quick Start
 
-After cloning, run `/start` in Claude Code. Claude will ask you a series of questions one at a time and write your profile automatically.
+### Try It (Hosted)
+Visit the deployed app and start a Guest session — no account needed.
 
-If you prefer to seed it manually, paste this into Claude Code:
-
+### Run It Yourself
+```bash
+git clone https://github.com/seintun/sifu-quest.git
+cd sifu-quest/web
+npm install
+npm run dev
 ```
-Please initialize my workspace. Read memory/profile.md to see the template fields,
-then ask me the following questions one at a time (wait for my answer before continuing):
-1. What's your name or what should I call you?
-2. What's your current situation? (employed + job hunting, laid off, new grad, career switcher, etc.)
-3. What roles are you targeting? (e.g., senior frontend, full-stack, backend, staff+)
-4. What's your primary programming language? Is that also what you want to use for DSA/LeetCode?
-5. What companies or company tiers are you targeting? (e.g., FAANG, Series B startups, fintech)
-6. What's your rough timeline? (actively interviewing, 3 months out, just exploring)
-7. What are 2-3 of your strongest technical areas?
-8. What are 1-2 areas that need work before interviews?
 
-After I answer all questions, write a fully populated memory/profile.md and an initial
-memory/progress.md. Then summarize my profile and suggest a first action.
-```
+> **Full setup instructions** (including how to get API keys from Google, Supabase, Anthropic, and Sentry) are in the **[Setup Guide](./SETUP.md)**.
 
 ---
 
-## Customizing
+## Documentation
 
-### Adding a new mode
-
-1. Create `modes/your-mode.md` with coaching rules for that domain
-2. Add a row to the Session Routing table in `CLAUDE.md`
-3. Add a corresponding memory file if you want persistence
-
-### Editing agent behavior
-
-Open `.claude/agents/<agent-name>.md` and modify the system prompt. Agents are stateless — they receive the current conversation context and return a result.
-
-### Extending memory schema
-
-Add new fields to any `memory/*.md` file. Claude will pick them up automatically since it reads the full file contents. Document new fields in `memory/README.md`.
+| Document | What's Inside |
+|----------|--------------|
+| **[SETUP.md](./SETUP.md)** | Step-by-step local dev and Vercel production setup, including how to obtain every API key |
+| **[TECHNICAL_DOCS.md](./TECHNICAL_DOCS.md)** | Architecture diagrams, database schema, API reference, security model |
+| **[DEPLOYMENT.md](./DEPLOYMENT.md)** | Quick-reference for Vercel environment variables |
 
 ---
 
-## Tips for Best Results
+## Tech Stack
 
-- **Start each session with context**: "I'm continuing DSA from yesterday, I was on binary search" — Claude loads memory but a quick framing helps
-- **Use the hint ladder**: In DSA mode, resist asking for the answer. The hints-first approach builds real retention
-- **Log corrections in the moment**: If Claude gets something wrong, say "that's incorrect — [correction]" and it will update `memory/corrections.md`
-- **Re-run `/start` if your situation changes**: Got a new job offer? Changed target companies? Re-run `/start` to update your profile
-- **Memory files are yours**: They're gitignored by default. Edit them directly anytime to correct or add context
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS |
+| Backend | Next.js API Routes (serverless on Vercel) |
+| Database | Supabase (PostgreSQL with Row Level Security) |
+| AI | Claude by Anthropic |
+| Auth | NextAuth.js + Supabase Auth (Google OAuth + Anonymous) |
+| Monitoring | Sentry |
+| Encryption | AES-256-CBC for stored API keys |
+
+---
+
+## Contributing
+
+1. Fork the repo
+2. Create a feature branch (`git checkout -b feature/my-feature`)
+3. Commit your changes (`git commit -m 'feat: add my feature'`)
+4. Push to the branch (`git push origin feature/my-feature`)
+5. Open a Pull Request
 
 ---
 
