@@ -14,7 +14,7 @@ const MODE_TO_FILES: Record<string, { mode: string; memory: string[] }> = {
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, mode } = await request.json()
+    const { messages, mode, isGreeting } = await request.json()
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: 'Messages required' }), {
@@ -52,6 +52,10 @@ export async function POST(request: NextRequest) {
       if (memoryParts.length > 0) {
         systemPrompt += '\n\n---\n## Current Memory Context\n\n' + memoryParts.join('\n\n')
       }
+    }
+
+    if (isGreeting) {
+      systemPrompt += '\n\n---\n## Greeting Instruction\n\nThe user just opened this coaching mode. Write a warm, concise welcome (2-4 sentences). Reference their past progress from memory if relevant. End with one open question to kick off the session.'
     }
 
     const client = new Anthropic({ apiKey })

@@ -18,6 +18,14 @@ import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 
+const MODE_STARTERS: Record<string, string[]> = {
+  dsa: ['Give me a medium array problem', 'Practice dynamic programming', 'Quiz me on graphs', 'Review sliding window'],
+  'system-design': ['Design a URL shortener', 'Scale a newsfeed', 'Explain consistent hashing', 'Rate limiter design'],
+  'interview-prep': ['Start a mock interview', 'Give me a behavioral question', 'Ask a system design question', 'Test me on React'],
+  'job-search': ['Help me write a resume bullet', 'Review a job description', 'Prep behavioral questions', 'Analyze my pipeline'],
+  'business-ideas': ['Explore an idea I have', 'Validate a startup concept', 'Stress-test an idea', 'Find a niche problem'],
+}
+
 const MODES = [
   { value: 'dsa', label: 'DSA Coach' },
   { value: 'system-design', label: 'System Design' },
@@ -112,10 +120,19 @@ function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreamin
 
 export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
-  const { messages, isStreaming, sendMessage, clearHistory, stopStreaming } = useChat(mode)
+  const { messages, isStreaming, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
+  const hasGreetedRef = useRef<string | null>(null)
   const [input, setInput] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-greet on mode switch when history is empty
+  useEffect(() => {
+    if (messages.length === 0 && hasGreetedRef.current !== mode) {
+      hasGreetedRef.current = mode
+      greet()
+    }
+  }, [mode, messages.length, greet])
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
@@ -127,6 +144,11 @@ export default function CoachPage() {
   useEffect(() => {
     scrollToBottom()
   }, [messages, scrollToBottom])
+
+  const handleClearHistory = () => {
+    hasGreetedRef.current = null
+    clearHistory()
+  }
 
   const handleSend = () => {
     const text = input.trim()
@@ -164,7 +186,7 @@ export default function CoachPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={clearHistory}
+            onClick={handleClearHistory}
             className="text-muted-foreground hover:text-danger"
           >
             <Trash2 className="h-4 w-4" />
@@ -181,13 +203,6 @@ export default function CoachPage() {
             className="flex-1 overflow-y-auto p-4 min-h-0"
           >
             <div className="space-y-4">
-              {messages.length === 0 && (
-                <div className="text-center text-muted-foreground py-16">
-                  <MessageCircle className="h-8 w-8 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">Start a conversation with your {MODES.find(m => m.value === mode)?.label || 'coach'}.</p>
-                  <p className="text-xs text-dim mt-1">Your chat history is saved per mode.</p>
-                </div>
-              )}
               {messages.map((msg, i) => (
                 <ChatBubble
                   key={i}
@@ -195,6 +210,19 @@ export default function CoachPage() {
                   isStreaming={isStreaming && i === messages.length - 1 && msg.role === 'assistant'}
                 />
               ))}
+              {!isStreaming && messages.length === 1 && messages[0].role === 'assistant' && (
+                <div className="flex flex-wrap gap-2 mt-2 px-1">
+                  {(MODE_STARTERS[mode] ?? []).map(chip => (
+                    <button
+                      key={chip}
+                      onClick={() => sendMessage(chip)}
+                      className="text-xs px-3 py-1.5 rounded-full border border-coach/30 text-coach/80 hover:bg-coach/10 hover:border-coach/60 transition-colors cursor-pointer"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
