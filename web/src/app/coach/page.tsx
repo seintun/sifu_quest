@@ -121,19 +121,21 @@ function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreamin
 export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
   const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
-  const { messages, isStreaming, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
+  const { messages, isStreaming, isLoaded, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
   const hasGreetedRef = useRef<string | null>(null)
   const [input, setInput] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auto-greet on mode switch when history is empty
+  // Auto-greet only after encrypted history has been loaded — prevents a spurious
+  // greeting from firing against the empty initial state before async decrypt completes
   useEffect(() => {
+    if (!isLoaded) return
     if (messages.length === 0 && hasGreetedRef.current !== mode) {
       hasGreetedRef.current = mode
       greet()
     }
-  }, [mode, messages.length, greet])
+  }, [mode, messages.length, greet, isLoaded])
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {

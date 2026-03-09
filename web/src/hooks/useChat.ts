@@ -1,46 +1,38 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { saveMessages, loadMessages, removeMessages, type ChatMessage } from '@/lib/chat-storage'
 
-export interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-}
+export type { ChatMessage }
 
 const STORAGE_PREFIX = 'thinking-buddy-chat-'
 
 export function useChat(mode: string) {
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    if (typeof window === 'undefined') return []
-    try {
-      const stored = localStorage.getItem(`${STORAGE_PREFIX}${mode}`)
-      return stored ? JSON.parse(stored) : []
-    } catch {
-      return []
-    }
-  })
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+  // Track which mode's data is currently loaded to guard premature saves
+  const loadedModeRef = useRef<string | null>(null)
 
-  // Persist to localStorage
+  // Decrypt and load history for the current mode
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`${STORAGE_PREFIX}${mode}`, JSON.stringify(messages))
-    }
-  }, [messages, mode])
-
-  // Reload messages when mode changes
-  useEffect(() => {
-    if (typeof window === 'undefined') return
+    setIsLoaded(false)
     abortRef.current?.abort()
     setIsStreaming(false)
-    try {
-      const stored = localStorage.getItem(`${STORAGE_PREFIX}${mode}`)
-      setMessages(stored ? JSON.parse(stored) : [])
-    } catch {
-      setMessages([])
-    }
+    loadMessages(`${STORAGE_PREFIX}${mode}`).then(msgs => {
+      setMessages(msgs)
+      loadedModeRef.current = mode
+      setIsLoaded(true)
+    })
   }, [mode])
+
+  // Encrypt and persist — only after load for this mode completes to avoid
+  // cross-mode overwrites during the async load transition
+  useEffect(() => {
+    if (loadedModeRef.current !== mode) return
+    saveMessages(`${STORAGE_PREFIX}${mode}`, messages)
+  }, [messages, mode])
 
   const sendMessage = useCallback(async (userMessage: string) => {
     const newMessages: ChatMessage[] = [
@@ -69,50 +61,38 @@ export function useChat(mode: string) {
       }
 
       const reader = res.body?.getReader()
-      if (!reader) {
-        setIsStreaming(false)
-        return
-      }
+      if (!reader) { setIsStreaming(false); return }
 
       const decoder = new TextDecoder()
       let assistantContent = ''
-
-      // Add placeholder assistant message
       setMessages([...newMessages, { role: 'assistant', content: '' }])
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim()
-            if (data === '[DONE]') continue
-            try {
-              const parsed = JSON.parse(data)
-              if (parsed.text) {
-                assistantContent += parsed.text
-                setMessages(prev => {
-                  const updated = [...prev]
-                  updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
-                  return updated
-                })
-              }
-              if (parsed.error) {
-                assistantContent += `\n\nError: ${parsed.error}`
-                setMessages(prev => {
-                  const updated = [...prev]
-                  updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
-                  return updated
-                })
-              }
-            } catch {
-              // skip malformed JSON
+        for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6).trim()
+          if (data === '[DONE]') continue
+          try {
+            const parsed = JSON.parse(data)
+            if (parsed.text) {
+              assistantContent += parsed.text
+              setMessages(prev => {
+                const updated = [...prev]
+                updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
+                return updated
+              })
             }
-          }
+            if (parsed.error) {
+              assistantContent += `\n\nError: ${parsed.error}`
+              setMessages(prev => {
+                const updated = [...prev]
+                updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
+                return updated
+              })
+            }
+          } catch { /* skip malformed JSON */ }
         }
       }
     } catch (err) {
@@ -134,13 +114,11 @@ export function useChat(mode: string) {
     const controller = new AbortController()
     abortRef.current = controller
 
-    const greetMessages = [{ role: 'user', content: 'Start the session.' }]
-
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: greetMessages, mode, isGreeting: true }),
+        body: JSON.stringify({ messages: [{ role: 'user', content: 'Start the session.' }], mode, isGreeting: true }),
         signal: controller.signal,
       })
 
@@ -152,41 +130,30 @@ export function useChat(mode: string) {
       }
 
       const reader = res.body?.getReader()
-      if (!reader) {
-        setIsStreaming(false)
-        return
-      }
+      if (!reader) { setIsStreaming(false); return }
 
       const decoder = new TextDecoder()
       let assistantContent = ''
-
       setMessages([{ role: 'assistant', content: '' }])
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim()
-            if (data === '[DONE]') continue
-            try {
-              const parsed = JSON.parse(data)
-              if (parsed.text) {
-                assistantContent += parsed.text
-                setMessages([{ role: 'assistant', content: assistantContent }])
-              }
-              if (parsed.error) {
-                assistantContent += `\n\nError: ${parsed.error}`
-                setMessages([{ role: 'assistant', content: assistantContent }])
-              }
-            } catch {
-              // skip malformed JSON
+        for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6).trim()
+          if (data === '[DONE]') continue
+          try {
+            const parsed = JSON.parse(data)
+            if (parsed.text) {
+              assistantContent += parsed.text
+              setMessages([{ role: 'assistant', content: assistantContent }])
             }
-          }
+            if (parsed.error) {
+              assistantContent += `\n\nError: ${parsed.error}`
+              setMessages([{ role: 'assistant', content: assistantContent }])
+            }
+          } catch { /* skip malformed JSON */ }
         }
       }
     } catch (err) {
@@ -203,14 +170,12 @@ export function useChat(mode: string) {
 
   const clearHistory = useCallback(() => {
     setMessages([])
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(`${STORAGE_PREFIX}${mode}`)
-    }
+    removeMessages(`${STORAGE_PREFIX}${mode}`)
   }, [mode])
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort()
   }, [])
 
-  return { messages, isStreaming, sendMessage, greet, clearHistory, stopStreaming }
+  return { messages, isStreaming, isLoaded, sendMessage, greet, clearHistory, stopStreaming }
 }
