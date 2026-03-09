@@ -1,9 +1,4 @@
-import fs from 'fs/promises'
-import path from 'path'
-import os from 'os'
-
-const getMemoryDir = () => path.resolve(process.cwd(), process.env.MEMORY_DIR || '../memory')
-const MODES_DIR = path.resolve(process.cwd(), process.env.MODES_DIR || '../modes')
+import { createClient } from './supabase'
 
 const ALLOWED_MEMORY_FILES = [
   'profile.md',
@@ -36,45 +31,104 @@ function validateModeFile(filename: string): void {
   }
 }
 
-export async function readMemoryFile(filename: string): Promise<string> {
+// Memory files are scoped to a user and read from the Supabase DB
+export async function readMemoryFile(userId: string, filename: string): Promise<string> {
   validateMemoryFile(filename)
-  const filePath = path.join(getMemoryDir(), filename)
-  try {
-    return await fs.readFile(filePath, 'utf-8')
-  } catch {
+  
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('memory_files')
+    .select('content')
+    .eq('user_id', userId)
+    .eq('filename', filename)
+    .single()
+
+  if (error || !data) {
     return ''
   }
+  return data.content || ''
 }
 
+// Mode files are static assets bundled with the app (not user-scoped)
 export async function readModeFile(filename: string): Promise<string> {
   validateModeFile(filename)
-  const filePath = path.join(MODES_DIR, filename)
+  
+  // They have been moved to src/modes/ but Next.js server components can dynamically read them 
+  // via fs at runtime *if* they are in the project root. However, Vercel edge/serverless 
+  // can lose track of raw dynamic fs reads unless specifically bundled. 
+  // The safest pattern is to import them as static strings via webpack, but since 
+  // this is a nodejs runtime API route, we can fetch from process.cwd() IF we ensure 
+  // the files exist in the build output. For now, we will use a hardcoded lookup map:
+  
   try {
-    return await fs.readFile(filePath, 'utf-8')
-  } catch {
+    const rawModeFiles: Record<string, string> = {
+      'dsa.md': require('../modes/dsa.md').default,
+      'interview-prep.md': require('../modes/interview-prep.md').default,
+      'system-design.md': require('../modes/system-design.md').default,
+      'job-search.md': require('../modes/job-search.md').default,
+      'business-ideas.md': require('../modes/business-ideas.md').default,
+    }
+    return rawModeFiles[filename] || ''
+  } catch (error) {
+    console.warn(`Failed to read mode file matching ${filename}:`, error)
     return ''
   }
 }
 
-// Simple queue-based write lock to prevent concurrent corruption
-const writeLocks = new Map<string, Promise<void>>()
-
-export async function writeMemoryFile(filename: string, content: string): Promise<void> {
+export async function writeMemoryFile(
+  userId: string, 
+  filename: string, 
+  content: string,
+  changeSource: string = 'manual'
+): Promise<void> {
   validateMemoryFile(filename)
-  const filePath = path.join(getMemoryDir(), filename)
+  
+  const supabase = await createClient()
+  
+  // We use Supabase RPC or upsert to bump the version, but the easiest Upsert is:
+  // 1. Get current version
+  // 2. Upsert with version + 1
+  
+  const { data: currentRecord } = await supabase
+    .from('memory_files')
+    .select('version')
+    .eq('user_id', userId)
+    .eq('filename', filename)
+    .single()
+    
+  const nextVersion = (currentRecord?.version || 0) + 1
 
-  // Queue writes per file
-  const existing = writeLocks.get(filename) || Promise.resolve()
-  const writePromise = existing.then(async () => {
-    await fs.mkdir(getMemoryDir(), { recursive: true })
-    // Atomic write: write to temp file then rename
-    const tmpPath = path.join(os.tmpdir(), `memory-${filename}-${Date.now()}`)
-    await fs.writeFile(tmpPath, content, 'utf-8')
-    await fs.rename(tmpPath, filePath)
-  })
+  const { error } = await supabase
+    .from('memory_files')
+    .upsert({
+      user_id: userId,
+      filename: filename,
+      content: content,
+      version: nextVersion,
+      updated_at: new Date().toISOString()
+    }, { 
+      onConflict: 'user_id,filename' 
+    })
 
-  writeLocks.set(filename, writePromise.catch(() => {}))
-  await writePromise
+  if (error) {
+    console.error(`Error writing memory file ${filename}:`, error)
+    throw new Error(`Failed to save ${filename}`)
+  }
+
+  // The database trigger 'snapshot_memory_version' will automatically record 
+  // the audit trail row into memory_file_versions. But since we need to pass
+  // the changeSource to the trigger via TG_ARGV (which isn't easy via REST), 
+  // we'll manually insert the audit row here instead of relying solely on the DB trigger for now.
+  
+  await supabase
+    .from('memory_file_versions')
+    .insert({
+      user_id: userId,
+      filename: filename,
+      content: content,
+      version: nextVersion,
+      change_source: changeSource
+    })
 }
 
 export function getAllowedMemoryFiles(): string[] {
@@ -85,15 +139,12 @@ export function getAllowedModeFiles(): string[] {
   return [...ALLOWED_MODE_FILES]
 }
 
-export async function listMemoryFiles(): Promise<string[]> {
-  const files: string[] = []
-  for (const f of ALLOWED_MEMORY_FILES) {
-    try {
-      await fs.access(path.join(getMemoryDir(), f))
-      files.push(f)
-    } catch {
-      // file doesn't exist, skip
-    }
-  }
-  return files
+export async function listMemoryFiles(userId: string): Promise<string[]> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('memory_files')
+    .select('filename')
+    .eq('user_id', userId)
+
+  return (data || []).map(row => row.filename)
 }

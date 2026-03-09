@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { writeMemoryFile } from '@/lib/memory'
 import { getPlanTimelineMeta } from '@/lib/profile-timeline'
 import Anthropic from '@anthropic-ai/sdk'
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '../auth/[...nextauth]/route'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -24,6 +25,11 @@ interface OnboardingData {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const userId = session.user.id
     const data: OnboardingData = await request.json()
 
     const profileContent = `# User Profile
@@ -184,7 +190,8 @@ ${data.weaknesses.split(',').map(s => `- ${s.trim()}`).join('\n')}
       ? `Build exactly ${timelineMeta.durationMonths} monthly phases labeled "## Month 1 — ...", "## Month 2 — ...", up to Month ${timelineMeta.durationMonths}.`
       : `Build phased milestones that explicitly align to the stated timeline: "${data.timeline}".`
 
-    const client = new Anthropic()
+    // Onboarding generation always uses the app's key since the user hasn't added theirs yet
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     const planResponse = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 2048,
@@ -209,14 +216,14 @@ Format as clean markdown suitable for rendering.`
     const planContent = (planResponse.content[0] as { type: 'text'; text: string }).text
 
     await Promise.all([
-      writeMemoryFile('profile.md', profileContent),
-      writeMemoryFile('progress.md', progressContent),
-      writeMemoryFile('dsa-patterns.md', dsaPatternsContent),
-      writeMemoryFile('job-search.md', jobSearchContent),
-      writeMemoryFile('system-design.md', systemDesignContent),
-      writeMemoryFile('ideas.md', ideasContent),
-      writeMemoryFile('corrections.md', correctionsContent),
-      writeMemoryFile('plan.md', planContent),
+      writeMemoryFile(userId, 'profile.md', profileContent, 'onboarding'),
+      writeMemoryFile(userId, 'progress.md', progressContent, 'onboarding'),
+      writeMemoryFile(userId, 'dsa-patterns.md', dsaPatternsContent, 'onboarding'),
+      writeMemoryFile(userId, 'job-search.md', jobSearchContent, 'onboarding'),
+      writeMemoryFile(userId, 'system-design.md', systemDesignContent, 'onboarding'),
+      writeMemoryFile(userId, 'ideas.md', ideasContent, 'onboarding'),
+      writeMemoryFile(userId, 'corrections.md', correctionsContent, 'onboarding'),
+      writeMemoryFile(userId, 'plan.md', planContent, 'onboarding'),
     ])
 
     return NextResponse.json({ success: true })
@@ -225,3 +232,4 @@ Format as clean markdown suitable for rendering.`
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
