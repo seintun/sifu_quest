@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Claude Thinking Buddy — First-time setup script
+ * Sifu Quest — First-time setup script
  *
  * Handles:
  *   1. Creating web/.env.local (prompts for API key, memory dir)
@@ -12,13 +12,13 @@
  *   or: cd web && npm run setup
  */
 
-import { createInterface } from 'readline/promises'
-import { stdin as input, stdout as output } from 'process'
-import fs from 'fs/promises'
-import path from 'path'
-import os from 'os'
-import { fileURLToPath } from 'url'
 import { execSync } from 'child_process'
+import fs from 'fs/promises'
+import os from 'os'
+import path from 'path'
+import { stdin as input, stdout as output } from 'process'
+import { createInterface } from 'readline/promises'
+import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const WEB_DIR = path.resolve(__dirname, '..')
@@ -63,7 +63,7 @@ async function main() {
   const rl = createInterface({ input, output })
 
   console.log()
-  console.log(c('  Claude Thinking Buddy', BOLD, CYAN) + c(' — Workspace Setup', DIM))
+  console.log(c('  Sifu Quest', BOLD, CYAN) + c(' — Workspace Setup', DIM))
   console.log(c('  ──────────────────────────────────────', DIM))
   console.log()
 
@@ -90,7 +90,7 @@ async function main() {
   }
 
   // Memory dir
-  const defaultMemoryDir = path.join(os.homedir(), '.claude-memory/claude_thinking_buddy')
+  const defaultMemoryDir = path.join(os.homedir(), '.claude-memory/sifu-quest')
   if (!envVars.MEMORY_DIR) {
     console.log(c(`  Default memory location: ${defaultMemoryDir}`, DIM))
     const custom = await rl.question(c('  Press Enter to accept, or type a custom path: ', BOLD))

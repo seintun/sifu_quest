@@ -1,9 +1,9 @@
+import { auth } from '@/auth'
 import { decryptKey } from '@/lib/apikey'
 import { readMemoryFile, readModeFile } from '@/lib/memory'
 import { createClient } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest } from 'next/server'
-import { auth } from '@/auth'
 
 export const runtime = 'nodejs'
 
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build system prompt from mode + memory files
-    let systemPrompt = 'You are a helpful coaching assistant.'
+    let systemPrompt = 'You are Sifu, a helpful mastery coach.'
 
     const modeConfig = MODE_TO_FILES[mode || 'dsa']
     if (modeConfig) {
@@ -121,10 +121,10 @@ export async function POST(request: NextRequest) {
         const nameInstruction = userName
           ? `Greet the user as "${userName}" — this name comes directly from their memory profile.`
           : 'No name found in memory — use a neutral greeting without fabricating a name.'
-        systemPrompt += `\n\n---\n## Greeting Instruction\n\nThe user just opened this coaching mode. Write a warm, concise welcome (2-4 sentences). ${nameInstruction} Reference their past progress from memory if relevant. End with one open question to kick off the session.`
+        systemPrompt += `\n\n---\n## Greeting Instruction\n\nThe user just opened this mastery mode. Write a warm, concise welcome (2-4 sentences). ${nameInstruction} Reference their past progress from memory if relevant. End with one open question to kick off the session.`
       }
     } else if (isGreeting) {
-      systemPrompt += '\n\n---\n## Greeting Instruction\n\nThe user just opened this coaching mode. Write a warm, concise welcome (2-4 sentences). Use a neutral greeting. End with one open question to kick off the session.'
+      systemPrompt += '\n\n---\n## Greeting Instruction\n\nThe user just opened this mastery mode. Write a warm, concise welcome (2-4 sentences). Use a neutral greeting. End with one open question to kick off the session.'
     }
 
     const client = new Anthropic({ apiKey })

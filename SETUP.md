@@ -1,6 +1,6 @@
 # Setup Guide
 
-This guide walks you through setting up **AnthropiQ (Claude Thinking Buddy)** for both local development and Vercel production deployment. It includes detailed instructions on how to obtain every required API key and secret.
+This guide walks you through setting up **Sifu Quest** for both local development and Vercel production deployment. It includes detailed instructions on how to obtain every required API key and secret.
 
 ---
 
@@ -56,7 +56,7 @@ service_role key: eyJ...  ← use as SUPABASE_SERVICE_ROLE_KEY
 #### For Production (Hosted)
 
 1. Go to [supabase.com](https://supabase.com) and sign in (or create an account).
-2. Click **New Project** → choose your organization → name it (e.g., `anthropiq`) → set a database password → choose a region → click **Create**.
+2. Click **New Project** → choose your organization → name it (e.g., `sifu-quest`) → set a database password → choose a region → click **Create**.
 3. Wait for the project to finish provisioning (~2 minutes).
 4. Navigate to **Settings → API** in the left sidebar.
 5. Copy the following values:
@@ -105,7 +105,7 @@ Google OAuth enables users to sign in with their Google account.
    - Click **Save and Continue** through all steps.
 6. Back in **Credentials → + CREATE CREDENTIALS → OAuth client ID**:
    - **Application type**: Web application
-   - **Name**: `AnthropiQ` (or any label)
+   - **Name**: `Sifu Quest` (or any label)
    - **Authorized JavaScript origins**:
      ```
      http://localhost:3000
@@ -133,7 +133,7 @@ The Anthropic API key powers the Claude LLM for the coaching chat.
 1. Go to [console.anthropic.com](https://console.anthropic.com/).
 2. Sign in or create an account.
 3. Navigate to **API Keys** in the left sidebar.
-4. Click **Create Key** → give it a name (e.g., `anthropiq-prod`) → click **Create**.
+4. Click **Create Key** → give it a name (e.g., `sifu-quest-prod`) → click **Create**.
 5. Copy the key immediately (it won't be shown again).
 
 | Console Field | Environment Variable |
@@ -150,7 +150,7 @@ Sentry provides error tracking and performance monitoring.
 
 1. Go to [sentry.io](https://sentry.io/) and sign in (or create an account).
 2. Click **Create Project** → select **Next.js** as the platform.
-3. Name it (e.g., `anthropiq-web`) → click **Create Project**.
+3. Name it (e.g., `sifu-quest-web`) → click **Create Project**.
 4. On the setup page, copy the **DSN** value (looks like `https://abc123@o456.ingest.sentry.io/789`).
 
 | Sentry Field      | Environment Variable             |

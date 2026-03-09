@@ -1,6 +1,6 @@
-# AnthropiQ — Technical Documentation
+# Sifu Quest — Technical Documentation
 
-> **Claude Thinking Buddy** (codename: AnthropiQ) is an AI-powered career coaching web application. It uses Claude (Anthropic) as the backbone LLM, Supabase for authentication and persistent storage, and is deployed globally on Vercel.
+> **Sifu Quest** is an AI-powered career mastery web application. It uses Claude (Anthropic) as the backbone LLM, Supabase for authentication and persistent storage, and is deployed globally on Vercel.
 
 ---
 

@@ -1,4 +1,4 @@
-# Claude Thinking Buddy — Senior SWE Job Search Workspace
+# Sifu Quest — Your Path to Mastery
 
 An AI-powered job search and interview prep workspace built on top of Claude Code. Clone it, run `/start`, and you have a personalized coaching system that remembers your strengths, tracks your progress, and adapts to how you learn.
 
@@ -30,8 +30,8 @@ Claude reads your profile and memory files at the start of each session, so it a
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/your-username/claude-thinking-buddy.git
-cd claude-thinking-buddy
+git clone https://github.com/seintun/sifu-quest.git
+cd sifu-quest
 
 # 2. Open Claude Code
 claude
@@ -49,7 +49,7 @@ That's it. The `/start` command interviews you, then writes your personal profil
 ### Directory Structure
 
 ```
-claude-thinking-buddy/
+sifu-quest/
 ├── CLAUDE.md                    # Master instructions for Claude (routing, rules)
 ├── modes/                       # Mode-specific coaching prompts
 │   ├── dsa.md                   # DSA/LeetCode coaching rules

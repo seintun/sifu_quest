@@ -1,23 +1,23 @@
 'use client'
 
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { getPlanTimelineMeta, parseProfileSnapshot } from '@/lib/profile-timeline'
+import { cn } from '@/lib/utils'
+import {
+    BookOpen,
+    Briefcase,
+    Calendar,
+    ClipboardList,
+    Code2,
+    LayoutDashboard,
+    Menu,
+    MessageCircle,
+    Network,
+    X,
+} from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { cn } from '@/lib/utils'
-import { getPlanTimelineMeta, parseProfileSnapshot } from '@/lib/profile-timeline'
-import {
-  LayoutDashboard,
-  Calendar,
-  Code2,
-  Network,
-  Briefcase,
-  ClipboardList,
-  BookOpen,
-  MessageCircle,
-  Menu,
-  X,
-} from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
 
 const NAV_ITEMS = [
   { href: '/',              label: 'Dashboard',      icon: LayoutDashboard, color: 'streak' },
@@ -94,7 +94,7 @@ export function Sidebar() {
     <aside className="hidden md:flex w-56 flex-col fixed inset-y-0 left-0 bg-surface border-r border-border z-30">
       <div className="p-4 border-b border-border">
         <h1 className="font-display text-lg font-bold text-foreground">
-          Thinking Buddy
+          Sifu Quest
         </h1>
         <p className="text-xs text-muted-foreground mt-0.5">Personal Dashboard</p>
       </div>
@@ -112,7 +112,7 @@ export function MobileSidebar() {
     <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-surface border-b border-border">
       <div className="flex items-center justify-between p-3">
         <h1 className="font-display text-lg font-bold text-foreground">
-          Thinking Buddy
+          Sifu Quest
         </h1>
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger
@@ -123,7 +123,7 @@ export function MobileSidebar() {
           <SheetContent side="left" className="w-56 bg-surface border-r border-border p-0">
             <SheetTitle className="sr-only">Navigation</SheetTitle>
             <div className="p-4 border-b border-border">
-              <h2 className="font-display text-lg font-bold">Thinking Buddy</h2>
+              <h2 className="font-display text-lg font-bold">Sifu Quest</h2>
             </div>
             <div className="p-3">
               <NavLinks onNavigate={() => setOpen(false)} />

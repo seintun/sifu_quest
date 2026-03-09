@@ -1,4 +1,4 @@
-# Plan: Claude Thinking Buddy — Web Dashboard
+# Plan: Sifu Quest — Web Dashboard
 
 ## Context
 
