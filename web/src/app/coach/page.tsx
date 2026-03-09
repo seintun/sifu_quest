@@ -120,6 +120,7 @@ function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreamin
 
 export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
+  const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
   const { messages, isStreaming, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
   const hasGreetedRef = useRef<string | null>(null)
   const [input, setInput] = useState('')
@@ -175,9 +176,9 @@ export default function CoachPage() {
         <div className="flex items-center gap-2">
           <Select value={mode} onValueChange={v => v && setMode(v)}>
             <SelectTrigger className="w-44 bg-surface border-border">
-              <SelectValue />
+              <SelectValue>{selectedModeLabel}</SelectValue>
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent alignItemWithTrigger={false}>
               {MODES.map(m => (
                 <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
               ))}
