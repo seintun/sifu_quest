@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { canSaveAnthropicApiKey, shouldShowRemoveApiKey } from '@/lib/account-settings-ui'
 import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
+import { getOnboardingPrefillName } from '@/lib/onboarding-name'
 import { validateFullName } from '@/lib/profile-name'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -64,7 +65,7 @@ export default function SettingsPage() {
       const data = await res.json()
       if (res.ok) {
         setAccountStatus(data.account)
-        setFullName(data.account?.displayName || '')
+        setFullName(getOnboardingPrefillName(data.account?.displayName, data.account?.prefillName))
       } else if (res.status === 401) {
         router.push('/api/auth/signin')
         return
