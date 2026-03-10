@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { assertRequiredEnv, getAuthSecret, getMissingRequiredEnv } from './env.ts'
+import { assertRequiredEnv, getAuthSecret, getMissingRequiredEnv, getRuntimeConfigStatus } from './env.ts'
 
 const originalEnv = { ...process.env }
 
@@ -52,4 +52,15 @@ test('getAuthSecret throws when neither secret is present', () => {
     () => getAuthSecret(),
     /Missing NEXTAUTH_SECRET/
   )
+})
+
+test('getRuntimeConfigStatus reports missing required keys without values', () => {
+  resetEnv()
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost'
+  delete process.env.GOOGLE_CLIENT_ID
+
+  const status = getRuntimeConfigStatus()
+
+  assert.equal(Array.isArray(status.missingRequiredKeys), true)
+  assert.equal(status.missingRequiredKeys.includes('GOOGLE_CLIENT_ID'), true)
 })
