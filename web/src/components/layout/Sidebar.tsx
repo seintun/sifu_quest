@@ -13,6 +13,7 @@ import {
     Menu,
     MessageCircle,
     Network,
+    Settings,
     X,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { href: '/jobs',          label: 'Job Search',     icon: Briefcase,       color: 'jobs' },
   { href: '/memory',        label: 'Memory',         icon: BookOpen,        color: 'streak' },
   { href: '/coach',         label: 'Coach Chat',     icon: MessageCircle,   color: 'coach' },
+  { href: '/settings',      label: 'Settings',       icon: Settings,        color: 'streak' },
 ] as const
 
 const COLOR_CLASSES: Record<string, { active: string; border: string }> = {

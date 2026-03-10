@@ -2,8 +2,21 @@
 
 import { signOut } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
+import { validateFullName } from '@/lib/profile-name'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { KeyRound, Loader2, ShieldAlert, UserRound } from 'lucide-react'
 
 type AccountStatus = {
   userId: string
@@ -13,18 +26,31 @@ type AccountStatus = {
   avatarUrl: string | null
 }
 
+type FlashMessage = { text: string; type: 'success' | 'error' } | null
+
 export default function SettingsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  
+
   const [apiKey, setApiKey] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
+  const [fullName, setFullName] = useState('')
+
+  const [isSavingName, setIsSavingName] = useState(false)
+  const [isSavingKey, setIsSavingKey] = useState(false)
+  const [isRemovingKey, setIsRemovingKey] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+
   const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null)
   const [isAccountStatusLoading, setIsAccountStatusLoading] = useState(false)
   const [isAccountStatusInitialized, setIsAccountStatusInitialized] = useState(false)
   const [accountStatusError, setAccountStatusError] = useState('')
-  const [message, setMessage] = useState({ text: '', type: '' })
+
+  const [message, setMessage] = useState<FlashMessage>(null)
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+
+  const isDeletePhraseValid = deleteConfirmText === 'DELETE'
 
   const loadAccountStatus = useCallback(async () => {
     setIsAccountStatusLoading(true)
@@ -34,6 +60,7 @@ export default function SettingsPage() {
       const data = await res.json()
       if (res.ok) {
         setAccountStatus(data.account)
+        setFullName(data.account?.displayName || '')
       } else if (res.status === 401) {
         router.push('/api/auth/signin')
         return
@@ -61,57 +88,105 @@ export default function SettingsPage() {
     }
   }, [searchParams, loadAccountStatus])
 
+  const handleSaveName = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMessage(null)
+
+    const validation = validateFullName(fullName)
+    if (!validation.ok) {
+      setMessage({ text: validation.error, type: 'error' })
+      return
+    }
+
+    setIsSavingName(true)
+    try {
+      const res = await fetch('/api/account', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullName: validation.value }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setMessage({ text: data.error || 'Failed to update full name.', type: 'error' })
+        return
+      }
+
+      setFullName(data.account?.displayName || validation.value)
+      setAccountStatus((prev) => (prev ? { ...prev, displayName: data.account?.displayName || validation.value } : prev))
+      setMessage({ text: 'Full name updated successfully.', type: 'success' })
+    } catch {
+      setMessage({ text: 'An unexpected error occurred while updating your full name.', type: 'error' })
+    } finally {
+      setIsSavingName(false)
+    }
+  }
+
   const handleSaveKey = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSaving(true)
-    setMessage({ text: '', type: '' })
-    
+    setIsSavingKey(true)
+    setMessage(null)
+
     try {
       const res = await fetch('/api/auth/apikey', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey })
+        body: JSON.stringify({ apiKey }),
       })
-      
+
       const data = await res.json()
       if (res.ok) {
-        setMessage({ text: 'API Key saved successfully.', type: 'success' })
-        setApiKey('') // Clear it from memory
+        setMessage({ text: 'API key saved successfully.', type: 'success' })
+        setApiKey('')
       } else {
-        setMessage({ text: data.error || 'Failed to save key.', type: 'error' })
+        setMessage({ text: data.error || 'Failed to save API key.', type: 'error' })
       }
     } catch {
-      setMessage({ text: 'An unexpected error occurred.', type: 'error' })
+      setMessage({ text: 'An unexpected error occurred while saving API key.', type: 'error' })
     } finally {
-      setIsSaving(false)
+      setIsSavingKey(false)
     }
   }
-  
-  const handleDeleteAccount = async () => {
-    if (!window.confirm('Are you absolutely sure? This will delete all your memory context, logs, and chats. This cannot be undone.')) {
-      return
+
+  const handleRemoveKey = async () => {
+    setIsRemovingKey(true)
+    setMessage(null)
+
+    try {
+      const res = await fetch('/api/auth/apikey', { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setMessage({ text: data.error || 'Failed to remove API key.', type: 'error' })
+        return
+      }
+      setMessage({ text: 'API key removed.', type: 'success' })
+    } catch {
+      setMessage({ text: 'An unexpected error occurred while removing API key.', type: 'error' })
+    } finally {
+      setIsRemovingKey(false)
     }
-    
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!isDeletePhraseValid) return
+
     setIsDeleting(true)
+    setMessage(null)
     try {
       const res = await fetch('/api/account', { method: 'DELETE' })
       if (res.ok) {
         await signOut({ callbackUrl: '/' })
       } else {
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         setMessage({ text: data.error || 'Failed to delete account.', type: 'error' })
-        setIsDeleting(false)
+        setDeleteDialogOpen(false)
       }
     } catch {
-      setMessage({ text: 'An unexpected error occurred.', type: 'error' })
+      setMessage({ text: 'An unexpected error occurred while deleting your account.', type: 'error' })
+      setDeleteDialogOpen(false)
+    } finally {
       setIsDeleting(false)
     }
   }
-
-  if (!isAccountStatusInitialized) return <div className="p-8">Loading...</div>
-
-  const isGuest = Boolean(accountStatus?.isGuest)
-  const showGuestUpgradeSection = isGuest || Boolean(accountStatusError)
 
   const handleLinkGoogle = async () => {
     const result = await startGuestGoogleUpgrade(window.location.origin)
@@ -120,101 +195,193 @@ export default function SettingsPage() {
     }
   }
 
+  const isGuest = Boolean(accountStatus?.isGuest)
+  const showGuestUpgradeSection = isGuest || Boolean(accountStatusError)
+
+  const normalizedCurrentName = useMemo(() => (accountStatus?.displayName ?? '').trim(), [accountStatus?.displayName])
+  const normalizedInputName = useMemo(() => fullName.trim().replace(/\s+/g, ' '), [fullName])
+  const isNameDirty = normalizedInputName !== normalizedCurrentName
+
+  if (!isAccountStatusInitialized) return <div className="p-8 text-muted-foreground">Loading settings...</div>
+
   return (
-    <div className="max-w-2xl mx-auto p-8 space-y-8">
-      <h1 className="text-3xl font-bold">Account Settings</h1>
-      
-      {message.text && (
-        <div className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div>
+        <h1 className="font-display text-3xl font-bold">Account Settings</h1>
+        <p className="text-muted-foreground text-sm mt-1">Manage profile info, API access, and account safety controls.</p>
+      </div>
+
+      {message && (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            message.type === 'success'
+              ? 'border-success/30 bg-success/10 text-success'
+              : 'border-danger/30 bg-danger/10 text-danger'
+          }`}
+        >
           {message.text}
         </div>
       )}
 
-      {/* Guest Upgrade Section */}
       {showGuestUpgradeSection && (
-        <section className="bg-streak/10 p-6 rounded-lg shadow-sm border border-streak/30">
-          <h2 className="text-xl font-semibold text-streak mb-2">Upgrade to Full Account</h2>
-          {accountStatusError ? (
-            <p className="text-red-700 bg-red-100 rounded px-3 py-2 mb-4 text-sm">
-              {accountStatusError}
-            </p>
-          ) : (
-            <p className="text-slate-600 mb-4 text-sm">
-              You are currently using a temporary Guest session. Link a Google account to permanently save your chat history, memory files, and progress metrics.
-            </p>
-          )}
-          <div className="flex items-center gap-2">
-          <button
-            onClick={handleLinkGoogle}
-            disabled={isAccountStatusLoading}
-            className="bg-streak hover:opacity-90 text-white px-4 py-2 rounded-md font-medium transition-opacity flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-              <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-              <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-              <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-            </svg>
-            Link Google Account
-          </button>
-          <button
-            onClick={() => void loadAccountStatus()}
-            disabled={isAccountStatusLoading}
-            className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-4 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
-          >
-            {isAccountStatusLoading ? 'Refreshing...' : 'Retry Status'}
-          </button>
-          </div>
-        </section>
+        <Card className="border-streak/30 bg-streak/5 shadow-glow-streak">
+          <CardHeader>
+            <CardTitle>Upgrade to Full Account</CardTitle>
+            <CardDescription>
+              {accountStatusError
+                ? accountStatusError
+                : 'You are currently in a guest session. Link Google to permanently keep your memory and progress.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button onClick={handleLinkGoogle} disabled={isAccountStatusLoading}>
+              Link Google Account
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void loadAccountStatus()}
+              disabled={isAccountStatusLoading}
+            >
+              {isAccountStatusLoading ? 'Refreshing...' : 'Retry Status'}
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
-      {/* API Key Section */}
-      <section className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-        <h2 className="text-xl font-semibold mb-2">Anthropic API Key</h2>
-        <p className="text-slate-600 mb-4 text-sm">
-          Your API key is encrypted and stored securely. We only use it to communicate with Claude on your behalf.
-        </p>
-        
-        <form onSubmit={handleSaveKey} className="space-y-4">
-          <div>
-            <label htmlFor="apiKey" className="block text-sm font-medium text-slate-700 mb-1">
-              API Key (sk-ant-...)
+      <Card className="border-border bg-surface/80 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <UserRound className="h-4 w-4 text-plan" />
+            Profile
+          </CardTitle>
+          <CardDescription>Set the name used across your workspace and coach context.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSaveName} className="space-y-3">
+            <div className="space-y-1.5">
+              <label htmlFor="fullName" className="text-sm font-medium text-foreground">
+                Full Name
+              </label>
+              <Input
+                id="fullName"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="e.g., Ada Lovelace"
+                maxLength={80}
+                disabled={isSavingName}
+                className="bg-elevated/50"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button type="submit" disabled={isSavingName || !isNameDirty}>
+                {isSavingName ? 'Saving...' : 'Save Full Name'}
+              </Button>
+              <span className="text-xs text-muted-foreground">This also updates your `profile.md` name line.</span>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border bg-surface/80 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-coach" />
+            Anthropic API Key
+          </CardTitle>
+          <CardDescription>
+            Your key is encrypted at rest and only used to communicate with Claude on your behalf.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSaveKey} className="space-y-3">
+            <div className="space-y-1.5">
+              <label htmlFor="apiKey" className="text-sm font-medium text-foreground">
+                API Key (sk-ant-...)
+              </label>
+              <Input
+                id="apiKey"
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="Paste your Anthropic key"
+                className="bg-elevated/50"
+                required
+                disabled={isSavingKey}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="submit" disabled={isSavingKey || isRemovingKey}>
+                {isSavingKey ? 'Saving...' : 'Save API Key'}
+              </Button>
+              <Button type="button" variant="outline" onClick={handleRemoveKey} disabled={isSavingKey || isRemovingKey}>
+                {isRemovingKey ? 'Removing...' : 'Remove Key'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border-danger/40 bg-danger/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-danger">
+            <ShieldAlert className="h-4 w-4" />
+            Danger Zone
+          </CardTitle>
+          <CardDescription>
+            Permanently delete your account and all associated data. This action is irreversible.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
+            Delete Account
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={(open) => {
+        setDeleteDialogOpen(open)
+        if (!open) setDeleteConfirmText('')
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Account Deletion</DialogTitle>
+            <DialogDescription>
+              This will permanently remove your profile, memory files, chats, progress, and auth account.
+              Type <code className="px-1 py-0.5 rounded bg-elevated text-foreground">DELETE</code> to confirm.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-1.5">
+            <label htmlFor="deleteConfirm" className="text-sm font-medium text-foreground">
+              Type DELETE to continue
             </label>
-            <input
-              id="apiKey"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="Enter new API key to update..."
-              className="w-full px-4 py-2 border border-slate-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              required
+            <Input
+              id="deleteConfirm"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="DELETE"
+              className="bg-elevated/50"
+              autoComplete="off"
             />
           </div>
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium disabled:opacity-50 transition-colors"
-          >
-            {isSaving ? 'Saving...' : 'Save API Key'}
-          </button>
-        </form>
-      </section>
 
-      {/* Danger Zone Section */}
-      <section className="bg-white p-6 rounded-lg shadow-sm border border-red-200 mt-8">
-        <h2 className="text-xl font-semibold text-red-600 mb-2">Danger Zone</h2>
-        <p className="text-slate-600 mb-4 text-sm">
-          Permanently delete your account and all associated data (memories, chat history, progress logs). This action is irreversible.
-        </p>
-        
-        <button
-          onClick={handleDeleteAccount}
-          disabled={isDeleting}
-          className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-4 py-2 rounded-md font-medium disabled:opacity-50 transition-colors"
-        >
-          {isDeleting ? 'Deleting...' : 'Delete Account'}
-        </button>
-      </section>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteAccount} disabled={!isDeletePhraseValid || isDeleting}>
+              {isDeleting ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Deleting...
+                </span>
+              ) : (
+                'Delete Account'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
