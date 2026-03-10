@@ -15,10 +15,16 @@ import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { useChat, type ChatMessage } from '@/hooks/useChat'
 import 'highlight.js/styles/github-dark.css'
 import { MessageCircle, Send, Square, Trash2, Sparkles } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ComponentType, type HTMLAttributes } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
+
+const FREE_TIER_EXHAUSTED_MESSAGE =
+  'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your data remains fully encrypted and structurally private.'
+
+const GUEST_LIMIT_REACHED_MESSAGE =
+  'You have reached the guest limit. Please sign up to continue. After creating your account, add your own Anthropic API key in **Settings** to keep chatting securely.'
 
 const MODE_STARTERS: Record<string, string[]> = {
   dsa: ['Give me a medium array problem', 'Practice dynamic programming', 'Quiz me on graphs', 'Review sliding window'],
@@ -36,7 +42,12 @@ const MODES = [
   { value: 'business-ideas', label: 'Business Ideas' },
 ]
 
-function CodeBlock({ className, children, node, ...props }: any) {
+type CodeBlockProps = HTMLAttributes<HTMLElement> & {
+  node?: unknown
+}
+
+function CodeBlock({ className, children, node: _node, ...props }: CodeBlockProps) {
+  void _node
   const match = /language-(\w+)/.exec(className || '')
   const lang = match ? match[1] : null
   
@@ -109,7 +120,7 @@ function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreamin
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeHighlight]}
             components={{
-              code: CodeBlock as React.ComponentType<React.HTMLAttributes<HTMLElement>>,
+              code: CodeBlock as ComponentType<HTMLAttributes<HTMLElement>>,
               pre: ({ children }) => <>{children}</>,
             }}
           >
@@ -128,6 +139,7 @@ export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
   const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
   const { messages, setMessages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
+  const isGuest = Boolean(freeQuota?.isGuest)
   const hasGreetedRef = useRef<string | null>(null)
   const [dismissedPrompt, setDismissedPrompt] = useState(false)
   const [input, setInput] = useState('')
@@ -143,14 +155,14 @@ export default function CoachPage() {
         hasGreetedRef.current = mode
         setMessages([{
           role: 'assistant',
-          content: 'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your data remains fully encrypted and structurally private.'
+          content: isGuest ? GUEST_LIMIT_REACHED_MESSAGE : FREE_TIER_EXHAUSTED_MESSAGE
         }])
         return
       }
       hasGreetedRef.current = mode
       greet()
     }
-  }, [mode, messages.length, greet, isLoaded, upgradeRequired, freeQuota, setMessages])
+  }, [mode, messages.length, greet, isLoaded, upgradeRequired, freeQuota, setMessages, isGuest])
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
@@ -175,19 +187,25 @@ export default function CoachPage() {
     if (!isStreaming && freeQuota?.isFreeTier && freeQuota.remaining <= 0 && messages.length > 0) {
       const lastMessage = messages[messages.length - 1]
       // Only append if we haven't already appended it
-      if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.content.includes('exhausted your free messages')) {
+      const hasLimitMessage =
+        lastMessage?.content.includes('exhausted your free messages') ||
+        lastMessage?.content.includes('reached the guest limit')
+
+      if (lastMessage && lastMessage.role === 'assistant' && !hasLimitMessage) {
         setMessages((prev) => [
           ...prev,
           {
             role: 'assistant',
-            content: 'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your past conversation remains accessible here.'
+            content: isGuest
+              ? GUEST_LIMIT_REACHED_MESSAGE
+              : 'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your past conversation remains accessible here.'
           }
         ])
         // Reveal the popup overlay after the stream finishes
-        setDismissedPrompt(false)
+        queueMicrotask(() => setDismissedPrompt(false))
       }
     }
-  }, [isStreaming, freeQuota, messages, setMessages])
+  }, [isStreaming, freeQuota, messages, setMessages, isGuest])
 
   const handleClearHistory = () => {
     hasGreetedRef.current = null
@@ -249,7 +267,7 @@ export default function CoachPage() {
             <>
               {freeQuota?.isFreeTier && freeQuota.remaining <= 0 && !isStreaming && !dismissedPrompt && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-                  <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />
+                  {isGuest ? <UpgradePrompt /> : <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />}
                 </div>
               )}
               {/* Scrollable messages */}
@@ -295,7 +313,11 @@ export default function CoachPage() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={freeQuota?.isFreeTier && freeQuota.remaining <= 0 ? "Free limit reached" : "Type a message..."}
+                placeholder={
+                  freeQuota?.isFreeTier && freeQuota.remaining <= 0
+                    ? (isGuest ? 'Guest limit reached' : 'Free limit reached')
+                    : 'Type a message...'
+                }
                 className="bg-elevated border-border resize-none min-h-[2.5rem] max-h-32"
                 rows={1}
                 disabled={isStreaming || (freeQuota?.isFreeTier && freeQuota.remaining <= 0)}

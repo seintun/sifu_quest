@@ -13,6 +13,9 @@ export async function GET(request: NextRequest) {
        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
+    const sessionIsGuest =
+      session.user?.name === 'Guest' ||
+      Boolean(session.user?.email?.endsWith('@anonymous.local'))
     
     const { searchParams } = new URL(request.url)
     const mode = searchParams.get('mode')
@@ -43,7 +46,7 @@ export async function GET(request: NextRequest) {
     let freeQuota = null
     if (isFreeTier && userProfile) {
       if (userProfile.free_quota_exhausted) {
-        freeQuota = { isFreeTier: true, remaining: 0, total: FREE_TIER_MAX_USER_MESSAGES }
+        freeQuota = { isFreeTier: true, remaining: 0, total: FREE_TIER_MAX_USER_MESSAGES, isGuest: Boolean(userProfile.is_guest) }
       } else {
         const { data: totalMessagesData, error: totalMessagesError } = await supabase
           .from('chat_sessions')
@@ -57,13 +60,13 @@ export async function GET(request: NextRequest) {
 
         const totalMessages = totalMessagesData?.reduce((sum, session) => sum + (session.message_count || 0), 0) || 0
         const remaining = Math.max(0, FREE_TIER_MAX_MESSAGES - totalMessages)
-        freeQuota = { isFreeTier: true, remaining: Math.floor(remaining / 2), total: FREE_TIER_MAX_USER_MESSAGES }
+        freeQuota = { isFreeTier: true, remaining: Math.floor(remaining / 2), total: FREE_TIER_MAX_USER_MESSAGES, isGuest: Boolean(userProfile.is_guest) }
       }
     } else if (!isFreeTier) {
-       freeQuota = { isFreeTier: false, remaining: -1, total: -1 }
+       freeQuota = { isFreeTier: false, remaining: -1, total: -1, isGuest: Boolean(userProfile?.is_guest ?? sessionIsGuest) }
     } else {
        // no profile yet
-       freeQuota = { isFreeTier: true, remaining: FREE_TIER_MAX_USER_MESSAGES, total: FREE_TIER_MAX_USER_MESSAGES }
+       freeQuota = { isFreeTier: true, remaining: FREE_TIER_MAX_USER_MESSAGES, total: FREE_TIER_MAX_USER_MESSAGES, isGuest: Boolean(sessionIsGuest) }
     }
 
     // Find the most recent unarchived session for this mode 
@@ -119,6 +122,9 @@ export async function POST(request: NextRequest) {
        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
+    const sessionIsGuest =
+      session.user?.name === 'Guest' ||
+      Boolean(session.user?.email?.endsWith('@anonymous.local'))
     const { mode, title } = await request.json()
 
     if (!mode) {
@@ -168,7 +174,7 @@ export async function POST(request: NextRequest) {
     let freeQuota = null
     if (isFreeTier && userProfile) {
       if (userProfile.free_quota_exhausted) {
-        freeQuota = { isFreeTier: true, remaining: 0, total: FREE_TIER_MAX_USER_MESSAGES }
+        freeQuota = { isFreeTier: true, remaining: 0, total: FREE_TIER_MAX_USER_MESSAGES, isGuest: Boolean(userProfile.is_guest) }
       } else {
         const { data: totalMessagesData, error: totalMessagesError } = await supabase
           .from('chat_sessions')
@@ -182,12 +188,12 @@ export async function POST(request: NextRequest) {
 
         const totalMessages = totalMessagesData?.reduce((sum, session) => sum + (session.message_count || 0), 0) || 0
         const remaining = Math.max(0, FREE_TIER_MAX_MESSAGES - totalMessages)
-        freeQuota = { isFreeTier: true, remaining: Math.floor(remaining / 2), total: FREE_TIER_MAX_USER_MESSAGES }
+        freeQuota = { isFreeTier: true, remaining: Math.floor(remaining / 2), total: FREE_TIER_MAX_USER_MESSAGES, isGuest: Boolean(userProfile.is_guest) }
       }
     } else if (!isFreeTier) {
-       freeQuota = { isFreeTier: false, remaining: -1, total: -1 }
+       freeQuota = { isFreeTier: false, remaining: -1, total: -1, isGuest: Boolean(userProfile?.is_guest ?? sessionIsGuest) }
     } else {
-       freeQuota = { isFreeTier: true, remaining: FREE_TIER_MAX_USER_MESSAGES, total: FREE_TIER_MAX_USER_MESSAGES }
+       freeQuota = { isFreeTier: true, remaining: FREE_TIER_MAX_USER_MESSAGES, total: FREE_TIER_MAX_USER_MESSAGES, isGuest: Boolean(sessionIsGuest) }
     }
 
     if (error) {
