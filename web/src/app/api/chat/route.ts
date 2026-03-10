@@ -20,6 +20,7 @@ type UserProfileRow = {
   is_guest: boolean
   guest_expires_at: string | null
   api_key_enc: string | null
+  free_quota_exhausted: boolean
 }
 
 export async function POST(request: NextRequest) {
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     // If the row is missing (e.g., first session), bootstrap it instead of hard-failing.
     const { data: existingProfile, error: profileFetchError } = await supabase
       .from('user_profiles')
-      .select('is_guest, guest_expires_at, api_key_enc')
+      .select('is_guest, guest_expires_at, api_key_enc, free_quota_exhausted')
       .eq('id', userId)
       .maybeSingle()
 
@@ -70,8 +71,9 @@ export async function POST(request: NextRequest) {
           is_guest: isGuest,
           guest_expires_at: guestExpiry,
           last_active_at: new Date().toISOString(),
+          free_quota_exhausted: false,
         })
-        .select('is_guest, guest_expires_at, api_key_enc')
+        .select('is_guest, guest_expires_at, api_key_enc, free_quota_exhausted')
         .single()
 
       if (createProfileError) {
@@ -112,6 +114,20 @@ export async function POST(request: NextRequest) {
     }
 
     if (usingFreeKey) {
+      if (userProfile.free_quota_exhausted) {
+          if (userProfile.is_guest) {
+            return new Response(JSON.stringify({ 
+              error: 'guest_limit_reached',
+              message: 'You have reached your free message limit as a guest. Please log in to continue.'
+            }), { status: 403 })
+          } else {
+             return new Response(JSON.stringify({ 
+               error: 'missing_api_key',
+               message: 'You have exhausted your free messages. Please add your Anthropic API key in Settings to continue.'
+             }), { status: 403 })
+          }
+      }
+
       // Check total messages across ALL sessions for this user (max 10 = 5 user + 5 assistant)
       const { data: totalMessagesData, error: countError } = await supabase
         .from('chat_sessions')
@@ -122,6 +138,9 @@ export async function POST(request: NextRequest) {
         const totalMessages = totalMessagesData.reduce((sum, session) => sum + (session.message_count || 0), 0)
         
         if (totalMessages >= 10) { 
+          // Update the specific flag so we don't need to compute this sum every time
+          await supabase.from('user_profiles').update({ free_quota_exhausted: true }).eq('id', userId)
+
           if (userProfile.is_guest) {
             return new Response(JSON.stringify({ 
               error: 'guest_limit_reached',

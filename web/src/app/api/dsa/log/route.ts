@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     await writeMemoryFile(userId, 'dsa-patterns.md', content, 'dsa_log')
 
     // Fire progress event for metrics
-    await logProgressEvent(userId, 'dsa_problem_logged', 'dsa', attempt)
+    await logProgressEvent(userId, 'dsa_problem_logged', 'dsa', attempt as unknown as Record<string, unknown>)
     await logAuditEvent(userId, 'update_memory', 'dsa-patterns.md', { action: 'logged_problem', problem: attempt.problem })
 
     return NextResponse.json({ success: true })
