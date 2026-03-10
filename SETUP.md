@@ -276,6 +276,9 @@ npm run build
 Before the app can save any data, you must push the schema to your hosted Supabase project:
 
 ```bash
+# Log in to the Supabase CLI (this will open your browser)
+npx supabase login
+
 # Link your local repo to your hosted Supabase project
 npx supabase link --project-ref your-project-ref-id
 
