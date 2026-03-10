@@ -30,23 +30,23 @@ export default async function LoginPage() {
         <div className="absolute inset-0 bg-background/80 backdrop-blur-[60px]" />
       </div>
 
-      <div className="w-full max-w-[1000px] z-10 grid md:grid-cols-2 gap-8 md:gap-12 items-center px-4 py-8 sm:p-0">
+      <div className="w-full max-w-[1000px] z-10 grid md:grid-cols-2 gap-6 md:gap-12 items-center px-4 py-4 sm:p-0">
         {/* Left Side - Brand & Value Prop */}
-        <div className="space-y-6 md:space-y-8 max-w-sm mx-auto md:max-w-none md:mx-0">
+        <div className="space-y-4 md:space-y-8 max-w-sm mx-auto md:max-w-none md:mx-0">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface border border-border/50 text-[10px] md:text-xs font-medium text-muted-foreground mb-4 md:mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface border border-border/50 text-[10px] md:text-xs font-medium text-muted-foreground mb-2 md:mb-6">
               <span className="w-2 h-2 rounded-full bg-streak animate-pulse" />
               Your path to mastery
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-7xl font-display font-bold tracking-tight text-foreground">
               Sifu Quest
             </h1>
-            <p className="mt-3 md:mt-4 text-base md:text-lg text-muted-foreground max-w-md leading-relaxed">
+            <p className="mt-2 md:mt-4 text-sm sm:text-base md:text-lg text-muted-foreground max-w-md leading-relaxed">
               The AI-powered career coaching dashboard that treats your job search like an RPG. Track, learn, and level up.
             </p>
           </div>
 
-          <div className="space-y-4 md:space-y-6 pt-2 md:pt-4">
+          <div className="space-y-3 md:space-y-6 pt-2 md:pt-4">
             <Feature
               icon={Compass}
               title="Interactive Mastery"
@@ -69,10 +69,10 @@ export default async function LoginPage() {
         </div>
 
         {/* Right Side - Auth Card */}
-        <div className="flex flex-col items-center mt-4 md:mt-0">
-          <div className="w-full max-w-[400px] rounded-2xl sm:border border-border/50 sm:bg-surface/50 sm:backdrop-blur-xl p-4 sm:p-8 sm:shadow-2xl relative">
+        <div className="flex flex-col items-center mt-2 md:mt-0">
+          <div className="w-full max-w-[400px] rounded-2xl sm:border border-border/50 sm:bg-surface/50 sm:backdrop-blur-xl p-3 sm:p-8 sm:shadow-2xl relative">
             <div className="hidden sm:block absolute -inset-[1px] rounded-2xl bg-gradient-to-b from-foreground/10 to-transparent pointer-events-none" />
-            <div className="relative z-10 space-y-6">
+            <div className="relative z-10 space-y-4 sm:space-y-6">
               <div className="text-center space-y-1 sm:space-y-2">
                 <h2 className="text-xl sm:text-2xl font-display font-bold">Welcome back</h2>
                 <p className="text-xs sm:text-sm text-muted-foreground">Sign in to continue your journey</p>
@@ -80,7 +80,7 @@ export default async function LoginPage() {
 
               <AuthForm />
               
-              <p className="text-center text-[10px] sm:text-xs text-muted-foreground mt-4 sm:mt-6">
+              <p className="text-center text-[10px] sm:text-xs text-muted-foreground mt-3 sm:mt-6 leading-tight">
                 By continuing, you trust Sifu Quest with your career progression data. (Locally, of course.)
               </p>
             </div>
@@ -103,21 +103,21 @@ function Feature({
   color: (typeof DOMAIN_COLORS)[keyof typeof DOMAIN_COLORS]
 }) {
   return (
-    <div className="flex gap-4 items-start group">
+    <div className="flex gap-3 md:gap-4 items-start group">
       <div 
-        className="shrink-0 p-2.5 rounded-xl border transition-colors duration-300"
+        className="shrink-0 p-2 md:p-2.5 rounded-xl border transition-colors duration-300"
         style={{ 
           backgroundColor: `${color.hex}15`, 
           borderColor: `${color.hex}30`,
         }}
       >
-        <Icon className="w-5 h-5" style={{ color: color.hex }} />
+        <Icon className="w-4 h-4 md:w-5 md:h-5" style={{ color: color.hex }} />
       </div>
       <div>
-        <h3 className="font-medium text-foreground group-hover:text-foreground/90 transition-colors">
+        <h3 className="font-medium text-sm md:text-base text-foreground group-hover:text-foreground/90 transition-colors">
           {title}
         </h3>
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <p className="text-xs md:text-sm text-muted-foreground leading-snug md:leading-relaxed">
           {description}
         </p>
       </div>

@@ -30,19 +30,19 @@ export function AuthForm() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <Button 
         variant="outline" 
-        className="w-full h-12 relative group overflow-hidden border-border bg-transparent hover:bg-surface transition-all"
+        className="w-full h-11 sm:h-12 text-sm relative group overflow-hidden border-border bg-transparent hover:bg-surface transition-all"
         onClick={handleGoogleSignIn}
         disabled={isLoadingGoogle || isLoadingGuest}
       >
         <div className="absolute inset-x-0 bottom-0 h-[1px] bg-gradient-to-r from-transparent via-coach to-transparent translate-y-full group-hover:translate-y-0 transition-transform" />
         {isLoadingGoogle ? (
-          <div className="w-5 h-5 border-2 border-muted-foreground border-t-foreground rounded-full animate-spin" />
+          <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-muted-foreground border-t-foreground rounded-full animate-spin" />
         ) : (
           <>
-            <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-3" viewBox="0 0 24 24">
               <path
                 fill="currentColor"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -76,15 +76,15 @@ export function AuthForm() {
 
       <Button 
         variant="secondary" 
-        className="w-full h-12 group hover:bg-elevated text-foreground"
+        className="w-full h-11 sm:h-12 text-sm group hover:bg-elevated text-foreground"
         onClick={handleGuestSignIn}
         disabled={isLoadingGoogle || isLoadingGuest}
       >
         {isLoadingGuest ? (
-          <div className="w-5 h-5 border-2 border-muted-foreground border-t-foreground rounded-full animate-spin" />
+          <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-muted-foreground border-t-foreground rounded-full animate-spin" />
         ) : (
           <>
-            <User className="w-5 h-5 mr-3 text-muted-foreground group-hover:text-foreground transition-colors" />
+            <User className="w-4 h-4 sm:w-5 sm:h-5 mr-3 text-muted-foreground group-hover:text-foreground transition-colors" />
             Sign in as Guest
           </>
         )}
