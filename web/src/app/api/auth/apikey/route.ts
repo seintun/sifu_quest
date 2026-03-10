@@ -1,6 +1,7 @@
 import { encryptKey } from '@/lib/apikey'
 import { validateAnthropicApiKey } from '@/lib/apikey-validation'
 import { createAdminClient } from '@/lib/supabase-admin'
+import { deleteEncryptedProviderApiKey, upsertEncryptedProviderApiKey } from '@/lib/provider-api-keys'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
@@ -32,51 +33,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    const { apiKey } = await request.json()
+    const { apiKey, provider } = await request.json().catch(() => ({})) as { apiKey?: unknown; provider?: unknown }
     const normalizedApiKey = typeof apiKey === 'string' ? apiKey.trim() : ''
+    const normalizedProvider = provider === 'openrouter' ? 'openrouter' : 'anthropic'
 
-    if (!normalizedApiKey || !normalizedApiKey.startsWith('sk-ant-')) {
-      return NextResponse.json({ error: 'Invalid Anthropic API key' }, { status: 400 })
-    }
-
-    const keyValidation = await validateAnthropicApiKey(normalizedApiKey)
-    if (!keyValidation.ok) {
-      if (keyValidation.code === 'invalid_key') {
-        return NextResponse.json({ error: keyValidation.error, code: keyValidation.code }, { status: 400 })
+    if (normalizedProvider === 'anthropic') {
+      if (!normalizedApiKey || !normalizedApiKey.startsWith('sk-ant-')) {
+        return NextResponse.json({ error: 'Invalid Anthropic API key' }, { status: 400 })
       }
-      return NextResponse.json({ error: keyValidation.error, code: keyValidation.code }, { status: 503 })
+
+      const keyValidation = await validateAnthropicApiKey(normalizedApiKey)
+      if (!keyValidation.ok) {
+        if (keyValidation.code === 'invalid_key') {
+          return NextResponse.json({ error: keyValidation.error, code: keyValidation.code }, { status: 400 })
+        }
+        return NextResponse.json({ error: keyValidation.error, code: keyValidation.code }, { status: 503 })
+      }
+    } else if (!normalizedApiKey) {
+      return NextResponse.json({ error: 'Invalid OpenRouter API key' }, { status: 400 })
     }
     
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const encryptedKey = encryptKey(normalizedApiKey)
-    
+    await upsertEncryptedProviderApiKey(userId, normalizedProvider, encryptedKey)
     const supabase = createAdminClient()
-    
-    // Upsert ensures a profile row exists even before first chat bootstrap.
-    const { error } = await supabase
-      .from('user_profiles')
-      .upsert({
-        id: userId,
-        api_key_enc: encryptedKey,
-        last_active_at: new Date().toISOString(),
-      }, { onConflict: 'id' })
-      
-    if (error) {
-      console.error("Failed to save API key:", error)
-      if (error.code === '23503') {
-        return NextResponse.json(
-          { error: 'Session identity is out of sync. Please sign out and sign in again.', code: 'identity_mismatch' },
-          { status: 409 },
-        )
-      }
-      return NextResponse.json({ error: 'Failed to save API key' }, { status: 500 })
-    }
     
     // Log the action
     await supabase.from('audit_log').insert({
       user_id: userId,
       action: 'api_key.set',
-      resource: 'user_profiles'
+      resource: normalizedProvider,
+      details: { provider: normalizedProvider },
     })
     
     return NextResponse.json({ success: true })
@@ -87,7 +74,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
@@ -96,30 +83,15 @@ export async function DELETE() {
     
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const supabase = createAdminClient()
-    
-    const { error } = await supabase
-      .from('user_profiles')
-      .upsert({
-        id: userId,
-        api_key_enc: null,
-        last_active_at: new Date().toISOString(),
-      }, { onConflict: 'id' })
-      
-    if (error) {
-      console.error("Failed to delete API key:", error)
-      if (error.code === '23503') {
-        return NextResponse.json(
-          { error: 'Session identity is out of sync. Please sign out and sign in again.', code: 'identity_mismatch' },
-          { status: 409 },
-        )
-      }
-      return NextResponse.json({ error: 'Failed to delete API key' }, { status: 500 })
-    }
+    const { searchParams } = new URL(request.url)
+    const normalizedProvider = searchParams.get('provider') === 'openrouter' ? 'openrouter' : 'anthropic'
+    await deleteEncryptedProviderApiKey(userId, normalizedProvider)
     
     await supabase.from('audit_log').insert({
       user_id: userId,
       action: 'api_key.delete',
-      resource: 'user_profiles'
+      resource: normalizedProvider,
+      details: { provider: normalizedProvider },
     })
     
     return NextResponse.json({ success: true })
