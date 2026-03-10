@@ -55,6 +55,19 @@ const mdComponents: Components = {
   hr: () => <div className="my-4" />,
 }
 
+const checklistItemMdComponents: Components = {
+  p: ({ children }) => <span>{children}</span>,
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-plan hover:underline underline-offset-2">
+      {children}
+    </a>
+  ),
+  strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+  code: ({ children }) => (
+    <code className="text-plan bg-elevated/80 px-1.5 py-0.5 rounded text-[12px] font-mono">{children}</code>
+  ),
+}
+
 const CATEGORY_DOMAINS: Record<string, keyof typeof DOMAIN_COLORS> = {
   DSA: 'dsa',
   'System Design': 'design',
@@ -84,9 +97,11 @@ function PlanCheckItem({
         disabled={loading}
         className="mt-0.5"
       />
-      <span className={`text-sm ${item.checked ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-        {item.text}
-      </span>
+      <div className={`text-sm ${item.checked ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={checklistItemMdComponents}>
+          {item.text}
+        </ReactMarkdown>
+      </div>
     </div>
   )
 }
