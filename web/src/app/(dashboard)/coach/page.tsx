@@ -163,6 +163,25 @@ export default function CoachPage() {
     scrollToBottom()
   }, [messages, scrollToBottom])
 
+  // Automatically trigger the end-of-quota experience once the 5th message finishes streaming
+  useEffect(() => {
+    if (!isStreaming && freeQuota?.isFreeTier && freeQuota.remaining <= 0 && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1]
+      // Only append if we haven't already appended it
+      if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.content.includes('exhausted your free messages')) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: 'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your past conversation remains accessible here.'
+          }
+        ])
+        // Reveal the popup overlay after the stream finishes
+        setDismissedPrompt(false)
+      }
+    }
+  }, [isStreaming, freeQuota, messages, setMessages])
+
   const handleClearHistory = () => {
     hasGreetedRef.current = null
     clearHistory()
@@ -221,7 +240,7 @@ export default function CoachPage() {
              </div>
           ) : (
             <>
-              {freeQuota?.isFreeTier && freeQuota.remaining <= 0 && messages.length === 0 && !dismissedPrompt && (
+              {freeQuota?.isFreeTier && freeQuota.remaining <= 0 && !isStreaming && !dismissedPrompt && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
                   <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />
                 </div>
