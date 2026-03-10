@@ -4,7 +4,7 @@ To deploy this Next.js app to Vercel, you need to populate the following Environ
 
 ### Supabase
 - `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase Project URL.
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase Anon Key (safe for the browser).
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`: Your Supabase Anon / Publishable Key (safe for the browser).
 - `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase Service Role Key (used ONLY for the GDPR account deletion endpoint).
 
 ### Authentication & Keys

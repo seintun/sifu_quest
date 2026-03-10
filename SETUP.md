@@ -49,7 +49,7 @@ After startup, the CLI prints your local keys:
 
 ```
 API URL:         http://localhost:54321
-anon key:        eyJ...  ← use as NEXT_PUBLIC_SUPABASE_ANON_KEY
+anon key:        eyJ...  ← use as NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
 service_role key: eyJ...  ← use as SUPABASE_SERVICE_ROLE_KEY
 ```
 
@@ -230,7 +230,7 @@ touch .env.local
 ```env
 # ── Supabase (from `npx supabase start` output) ──
 NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<paste-local-anon-key>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=<paste-local-anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<paste-local-service-role-key>
 
 # ── Anthropic (for guest sessions) ──
@@ -290,7 +290,7 @@ Go to **Settings → Environment Variables** and add each variable:
 | Variable                               | Value Source                          | Environments       |
 | -------------------------------------- | ------------------------------------- | ------------------- |
 | `NEXT_PUBLIC_SUPABASE_URL`             | Supabase dashboard → Settings → API  | Production, Preview |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`        | Supabase dashboard → Settings → API  | Production, Preview |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase dashboard → Settings → API  | Production, Preview |
 | `SUPABASE_SERVICE_ROLE_KEY`            | Supabase dashboard → Settings → API  | Production, Preview |
 | `ANTHROPIC_API_KEY`                    | Anthropic Console → API Keys         | Production, Preview |
 | `API_KEY_ENCRYPTION_SECRET`            | `openssl rand -hex 32`               | Production, Preview |
@@ -336,7 +336,7 @@ After adding all environment variables, trigger a redeploy:
 | Variable                                | Required | Client-safe | Source                |
 | --------------------------------------- | -------- | ----------- | --------------------- |
 | `NEXT_PUBLIC_SUPABASE_URL`              | ✅       | ✅          | Supabase Dashboard    |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`         | ✅       | ✅          | Supabase Dashboard    |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`  | ✅       | ✅          | Supabase Dashboard    |
 | `SUPABASE_SERVICE_ROLE_KEY`             | ✅       | ❌          | Supabase Dashboard    |
 | `ANTHROPIC_API_KEY`                     | ✅       | ❌          | Anthropic Console     |
 | `API_KEY_ENCRYPTION_SECRET`             | ✅       | ❌          | `openssl rand -hex 32`|
