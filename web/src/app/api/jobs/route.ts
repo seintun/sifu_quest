@@ -1,4 +1,4 @@
-import { readMemoryFile, writeMemoryFile } from '@/lib/memory'
+import { MemoryWriteError, readMemoryFile, writeMemoryFile } from '@/lib/memory'
 import { addApplication, updateApplicationStatus } from '@/lib/parsers/job-search'
 import { logAuditEvent, logProgressEvent } from '@/lib/progress'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
@@ -49,6 +49,13 @@ export async function POST(request: NextRequest) {
     await writeMemoryFile(userId, 'job-search.md', content, 'job_app')
     return NextResponse.json({ success: true })
   } catch (error) {
+    if (error instanceof MemoryWriteError && error.dbCode === '23503') {
+      return NextResponse.json(
+        { error: 'Session identity is out of sync. Please sign out and sign in again.', code: 'identity_mismatch' },
+        { status: 409 },
+      )
+    }
+
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
   }

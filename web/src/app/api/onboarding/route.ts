@@ -1,4 +1,4 @@
-import { writeMemoryFile } from '@/lib/memory'
+import { MemoryWriteError, writeMemoryFile } from '@/lib/memory'
 import { getPlanTimelineMeta } from '@/lib/profile-timeline'
 import { assertRequiredEnv, MissingEnvironmentVariableError } from '@/lib/env'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
@@ -243,6 +243,12 @@ Format as clean markdown suitable for rendering.`
       return NextResponse.json(
         { error: 'Our AI planner is still being configured. Please try again shortly.' },
         { status: 503 },
+      )
+    }
+    if (error instanceof MemoryWriteError && error.dbCode === '23503') {
+      return NextResponse.json(
+        { error: 'Session identity is out of sync. Please sign out and sign in again.', code: 'identity_mismatch' },
+        { status: 409 },
       )
     }
 
