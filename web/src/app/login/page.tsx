@@ -12,9 +12,9 @@ export default async function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden bg-background">
+    <div className="min-h-screen relative flex items-center justify-center p-0 sm:p-4 overflow-hidden bg-background">
       {/* Dynamic Background */}
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0 hidden sm:block">
         <div 
           className="absolute -top-[20%] -left-[10%] w-[70vw] h-[70vw] rounded-full mix-blend-screen filter blur-[120px] opacity-20 animate-pulse"
           style={{ background: DOMAIN_COLORS.dsa.hex }}
@@ -30,23 +30,23 @@ export default async function LoginPage() {
         <div className="absolute inset-0 bg-background/80 backdrop-blur-[60px]" />
       </div>
 
-      <div className="w-full max-w-[1000px] z-10 grid md:grid-cols-2 gap-12 items-center">
+      <div className="w-full max-w-[1000px] z-10 grid md:grid-cols-2 gap-8 md:gap-12 items-center px-4 py-8 sm:p-0">
         {/* Left Side - Brand & Value Prop */}
-        <div className="space-y-8">
+        <div className="space-y-6 md:space-y-8 max-w-sm mx-auto md:max-w-none md:mx-0">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface border border-border/50 text-xs font-medium text-muted-foreground mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface border border-border/50 text-[10px] md:text-xs font-medium text-muted-foreground mb-4 md:mb-6">
               <span className="w-2 h-2 rounded-full bg-streak animate-pulse" />
               Your path to mastery
             </div>
-            <h1 className="text-5xl lg:text-7xl font-display font-bold tracking-tight text-foreground">
+            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-display font-bold tracking-tight text-foreground">
               Sifu Quest
             </h1>
-            <p className="mt-4 text-lg text-muted-foreground max-w-md leading-relaxed">
+            <p className="mt-3 md:mt-4 text-base md:text-lg text-muted-foreground max-w-md leading-relaxed">
               The AI-powered career coaching dashboard that treats your job search like an RPG. Track, learn, and level up.
             </p>
           </div>
 
-          <div className="space-y-6 pt-4">
+          <div className="space-y-4 md:space-y-6 pt-2 md:pt-4">
             <Feature
               icon={Compass}
               title="Interactive Mastery"
@@ -69,18 +69,18 @@ export default async function LoginPage() {
         </div>
 
         {/* Right Side - Auth Card */}
-        <div className="flex flex-col items-center">
-          <div className="w-full max-w-[400px] rounded-2xl border border-border/50 bg-surface/50 backdrop-blur-xl p-8 shadow-2xl relative">
-            <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-b from-foreground/10 to-transparent pointer-events-none" />
+        <div className="flex flex-col items-center mt-4 md:mt-0">
+          <div className="w-full max-w-[400px] rounded-2xl sm:border border-border/50 sm:bg-surface/50 sm:backdrop-blur-xl p-4 sm:p-8 sm:shadow-2xl relative">
+            <div className="hidden sm:block absolute -inset-[1px] rounded-2xl bg-gradient-to-b from-foreground/10 to-transparent pointer-events-none" />
             <div className="relative z-10 space-y-6">
-              <div className="text-center space-y-2">
-                <h2 className="text-2xl font-display font-bold">Welcome back</h2>
-                <p className="text-sm text-muted-foreground">Sign in to continue your journey</p>
+              <div className="text-center space-y-1 sm:space-y-2">
+                <h2 className="text-xl sm:text-2xl font-display font-bold">Welcome back</h2>
+                <p className="text-xs sm:text-sm text-muted-foreground">Sign in to continue your journey</p>
               </div>
 
               <AuthForm />
               
-              <p className="text-center text-xs text-muted-foreground mt-6">
+              <p className="text-center text-[10px] sm:text-xs text-muted-foreground mt-4 sm:mt-6">
                 By continuing, you trust Sifu Quest with your career progression data. (Locally, of course.)
               </p>
             </div>
