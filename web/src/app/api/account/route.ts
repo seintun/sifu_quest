@@ -1,30 +1,19 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import { NextRequest, NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase-admin'
+import { resolveCanonicalUserId } from '@/lib/user-identity'
+import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 
 export const runtime = 'nodejs'
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   try {
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    const userId = session.user.id
-    
-    // We need the service role key to delete a user from auth.users
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!serviceRoleKey) {
-      console.error("Missing SUPABASE_SERVICE_ROLE_KEY for GDPR delete")
-      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
-    }
-    
-    // Initialize admin client
-    const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey
-    )
+    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
+    const supabaseAdmin = createAdminClient()
     
     // 1. Log the deletion in audit_log before deleting
     await supabaseAdmin.from('audit_log').insert({
@@ -41,6 +30,12 @@ export async function DELETE(request: NextRequest) {
     
     if (error) {
       console.error("Failed to delete user from Supabase auth:", error)
+      if (error.message.toLowerCase().includes('not found')) {
+        return NextResponse.json(
+          { error: 'Session identity is out of sync. Please sign out and sign in again.', code: 'identity_mismatch' },
+          { status: 409 },
+        )
+      }
       return NextResponse.json({ error: 'Failed to delete account' }, { status: 500 })
     }
     

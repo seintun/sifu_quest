@@ -1,4 +1,5 @@
 import { computeMetrics } from '@/lib/metrics'
+import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 
@@ -10,7 +11,7 @@ export async function GET() {
     if (!session?.user?.id) {
        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const userId = session.user.id
+    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
 
     const metrics = await computeMetrics(userId)
     return NextResponse.json(metrics)

@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase'
+import { createAdminClient } from '@/lib/supabase-admin'
+import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 
@@ -10,9 +11,9 @@ export async function GET() {
     if (!session?.user?.id) {
        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const userId = session.user.id
+    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: events, error } = await supabase
       .from('progress_events')
       .select('*')

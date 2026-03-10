@@ -1,5 +1,6 @@
 import { getDay } from 'date-fns'
 import { readMemoryFile } from './memory'
+import { createAdminClient } from './supabase-admin'
 import { parseDSAPatterns, parseProblemHistory } from './parsers/dsa-patterns'
 import { parseJobApplications } from './parsers/job-search'
 import { parsePlan } from './parsers/plan-parser'
@@ -73,9 +74,8 @@ export async function computeMetrics(userId: string): Promise<DashboardMetrics> 
   ) || null
 
   // Calculate current streak from progress_events
-  const supabase = await import('./supabase').then(m => m.createClient())
-  const db = await supabase
-  const { data: events } = await db
+  const supabase = createAdminClient()
+  const { data: events } = await supabase
     .from('progress_events')
     .select('occurred_at')
     .eq('user_id', userId)
