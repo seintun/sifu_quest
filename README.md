@@ -115,6 +115,7 @@ npm run dev
 | Document | What's Inside |
 |----------|--------------|
 | **[docs/technical/](./docs/technical/)** | Architecture diagrams, database schema, API reference, security model |
+| **[docs/technical/provider-pricing-roadmap.md](./docs/technical/provider-pricing-roadmap.md)** | Technical decision roadmap for OpenRouter + Anthropic provider strategy, pricing policy, and chat telemetry |
 | **[docs/setup/](./docs/setup/)** | Step-by-step local development setup and Vercel production deployment |
 | **[docs/project/roadmap.md](./docs/project/roadmap.md)** | The comprehensive product roadmap and design system for Sifu Quest |
 

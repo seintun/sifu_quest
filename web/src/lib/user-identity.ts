@@ -14,7 +14,7 @@ export async function resolveCanonicalUserId(
     return sessionUserId
   }
 
-  if (!shouldAttemptEmailFallback(sessionEmail)) {
+  if (!sessionEmail || !shouldAttemptEmailFallback(sessionEmail)) {
     return sessionUserId
   }
 

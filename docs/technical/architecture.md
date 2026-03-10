@@ -1,5 +1,7 @@
 # Technical Architecture
 > Overview of Sifu Quest runtime, infrastructure, and core modules.
+>
+> See also: [Provider, Pricing, and Telemetry Technical Decision Roadmap](./provider-pricing-roadmap.md) for the planned OpenRouter + Anthropic rollout, quota policy, and usage telemetry design.
 
 ## High-Level Architecture
 
