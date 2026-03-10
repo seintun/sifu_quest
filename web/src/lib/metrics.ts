@@ -73,12 +73,17 @@ export async function computeMetrics(userId: string): Promise<DashboardMetrics> 
     r.day.toLowerCase() === todayName.toLowerCase()
   ) || null
 
+  const lookbackDate = new Date()
+  lookbackDate.setUTCHours(0, 0, 0, 0)
+  lookbackDate.setUTCDate(lookbackDate.getUTCDate() - 366)
+
   // Calculate current streak from progress_events
   const supabase = createAdminClient()
   const { data: events } = await supabase
     .from('progress_events')
     .select('occurred_at')
     .eq('user_id', userId)
+    .gte('occurred_at', lookbackDate.toISOString())
 
   const eventDates = (events || []).map(e => {
     // occurred_at is a TIMESTAMPTZ, so convert to YYYY-MM-DD
