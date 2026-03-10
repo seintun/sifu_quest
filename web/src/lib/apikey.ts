@@ -1,18 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
+import { getApiKeyEncryptionSecret } from './env'
 
-// Use a fallback for local dev if the secret isn't in .env yet, 
-// but ensure it's a 32-byte hex string.
-const getSecret = () => {
-  const secret = process.env.API_KEY_ENCRYPTION_SECRET
-  if (!secret) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('API_KEY_ENCRYPTION_SECRET is not set')
-    }
-    // Return a dummy 32-byte hex string for local dev if missing
-    return '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
-  }
-  return secret
-}
+const getSecret = () => getApiKeyEncryptionSecret()
 
 export function encryptKey(apiKey: string): string {
   const secret = getSecret()
