@@ -4,6 +4,17 @@ This guide walks you through setting up **Sifu Quest** for both local developmen
 
 ---
 
+## Runtime Model
+
+- User memory/profile/plan markdown files are stored in Supabase `memory_files`.
+- Coaching instructions come from `web/src/modes/*.md`.
+- Infrastructure secrets are configured via `.env.local` (local) and Vercel Environment Variables (deploy).
+- User-provided Anthropic keys are saved in-app and encrypted in `user_profiles.api_key_enc`.
+- Accounts without personal keys use trial mode with the shared `ANTHROPIC_API_KEY`: **5 user messages in 30 minutes**.
+- `.claude/*` and local `memory/*.md` files are local assistant-tooling context and are not the deployed web app memory source.
+
+---
+
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
@@ -142,7 +153,7 @@ The Anthropic API key powers the Claude LLM for the coaching chat.
 | ------------- | -------------------- |
 | **API Key**   | `ANTHROPIC_API_KEY`  |
 
-> 💡 **Note:** This key is used **only** for guest (anonymous) sessions, which are capped at 5 messages. Logged-in users provide their own key via the Settings page.
+> 💡 **Note:** This key powers trial mode for users without a personal key (guest or signed-in). Trial is capped at **5 user messages within 30 minutes**. Users can add a personal key in Settings to unlock unlimited usage.
 
 ---
 
@@ -258,7 +269,7 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000). You should be able to:
 - Log in with Google or start an anonymous guest session
 - Complete onboarding
-- Chat with the AI coach (uses your `ANTHROPIC_API_KEY`)
+- Chat in trial mode using `ANTHROPIC_API_KEY` until a personal key is added
 - View your dashboard and calendar
 
 ### Verify the build compiles cleanly
@@ -341,7 +352,7 @@ After adding all environment variables, trigger a redeploy:
 
 - [ ] Visit `https://your-app.vercel.app` — landing page loads
 - [ ] Click **Login with Google** — redirects to Google, returns authenticated
-- [ ] Start an anonymous session — limited to 5 chat messages
+- [ ] Start without a personal key — trial is limited to 5 messages / 30 minutes
 - [ ] Save an API key in Settings — verify it encrypts and round-trips
 - [ ] Delete your account — confirm all data is wiped (GDPR)
 - [ ] Check Sentry dashboard — errors and traces appear
