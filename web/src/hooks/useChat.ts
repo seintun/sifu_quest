@@ -82,11 +82,11 @@ export function useChat(mode: string) {
 
       if (!res.ok) {
         let errorMessage = 'Unknown error'
-        let errorCode = null
+        let errorCode: string | null = null
         try {
-           const errorData = await res.json()
+           const errorData: { message?: string; error?: string } = await res.json()
            errorMessage = errorData.message || errorData.error || errorMessage
-           errorCode = errorData.error
+           errorCode = errorData.error ?? null
         } catch { /* ignore */ }
         
         if (res.status === 403) {
@@ -169,11 +169,11 @@ export function useChat(mode: string) {
 
       if (!res.ok) {
         let errorMessage = 'Unknown error'
-        let errorCode = null
+        let errorCode: string | null = null
         try {
-           const errorData = await res.json()
+           const errorData: { message?: string; error?: string } = await res.json()
            errorMessage = errorData.message || errorData.error || errorMessage
-           errorCode = errorData.error
+           errorCode = errorData.error ?? null
         } catch { /* ignore */ }
         
         if (res.status === 403) {

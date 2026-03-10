@@ -85,10 +85,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Keep heartbeat updated (non-blocking).
-    void supabase
-      .from('user_profiles')
-      .update({ last_active_at: new Date().toISOString() })
-      .eq('id', userId)
+    void (async () => {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ last_active_at: new Date().toISOString() })
+        .eq('id', userId)
+        
+      if (error) {
+        console.error('Failed to update user last_active_at heartbeat:', error)
+      }
+    })().catch((err: unknown) => {
+      console.error('Unexpected error during user last_active_at heartbeat:', err)
+    })
 
     // 2. Guest enforcement and Free tier enforcement
     let apiKey = process.env.ANTHROPIC_API_KEY
@@ -110,6 +118,11 @@ export async function POST(request: NextRequest) {
       if (decryptedKey) {
         apiKey = decryptedKey
         usingFreeKey = false;
+      } else {
+        return new Response(JSON.stringify({
+          error: 'invalid_api_key',
+          message: 'Your saved API key could not be decrypted. Please re-add it in Settings to continue.'
+        }), { status: 403 })
       }
     }
 
@@ -134,7 +147,10 @@ export async function POST(request: NextRequest) {
         .select('message_count')
         .eq('user_id', userId)
         
-      if (!countError && totalMessagesData) {
+      if (countError) {
+        console.error('Failed to fetch chat session message counts for free tier checking', countError)
+        return new Response(JSON.stringify({ error: 'Failed to verify free tier limits' }), { status: 500 })
+      } else if (totalMessagesData) {
         const totalMessages = totalMessagesData.reduce((sum, session) => sum + (session.message_count || 0), 0)
         
         if (totalMessages >= 10) { 

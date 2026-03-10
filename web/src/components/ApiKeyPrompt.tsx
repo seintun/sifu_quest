@@ -1,4 +1,5 @@
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { KeyRound, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
@@ -13,8 +14,8 @@ export function ApiKeyPrompt() {
           </div>
           <CardTitle className="text-xl">Free Messages Exhausted</CardTitle>
           <CardDescription className="text-foreground/80">
-            You've used up your 5 free messages on the shared platform key. 
-            To continue this session, please provide your own Anthropic API key.
+            You've reached the free-tier limit on the shared platform key. 
+            To continue chatting, please provide your own Anthropic API key.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-4">
@@ -25,10 +26,8 @@ export function ApiKeyPrompt() {
              </div>
           </div>
           <div className="pt-2">
-            <Link href="/settings">
-              <Button className="w-full font-medium">
-                Go to Settings
-              </Button>
+            <Link href="/settings" className={cn(buttonVariants(), "w-full font-medium")}>
+              Go to Settings
             </Link>
           </div>
         </CardContent>
