@@ -1,4 +1,4 @@
-import { createClient } from './supabase'
+import { createAdminClient } from './supabase-admin'
 
 const ALLOWED_MEMORY_FILES = [
   'profile.md',
@@ -35,7 +35,7 @@ function validateModeFile(filename: string): void {
 export async function readMemoryFile(userId: string, filename: string): Promise<string> {
   validateMemoryFile(filename)
   
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('memory_files')
     .select('content')
@@ -74,7 +74,7 @@ export async function writeMemoryFile(
 ): Promise<void> {
   validateMemoryFile(filename)
   
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   
   // We use Supabase RPC or upsert to bump the version, but the easiest Upsert is:
   // 1. Get current version
@@ -131,7 +131,7 @@ export function getAllowedModeFiles(): string[] {
 }
 
 export async function listMemoryFiles(userId: string): Promise<string[]> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data } = await supabase
     .from('memory_files')
     .select('filename')
