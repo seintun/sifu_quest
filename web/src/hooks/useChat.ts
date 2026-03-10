@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+export interface FreeQuota {
+  isFreeTier: boolean
+  remaining: number
+  total: number
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
@@ -13,6 +19,7 @@ export function useChat(mode: string) {
   const [isStreaming, setIsStreaming] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
   const [upgradeRequired, setUpgradeRequired] = useState<string | null>(null)
+  const [freeQuota, setFreeQuota] = useState<FreeQuota | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   // Load history for the current mode from DB
@@ -30,6 +37,9 @@ export function useChat(mode: string) {
         if (data.session) {
            setSessionId(data.session.id)
            setMessages(data.messages || [])
+        }
+        if (data.freeQuota) {
+           setFreeQuota(data.freeQuota)
         }
         setIsLoaded(true)
       })
@@ -62,6 +72,9 @@ export function useChat(mode: string) {
     ]
     setMessages(newMessages)
     setIsStreaming(true)
+
+    // Optimistically decrement quota
+    setFreeQuota(prev => prev && prev.isFreeTier ? { ...prev, remaining: Math.max(0, prev.remaining - 1) } : prev)
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -247,5 +260,5 @@ export function useChat(mode: string) {
     abortRef.current?.abort()
   }, [])
 
-  return { messages, isStreaming, isLoaded, upgradeRequired, sendMessage, greet, clearHistory, stopStreaming }
+  return { messages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming }
 }

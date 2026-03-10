@@ -14,7 +14,7 @@ import { ApiKeyPrompt } from '@/components/ApiKeyPrompt'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { useChat, type ChatMessage } from '@/hooks/useChat'
 import 'highlight.js/styles/github-dark.css'
-import { MessageCircle, Send, Square, Trash2 } from 'lucide-react'
+import { MessageCircle, Send, Square, Trash2, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
@@ -127,7 +127,7 @@ function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreamin
 export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
   const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
-  const { messages, isStreaming, isLoaded, upgradeRequired, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
+  const { messages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
   const hasGreetedRef = useRef<string | null>(null)
   const [input, setInput] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -242,7 +242,13 @@ export default function CoachPage() {
           </div>
 
           {/* Input */}
-          <div className="border-t border-border p-3 shrink-0">
+          <div className="border-t border-border p-3 shrink-0 relative">
+            {freeQuota?.isFreeTier && (
+              <div className="absolute -top-11 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-background/95 backdrop-blur-sm border border-border/60 rounded-full px-3 py-1 shadow-sm text-xs font-medium text-foreground/80 z-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                <span>{freeQuota.remaining} / {freeQuota.total} free messages remaining</span>
+              </div>
+            )}
             <div className="flex gap-2">
               <Textarea
                 ref={textareaRef}

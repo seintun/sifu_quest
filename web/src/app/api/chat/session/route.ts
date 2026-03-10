@@ -22,6 +22,39 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient()
 
+    // 1. Calculate free-tier quota limits globally across all sessions
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('is_guest, api_key_enc, free_quota_exhausted')
+      .eq('id', userId)
+      .maybeSingle()
+
+    let isFreeTier = true
+    if (userProfile && !userProfile.is_guest && userProfile.api_key_enc) {
+      isFreeTier = false
+    }
+
+    let freeQuota = null
+    if (isFreeTier && userProfile) {
+      if (userProfile.free_quota_exhausted) {
+        freeQuota = { isFreeTier: true, remaining: 0, total: 5 }
+      } else {
+        const { data: totalMessagesData } = await supabase
+          .from('chat_sessions')
+          .select('message_count')
+          .eq('user_id', userId)
+
+        const totalMessages = totalMessagesData?.reduce((sum, session) => sum + (session.message_count || 0), 0) || 0
+        const remaining = Math.max(0, 10 - totalMessages)
+        freeQuota = { isFreeTier: true, remaining: Math.floor(remaining / 2), total: 5 }
+      }
+    } else if (!isFreeTier) {
+       freeQuota = { isFreeTier: false, remaining: -1, total: -1 }
+    } else {
+       // no profile yet
+       freeQuota = { isFreeTier: true, remaining: 5, total: 5 }
+    }
+
     // Find the most recent unarchived session for this mode 
     // In a multi-session UI, we would return a list. For now, we return the active one.
     const { data: chatSession, error: sessionError } = await supabase
@@ -40,7 +73,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!chatSession) {
-      return NextResponse.json({ session: null, messages: [] })
+      return NextResponse.json({ session: null, messages: [], freeQuota })
     }
 
     // Fetch messages for this session
@@ -58,7 +91,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       session: chatSession,
-      messages: messages.map(m => ({ role: m.role, content: m.content }))
+      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      freeQuota
     })
 
   } catch (error) {
