@@ -1,6 +1,7 @@
 import { readMemoryFile, writeMemoryFile } from '@/lib/memory'
 import { addConceptToTable } from '@/lib/parsers/system-design'
 import { logAuditEvent, logProgressEvent } from '@/lib/progress'
+import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) {
        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const userId = session.user.id
+    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
 
     const body = await request.json()
     const { concept, depthCovered, notes } = body

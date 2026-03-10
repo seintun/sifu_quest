@@ -3,6 +3,7 @@ import type { ProblemAttempt } from '@/lib/parsers/dsa-patterns'
 import { appendProblemToHistory, parseDSAPatterns, updatePatternMastery } from '@/lib/parsers/dsa-patterns'
 import { logAuditEvent, logProgressEvent } from '@/lib/progress'
 import type { MasteryLevel } from '@/lib/theme'
+import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) {
        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const userId = session.user.id
+    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
 
     const attempt: ProblemAttempt = await request.json()
 
@@ -52,4 +53,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
-
