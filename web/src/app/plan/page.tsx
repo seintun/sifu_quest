@@ -1,17 +1,17 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { DOMAIN_COLORS } from '@/lib/theme'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { ParsedPlan, PlanItem } from '@/lib/parsers/plan-parser'
 import { parsePlan } from '@/lib/parsers/plan-parser'
+import { DOMAIN_COLORS } from '@/lib/theme'
 import { AlertTriangle, Calendar, CheckCircle2, ChevronRight, Info } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import type { Components } from 'react-markdown'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { Components } from 'react-markdown'
 
 const mdComponents: Components = {
   h1: ({ children }) => <h1 className="text-xl font-display font-bold text-foreground mb-4">{children}</h1>,
@@ -121,7 +121,7 @@ function extractTitle(content: string): string {
 }
 
 function hasStructuredContent(plan: ParsedPlan): boolean {
-  return plan.months.length > 0 || plan.immediateSteps.length > 0 || plan.weeklyRhythm.length > 0
+  return plan.months.length > 0 || plan.immediateSteps.length > 0 || (plan.weeklyRhythm?.length ?? 0) > 0
 }
 
 export default function PlanPage() {
@@ -195,7 +195,7 @@ export default function PlanPage() {
       </div>
 
       {/* Weekly Rhythm */}
-      {plan.weeklyRhythm.length > 0 && (
+      {plan.weeklyRhythm?.length > 0 && (
         <Card className="border-border bg-surface">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
