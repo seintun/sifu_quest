@@ -9,6 +9,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest } from 'next/server'
 
 export const runtime = 'nodejs'
+const CHAT_UNAVAILABLE_MESSAGE = 'We hit a temporary issue loading your workspace. Please try again in a moment.'
+const CHAT_STREAM_ERROR_MESSAGE = 'We hit a temporary issue generating a response. Please try again.'
 
 const MODE_TO_FILES: Record<string, { mode: string; memory: string[] }> = {
   dsa: { mode: 'dsa.md', memory: ['profile.md', 'dsa-patterns.md', 'progress.md'] },
@@ -201,8 +203,7 @@ export async function POST(request: NextRequest) {
           }
         } catch (error) {
           if (!streamClosed) {
-            const message = error instanceof Error ? error.message : 'Stream error'
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: message })}\n\n`))
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: CHAT_STREAM_ERROR_MESSAGE })}\n\n`))
             controller.close()
             return
           }
@@ -219,8 +220,8 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return new Response(JSON.stringify({ error: message }), {
+    console.error('Failed to process chat request', error)
+    return new Response(JSON.stringify({ error: 'chat_unavailable', message: CHAT_UNAVAILABLE_MESSAGE }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     })

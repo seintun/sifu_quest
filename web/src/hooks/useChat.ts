@@ -20,6 +20,9 @@ const FREE_TIER_EXHAUSTED_MESSAGE =
 const GUEST_LIMIT_REACHED_MESSAGE =
   'You have reached the guest limit. Please sign up to continue. After creating your account, add your own Anthropic API key in **Settings** to keep chatting securely.'
 
+const CHAT_TEMPORARY_ERROR_MESSAGE =
+  'I hit a temporary issue loading your workspace. Please try again in a moment.'
+
 export function useChat(mode: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -143,8 +146,9 @@ export function useChat(mode: string) {
           setIsStreaming(false)
           return
         }
-        
-        setMessages([...newMessages, { role: 'assistant', content: `Error: ${errorMessage}` }])
+
+        const safeMessage = res.status >= 500 ? CHAT_TEMPORARY_ERROR_MESSAGE : errorMessage
+        setMessages([...newMessages, { role: 'assistant', content: safeMessage }])
         setIsStreaming(false)
         return
       }
@@ -194,7 +198,7 @@ export function useChat(mode: string) {
         if (err.name === 'AbortError') {
           return
         }
-        setMessages([...newMessages, { role: 'assistant', content: `Error: ${err.message}` }])
+        setMessages([...newMessages, { role: 'assistant', content: CHAT_TEMPORARY_ERROR_MESSAGE }])
       }
     } finally {
       if (abortRef.current === controller) {
@@ -240,8 +244,9 @@ export function useChat(mode: string) {
           setIsStreaming(false)
           return
         }
-        
-        setMessages([{ role: 'assistant', content: `Error: ${errorMessage}` }])
+
+        const safeMessage = res.status >= 500 ? CHAT_TEMPORARY_ERROR_MESSAGE : errorMessage
+        setMessages([{ role: 'assistant', content: safeMessage }])
         setIsStreaming(false)
         return
       }
@@ -275,7 +280,7 @@ export function useChat(mode: string) {
       }
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
-        setMessages([{ role: 'assistant', content: `Error: ${err.message}` }])
+        setMessages([{ role: 'assistant', content: CHAT_TEMPORARY_ERROR_MESSAGE }])
       }
     } finally {
       if (abortRef.current === controller) {

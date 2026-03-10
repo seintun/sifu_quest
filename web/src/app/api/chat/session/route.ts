@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 
 export const runtime = 'nodejs'
+const CHAT_SESSION_UNAVAILABLE_MESSAGE = 'We could not load your chat right now. Please refresh and try again.'
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,7 +42,10 @@ export async function GET(request: NextRequest) {
 
     if (sessionError && sessionError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
       console.error(sessionError)
-      return NextResponse.json({ error: 'Database error' }, { status: 500 })
+      return NextResponse.json(
+        { error: 'chat_session_unavailable', message: CHAT_SESSION_UNAVAILABLE_MESSAGE },
+        { status: 500 },
+      )
     }
 
     if (!chatSession) {
@@ -58,7 +62,10 @@ export async function GET(request: NextRequest) {
 
     if (messagesError) {
        console.error(messagesError)
-       return NextResponse.json({ error: 'Database error fetching messages' }, { status: 500 })
+       return NextResponse.json(
+         { error: 'chat_session_unavailable', message: CHAT_SESSION_UNAVAILABLE_MESSAGE },
+         { status: 500 },
+       )
     }
 
     return NextResponse.json({
@@ -68,8 +75,11 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('Failed to load chat session', error)
+    return NextResponse.json(
+      { error: 'chat_session_unavailable', message: CHAT_SESSION_UNAVAILABLE_MESSAGE },
+      { status: 500 },
+    )
   }
 }
 
@@ -126,7 +136,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ session: newSession, freeQuota })
 
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('Failed to create chat session', error)
+    return NextResponse.json(
+      { error: 'chat_session_unavailable', message: CHAT_SESSION_UNAVAILABLE_MESSAGE },
+      { status: 500 },
+    )
   }
 }
