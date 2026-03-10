@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test --experimental-strip-types src/lib/env.test.ts src/lib/entitlements.test.ts",
+    "test": "node --test --experimental-strip-types src/lib/env.test.mts src/lib/entitlements.test.mts",
     "setup": "node scripts/setup.mjs"
   },
   "dependencies": {
