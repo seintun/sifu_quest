@@ -15,7 +15,6 @@ import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { useChat, type ChatMessage } from '@/hooks/useChat'
 import 'highlight.js/styles/github-dark.css'
 import { MessageCircle, Send, Square, Trash2, Sparkles } from 'lucide-react'
-import { useSession } from 'next-auth/react'
 import { useCallback, useEffect, useRef, useState, type ComponentType, type HTMLAttributes } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
@@ -139,10 +138,9 @@ function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreamin
 export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
   const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
-  const { data: session } = useSession()
   const { messages, setMessages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
-  const isAuthenticatedUser = Boolean(session?.user?.email && !session.user.email.endsWith('@anonymous.local'))
-  const isGuest = Boolean(freeQuota?.isGuest) && !isAuthenticatedUser
+  const [accountIsGuest, setAccountIsGuest] = useState<boolean | null>(null)
+  const isGuest = accountIsGuest ?? Boolean(freeQuota?.isGuest)
   const hasGreetedRef = useRef<string | null>(null)
   const [dismissedPrompt, setDismissedPrompt] = useState(false)
   const [input, setInput] = useState('')
@@ -152,6 +150,31 @@ export default function CoachPage() {
   useEffect(() => {
     setDismissedPrompt(false)
   }, [mode])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadAccountStatus() {
+      try {
+        const res = await fetch('/api/account/status')
+        if (!res.ok || cancelled) {
+          return
+        }
+
+        const data = (await res.json()) as { account?: { isGuest?: boolean } }
+        if (typeof data.account?.isGuest === 'boolean') {
+          setAccountIsGuest(data.account.isGuest)
+        }
+      } catch {
+        // No-op: fallback to freeQuota.isGuest behavior.
+      }
+    }
+
+    void loadAccountStatus()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Auto-greet only after encrypted history has been loaded — prevents a spurious
   // greeting from firing against the empty initial state before async decrypt completes
