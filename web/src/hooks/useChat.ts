@@ -12,7 +12,7 @@ export function useChat(mode: string) {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
-  const [upgradeRequired, setUpgradeRequired] = useState(false)
+  const [upgradeRequired, setUpgradeRequired] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   // Load history for the current mode from DB
@@ -21,7 +21,7 @@ export function useChat(mode: string) {
     abortRef.current?.abort()
     setIsStreaming(false)
     setSessionId(null)
-    setUpgradeRequired(false)
+    setUpgradeRequired(null)
     setMessages([])
     
     fetch(`/api/chat/session?mode=${mode}`)
@@ -81,14 +81,17 @@ export function useChat(mode: string) {
       })
 
       if (!res.ok) {
-        if (res.status === 403) {
-          setUpgradeRequired(true)
-        }
         let errorMessage = 'Unknown error'
+        let errorCode = null
         try {
            const errorData = await res.json()
            errorMessage = errorData.message || errorData.error || errorMessage
+           errorCode = errorData.error
         } catch { /* ignore */ }
+        
+        if (res.status === 403) {
+          setUpgradeRequired(errorCode || 'missing_api_key')
+        }
         
         setMessages([...newMessages, { role: 'assistant', content: `Error: ${errorMessage}` }])
         setIsStreaming(false)
@@ -165,14 +168,17 @@ export function useChat(mode: string) {
       })
 
       if (!res.ok) {
-        if (res.status === 403) {
-          setUpgradeRequired(true)
-        }
         let errorMessage = 'Unknown error'
+        let errorCode = null
         try {
            const errorData = await res.json()
            errorMessage = errorData.message || errorData.error || errorMessage
+           errorCode = errorData.error
         } catch { /* ignore */ }
+        
+        if (res.status === 403) {
+          setUpgradeRequired(errorCode || 'missing_api_key')
+        }
         
         setMessages([{ role: 'assistant', content: `Error: ${errorMessage}` }])
         setIsStreaming(false)
