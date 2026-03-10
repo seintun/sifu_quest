@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase"
+import { createAdminClient } from "@/lib/supabase-admin"
 import { assertRequiredEnv, getAuthSecret } from "@/lib/env"
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
@@ -10,6 +11,61 @@ assertRequiredEnv([
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
 ])
+
+type OAuthUserSeed = {
+  email: string
+  name?: string | null
+  image?: string | null
+}
+
+async function findSupabaseUserByEmail(email: string): Promise<string | null> {
+  const supabaseAdmin = createAdminClient()
+  const normalizedEmail = email.trim().toLowerCase()
+  const perPage = 200
+  let page = 1
+
+  while (true) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage })
+    if (error) {
+      throw new Error(`Failed to list Supabase users: ${error.message}`)
+    }
+
+    const users = data?.users ?? []
+    const match = users.find((u) => u.email?.toLowerCase() === normalizedEmail)
+    if (match) {
+      return match.id
+    }
+
+    if (users.length < perPage) {
+      return null
+    }
+    page += 1
+  }
+}
+
+async function ensureSupabaseUserForGoogle(user: OAuthUserSeed): Promise<string> {
+  const supabaseAdmin = createAdminClient()
+  const existingId = await findSupabaseUserByEmail(user.email)
+  if (existingId) {
+    return existingId
+  }
+
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email: user.email.trim().toLowerCase(),
+    email_confirm: true,
+    user_metadata: {
+      name: user.name ?? null,
+      avatar_url: user.image ?? null,
+      provider: 'google',
+    },
+  })
+
+  if (error || !data.user) {
+    throw new Error(`Failed to create Supabase user for Google login: ${error?.message ?? 'unknown error'}`)
+  }
+
+  return data.user.id
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   secret: getAuthSecret(),
@@ -41,7 +97,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     })
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
+      if (account?.provider === 'google' && user) {
+        if (!user.email) {
+          throw new Error('Google account did not return an email address.')
+        }
+
+        token.id = await ensureSupabaseUserForGoogle({
+          email: user.email,
+          name: user.name,
+          image: user.image,
+        })
+        return token
+      }
+
       if (user) {
         token.id = user.id
       }
