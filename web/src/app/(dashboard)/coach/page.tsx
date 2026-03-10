@@ -255,10 +255,10 @@ export default function CoachPage() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Type a message..."
+                placeholder={freeQuota?.isFreeTier && freeQuota.remaining <= 0 ? "Free limit reached" : "Type a message..."}
                 className="bg-elevated border-border resize-none min-h-[2.5rem] max-h-32"
                 rows={1}
-                disabled={isStreaming}
+                disabled={isStreaming || (freeQuota?.isFreeTier && freeQuota.remaining <= 0)}
               />
               {isStreaming ? (
                 <Button
@@ -273,7 +273,7 @@ export default function CoachPage() {
                 <Button
                   size="sm"
                   onClick={handleSend}
-                  disabled={!input.trim()}
+                  disabled={!input.trim() || (freeQuota?.isFreeTier && freeQuota.remaining <= 0)}
                   className="shrink-0 self-end"
                 >
                   <Send className="h-4 w-4" />
