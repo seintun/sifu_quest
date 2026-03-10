@@ -278,3 +278,70 @@ It covers:
 - **Local Development** — Supabase emulator, `.env.local` configuration, `npm run dev`
 - **Vercel Production** — Dashboard setup, environment variables, Google OAuth redirect URIs, Supabase Auth configuration, and a post-deployment checklist
 - **Environment Variables Reference** — Full table of every variable with source and scope
+
+
+## Message Limit & API Flow Architecture
+
+The following diagram illustrates the enforcement of message limits and API keys within the Sifu Quest chat application:
+
+```mermaid
+flowchart TD
+    User(["User"]) --> ChatUI["Chat UI"]
+    ChatUI --> |Send Message| API_Route["app/api/chat/route.ts"]
+    
+    API_Route --> FetchProfile[("Fetch User Profile")]
+    FetchProfile --> CheckProfile{"Check User Profile
+(is_guest?)"}
+    
+    %% Guest Flow
+    CheckProfile -->|Guest| CheckExpiry{"Check Guest Expiry
+(> 30 mins?)"}
+    CheckExpiry -->|Expired| Error_Expired["403: session_expired"]
+    CheckExpiry -->|Valid| SetFreeKey["Set API Key = Platform Key"]
+    
+    %% Logged-in Flow
+    CheckProfile -->|Registered| CheckAppKey{"Has User API Key?"}
+    CheckAppKey -->|Yes| SetUserKey["Set API Key = User Key"]
+    CheckAppKey -->|No| SetFreeKey
+    
+    %% Shared Free Key Logic
+    SetFreeKey --> CheckQuotaFlag{"Profile Flag:
+free_quota_exhausted?"}
+    CheckQuotaFlag -->|True| DetermineLimitError
+    CheckQuotaFlag -->|False| LimitCheck{"DB Query:
+SUM(Session Messages) >= 10?"}
+    
+    LimitCheck -->|Yes| UpdateFlag[("Update DB:
+free_quota_exhausted = true")]
+    UpdateFlag --> DetermineLimitError
+    
+    LimitCheck -->|No| SendToAnthropic
+    
+    DetermineLimitError{"Is Guest?"}
+    DetermineLimitError -->|Yes| Error_GuestLimit["403: guest_limit_reached"]
+    DetermineLimitError -->|No| Error_MissingKey["403: missing_api_key"]
+    
+    %% Success Path
+    SetUserKey --> SendToAnthropic
+    SendToAnthropic["Send to Anthropic API"] --> StreamResponse["Stream Response Back"]
+    StreamResponse --> UpdateDB[("Update Supabase DB counts")]
+    
+    %% UI Rendering based on Errors
+    Error_GuestLimit -.-> |Updates UI State| HookState["useChat: upgradeRequired = 'guest_limit_reached'"]
+    Error_MissingKey -.-> |Updates UI State| HookState2["useChat: upgradeRequired = 'missing_api_key'"]
+    
+    HookState --> RenderUpgrade["Render UpgradePrompt
+(Sign Up CTA)"]
+    HookState2 --> RenderApiKey["Render ApiKeyPrompt
+(Go to Settings CTA)"]
+
+    classDef error fill:#f8d7da,stroke:#f5c2c7,stroke-width:2px,color:#842029
+    classDef success fill:#d1e7dd,stroke:#badbcc,stroke-width:2px,color:#0f5132
+    classDef process fill:#cfe2ff,stroke:#b6d4fe,stroke-width:2px,color:#084298
+    classDef db fill:#fcf8e3,stroke:#faebcc,stroke-width:2px,color:#8a6d3b
+    
+    class Error_Expired,Error_GuestLimit,Error_MissingKey error
+    class SendToAnthropic,StreamResponse success
+    class FetchProfile,UpdateFlag,UpdateDB db
+    class SetFreeKey,SetUserKey process
+```
