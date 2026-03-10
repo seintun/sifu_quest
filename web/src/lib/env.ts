@@ -12,6 +12,16 @@ const INFRA_ENV_KEYS = [
 
 export type InfraEnvKey = (typeof INFRA_ENV_KEYS)[number]
 
+export class MissingEnvironmentVariableError extends Error {
+  missingKeys: string[]
+
+  constructor(missingKeys: string[]) {
+    super('Server configuration is incomplete.')
+    this.name = 'MissingEnvironmentVariableError'
+    this.missingKeys = missingKeys
+  }
+}
+
 export function getMissingRequiredEnv(keys: readonly string[]): string[] {
   return keys.filter((key) => !process.env[key] || process.env[key]?.trim().length === 0)
 }
@@ -19,7 +29,7 @@ export function getMissingRequiredEnv(keys: readonly string[]): string[] {
 export function assertRequiredEnv(keys: readonly string[]): void {
   const missing = getMissingRequiredEnv(keys)
   if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`)
+    throw new MissingEnvironmentVariableError(missing)
   }
 }
 
@@ -65,4 +75,3 @@ export function getRuntimeConfigStatus() {
     missingRequiredKeys: required.filter((item) => !item.configured).map((item) => item.key),
   }
 }
-

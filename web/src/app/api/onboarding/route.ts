@@ -1,6 +1,6 @@
 import { writeMemoryFile } from '@/lib/memory'
 import { getPlanTimelineMeta } from '@/lib/profile-timeline'
-import { assertRequiredEnv } from '@/lib/env'
+import { assertRequiredEnv, MissingEnvironmentVariableError } from '@/lib/env'
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
@@ -235,7 +235,20 @@ Format as clean markdown suitable for rendering.`
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    if (error instanceof MissingEnvironmentVariableError) {
+      console.error('Onboarding blocked by missing environment configuration.', {
+        missingKeys: error.missingKeys,
+      })
+      return NextResponse.json(
+        { error: 'Our AI planner is still being configured. Please try again shortly.' },
+        { status: 503 },
+      )
+    }
+
+    console.error('Onboarding plan generation failed.', error)
+    return NextResponse.json(
+      { error: 'We could not generate your plan right now. Please try again.' },
+      { status: 500 },
+    )
   }
 }

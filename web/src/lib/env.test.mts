@@ -1,6 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { assertRequiredEnv, getAuthSecret, getMissingRequiredEnv } from './env.ts'
+import {
+  assertRequiredEnv,
+  getAuthSecret,
+  getMissingRequiredEnv,
+  MissingEnvironmentVariableError,
+} from './env.ts'
 
 const originalEnv = { ...process.env }
 
@@ -21,10 +26,15 @@ test('assertRequiredEnv throws with missing env keys', () => {
   resetEnv()
   delete process.env.TEST_REQUIRED
 
-  assert.throws(
-    () => assertRequiredEnv(['TEST_REQUIRED']),
-    /Missing required environment variables: TEST_REQUIRED/
-  )
+  assert.throws(() => assertRequiredEnv(['TEST_REQUIRED']), MissingEnvironmentVariableError)
+
+  try {
+    assertRequiredEnv(['TEST_REQUIRED'])
+  } catch (error) {
+    assert.ok(error instanceof MissingEnvironmentVariableError)
+    assert.equal(error.message, 'Server configuration is incomplete.')
+    assert.deepEqual(error.missingKeys, ['TEST_REQUIRED'])
+  }
 })
 
 test('getAuthSecret prefers NEXTAUTH_SECRET', () => {
