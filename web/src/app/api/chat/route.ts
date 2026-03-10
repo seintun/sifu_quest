@@ -85,12 +85,12 @@ export async function POST(request: NextRequest) {
     if (sessionId) {
       const { data: ownedSession } = await supabase
         .from('chat_sessions')
-        .select('id')
+        .select('id, mode, is_archived')
         .eq('id', sessionId)
         .eq('user_id', userId)
         .maybeSingle()
 
-      if (!ownedSession) {
+      if (!ownedSession || ownedSession.is_archived || ownedSession.mode !== (mode || 'dsa')) {
         return new Response(JSON.stringify({
           error: 'invalid_session',
           message: 'Invalid chat session for this user.'
@@ -222,12 +222,12 @@ export async function POST(request: NextRequest) {
 
               const { data: ownedSession } = await supabaseAction
                 .from('chat_sessions')
-                .select('id')
+                .select('id, mode, is_archived')
                 .eq('id', sessionId)
                 .eq('user_id', userId)
                 .maybeSingle()
 
-              if (!ownedSession) {
+              if (!ownedSession || ownedSession.is_archived || ownedSession.mode !== (mode || 'dsa')) {
                 return
               }
               
