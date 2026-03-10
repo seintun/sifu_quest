@@ -34,6 +34,15 @@ const FILE_META: Record<string, { icon: React.ElementType; color: string; accent
   'ideas.md':         { icon: Lightbulb,     color: 'text-coach',   accent: 'border-coach/30 bg-coach/5',   label: 'Ideas' },
 }
 
+const MEMORY_FILE_ORDER = [
+  'profile.md',
+  'progress.md',
+  'dsa-patterns.md',
+  'system-design.md',
+  'ideas.md',
+  'corrections.md',
+] as const
+
 /* Custom markdown components for premium rendering */
 function makeComponents(accentColor: string): Components {
   return {
@@ -119,9 +128,19 @@ export default function MemoryPage() {
       .then(data => {
         // plan.md has its own dedicated page — exclude it from the memory browser
         const fileList = (data.files || []).filter((f: string) => f !== 'plan.md')
-        setFiles(fileList)
-        if (fileList.length > 0 && !selectedFile) {
-          setSelectedFile(fileList[0])
+        const orderedFiles = [...fileList].sort((a: string, b: string) => {
+          const aIndex = MEMORY_FILE_ORDER.indexOf(a as (typeof MEMORY_FILE_ORDER)[number])
+          const bIndex = MEMORY_FILE_ORDER.indexOf(b as (typeof MEMORY_FILE_ORDER)[number])
+          const aPriority = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex
+          const bPriority = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex
+
+          if (aPriority !== bPriority) return aPriority - bPriority
+          return a.localeCompare(b)
+        })
+
+        setFiles(orderedFiles)
+        if (orderedFiles.length > 0 && !selectedFile) {
+          setSelectedFile(orderedFiles[0])
         }
       })
       .catch(() => {})

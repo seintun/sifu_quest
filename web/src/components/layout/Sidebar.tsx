@@ -21,11 +21,11 @@ import { useEffect, useState } from 'react'
 
 const NAV_ITEMS = [
   { href: '/',              label: 'Dashboard',      icon: LayoutDashboard, color: 'streak' },
+  { href: '/plan',          label: 'Plan',           icon: ClipboardList,   color: 'plan' },
   { href: '/calendar',      label: 'Calendar',       icon: Calendar,        color: 'streak' },
   { href: '/dsa',           label: 'DSA Tracker',    icon: Code2,           color: 'dsa' },
   { href: '/system-design', label: 'System Design',  icon: Network,         color: 'design' },
   { href: '/jobs',          label: 'Job Search',     icon: Briefcase,       color: 'jobs' },
-  { href: '/plan',          label: 'Plan',           icon: ClipboardList,   color: 'plan' },
   { href: '/memory',        label: 'Memory',         icon: BookOpen,        color: 'streak' },
   { href: '/coach',         label: 'Coach Chat',     icon: MessageCircle,   color: 'coach' },
 ] as const

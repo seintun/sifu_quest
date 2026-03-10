@@ -1,14 +1,15 @@
 'use client'
 
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DOMAIN_COLORS } from '@/lib/theme'
 import {
   ArrowRight,
   Briefcase,
   CheckCircle2,
+  ClipboardList,
   Code2,
   Flame,
+  MessageCircle,
   Network,
   Target,
 } from 'lucide-react'
@@ -110,6 +111,9 @@ export default function DashboardPage() {
     return <div className="text-muted-foreground">Loading dashboard...</div>
   }
 
+  const planHref = '/plan'
+  const planLabel = metrics.planLabel || 'Active Interview Plan'
+
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
@@ -191,7 +195,7 @@ export default function DashboardPage() {
       </Card>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
         <Link href="/dsa">
           <Card className="border-border bg-surface hover:border-dsa/30 hover:shadow-glow-dsa transition-all duration-200 cursor-pointer">
             <CardContent className="p-4 flex items-center justify-between">
@@ -214,12 +218,36 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </Link>
-        <Link href="/plan">
+        <Link href="/system-design">
+          <Card className="border-border bg-surface hover:border-design/30 hover:shadow-glow-design transition-all duration-200 cursor-pointer">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Network className="h-4 w-4 text-design" />
+                <span className="text-sm">System Design</span>
+              </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href={planHref}>
           <Card className="border-border bg-surface hover:border-plan/30 hover:shadow-glow-plan transition-all duration-200 cursor-pointer">
             <CardContent className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-plan border-plan/30">{metrics.currentPlanPeriodLabel || 'Plan'}</Badge>
-                <span className="text-sm">View Plan</span>
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-plan/30 bg-plan/10">
+                  <ClipboardList className="h-3.5 w-3.5 text-plan" />
+                </span>
+                <span className="text-sm">{planLabel}</span>
+              </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/coach">
+          <Card className="border-border bg-surface hover:border-coach/30 hover:shadow-glow-coach transition-all duration-200 cursor-pointer">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="h-4 w-4 text-coach" />
+                <span className="text-sm">Coach Chat</span>
               </div>
               <ArrowRight className="h-4 w-4 text-muted-foreground" />
             </CardContent>
