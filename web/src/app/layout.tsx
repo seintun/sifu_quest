@@ -1,4 +1,5 @@
 import { OnboardingGuard } from "@/components/layout/OnboardingGuard";
+import { Toaster } from "@/components/ui/sonner";
 
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
@@ -37,6 +38,7 @@ export default function RootLayout({
         <OnboardingGuard>
           {children}
         </OnboardingGuard>
+        <Toaster />
       </body>
     </html>
   );

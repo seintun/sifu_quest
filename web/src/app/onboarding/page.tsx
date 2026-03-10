@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -236,7 +237,6 @@ export default function OnboardingPage() {
   // API key phase
   const [needsApiKey, setNeedsApiKey] = useState<boolean | null>(null)
   const [apiKey, setApiKey] = useState('')
-  const [apiKeyError, setApiKeyError] = useState('')
   const [savingKey, setSavingKey] = useState(false)
 
   // Profile phase
@@ -282,7 +282,6 @@ export default function OnboardingPage() {
   }
 
   const handleSaveApiKey = async () => {
-    setApiKeyError('')
     setSavingKey(true)
     try {
       const res = await fetch('/api/setup', {
@@ -291,7 +290,12 @@ export default function OnboardingPage() {
         body: JSON.stringify({ apiKey }),
       })
       const data = await res.json()
-      if (!res.ok) { setApiKeyError(data.error || 'Failed to save API key'); return }
+      if (!res.ok) { 
+        toast.error('Invalid API Key', {
+          description: data.error || 'Failed to save API key',
+        })
+        return 
+      }
       setNeedsApiKey(false)
     } finally {
       setSavingKey(false)
@@ -323,7 +327,19 @@ export default function OnboardingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      if (res.ok) router.push('/')
+      
+      if (res.ok) {
+        router.push('/')
+      } else {
+        const errorData = await res.json()
+        toast.error('Plan Generation Failed', {
+          description: errorData.error || 'Something went wrong while building your plan.',
+        })
+      }
+    } catch (error) {
+      toast.error('Connection Error', {
+        description: 'Failed to connect to the server. Please try again.',
+      })
     } finally {
       setGenerating(false)
     }
@@ -352,13 +368,12 @@ export default function OnboardingPage() {
           <Input
             type="password"
             value={apiKey}
-            onChange={e => { setApiKey(e.target.value); setApiKeyError('') }}
+            onChange={e => setApiKey(e.target.value)}
             placeholder="sk-ant-..."
             className="bg-surface border-border font-mono"
             onKeyDown={e => { if (e.key === 'Enter' && apiKey.startsWith('sk-ant-')) { e.preventDefault(); handleSaveApiKey() } }}
             autoFocus
           />
-          {apiKeyError && <p className="text-destructive text-sm mt-2">{apiKeyError}</p>}
           <div className="flex justify-end mt-8">
             <Button onClick={handleSaveApiKey} disabled={!apiKey.startsWith('sk-ant-') || savingKey}>
               {savingKey ? 'Verifying...' : 'Next'}
