@@ -64,7 +64,7 @@ function CodeBlock({ className, children, node, ...props }: any) {
         </div>
       )}
       <pre className="!m-0 !rounded-none !border-0 !bg-transparent overflow-x-auto">
-        <code className={`${className} !bg-transparent text-[13px] leading-relaxed block p-4`} {...props}>
+        <code className={`${className || ''} font-mono !bg-transparent text-[13px] leading-relaxed block p-4`} {...props}>
           {children}
         </code>
       </pre>
