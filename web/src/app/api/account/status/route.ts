@@ -16,11 +16,13 @@ export async function GET() {
     const profile = await ensureUserProfile(userId, session.user.email)
     const sessionName = typeof session.user.name === 'string' ? session.user.name.trim() : ''
     const prefillName = profile.display_name ? null : (sessionName || null)
+    const isAnonymousSession = Boolean(session.user.email?.endsWith('@anonymous.local'))
 
     return NextResponse.json({
       account: {
         userId,
         isGuest: profile.is_guest,
+        isAnonymousSession,
         isLinked: !profile.is_guest,
         displayName: profile.display_name,
         hasApiKey: Boolean(profile.api_key_enc),

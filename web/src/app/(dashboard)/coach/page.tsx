@@ -140,7 +140,8 @@ export default function CoachPage() {
   const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
   const { messages, setMessages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
   const [accountIsGuest, setAccountIsGuest] = useState<boolean | null>(null)
-  const isGuest = accountIsGuest ?? Boolean(freeQuota?.isGuest)
+  const [isAnonymousSession, setIsAnonymousSession] = useState<boolean | null>(null)
+  const isGuest = isAnonymousSession === null ? (accountIsGuest ?? Boolean(freeQuota?.isGuest)) : isAnonymousSession
   const hasGreetedRef = useRef<string | null>(null)
   const [dismissedPrompt, setDismissedPrompt] = useState(false)
   const [input, setInput] = useState('')
@@ -161,9 +162,12 @@ export default function CoachPage() {
           return
         }
 
-        const data = (await res.json()) as { account?: { isGuest?: boolean } }
+        const data = (await res.json()) as { account?: { isGuest?: boolean; isAnonymousSession?: boolean } }
         if (typeof data.account?.isGuest === 'boolean') {
           setAccountIsGuest(data.account.isGuest)
+        }
+        if (typeof data.account?.isAnonymousSession === 'boolean') {
+          setIsAnonymousSession(data.account.isAnonymousSession)
         }
       } catch {
         // No-op: fallback to freeQuota.isGuest behavior.
