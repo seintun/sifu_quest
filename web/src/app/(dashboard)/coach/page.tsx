@@ -300,11 +300,22 @@ export default function CoachPage() {
           </div>
 
           {/* Input */}
-          <div className="border-t border-border p-3 shrink-0 relative">
+          <div className="border-t border-border p-3 shrink-0">
             {freeQuota?.isFreeTier && (
-              <div className="absolute -top-11 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-background/95 backdrop-blur-sm border border-border/60 rounded-full px-3 py-1 shadow-sm text-xs font-medium text-foreground/80 z-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <Sparkles className="w-3.5 h-3.5 text-primary" />
-                <span>{freeQuota.remaining} / {freeQuota.total} free messages remaining</span>
+              <div className="mb-2 rounded-md border border-border/60 bg-elevated/40 px-3 py-2 animate-in fade-in slide-in-from-bottom-1 duration-300">
+                <div className="flex items-center justify-between gap-2 text-xs font-medium text-foreground/80">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+                    Free tier usage
+                  </span>
+                  <span>{freeQuota.remaining} / {freeQuota.total} remaining</span>
+                </div>
+                <div className="mt-1.5 h-1.5 rounded-full bg-border/50 overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{ width: `${Math.max(0, Math.min(100, (freeQuota.remaining / freeQuota.total) * 100))}%` }}
+                  />
+                </div>
               </div>
             )}
             <div className="flex gap-2">

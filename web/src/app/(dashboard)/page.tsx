@@ -14,6 +14,7 @@ import {
   Flame,
   MessageCircle,
   Network,
+  Settings,
   Target,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -177,6 +178,7 @@ export default function DashboardPage() {
     { href: planHref, label: planLabel, hint: 'Review this week\'s priorities', icon: ClipboardList, domain: 'plan' },
     { href: '/coach', label: 'Coach Chat', hint: 'Get feedback for interview prep', icon: MessageCircle, domain: 'coach' },
     { href: '/memory', label: 'Open Memory', hint: 'Revisit notes and corrections', icon: BookOpen, domain: 'streak' },
+    { href: '/settings', label: 'Account Settings', hint: 'Update your profile and API key', icon: Settings, domain: 'streak' },
   ]
 
   return (

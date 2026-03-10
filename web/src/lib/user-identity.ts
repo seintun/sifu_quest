@@ -1,31 +1,8 @@
 import 'server-only'
 
+import { findSupabaseUserByEmail } from './auth-identity'
 import { createAdminClient } from './supabase-admin'
-
-async function findSupabaseUserByEmail(email: string): Promise<string | null> {
-  const supabaseAdmin = createAdminClient()
-  const normalizedEmail = email.trim().toLowerCase()
-  const perPage = 200
-  let page = 1
-
-  while (true) {
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage })
-    if (error) {
-      throw new Error(`Failed to list Supabase users: ${error.message}`)
-    }
-
-    const users = data?.users ?? []
-    const match = users.find((u) => u.email?.toLowerCase() === normalizedEmail)
-    if (match) {
-      return match.id
-    }
-
-    if (users.length < perPage) {
-      return null
-    }
-    page += 1
-  }
-}
+import { shouldAttemptEmailFallback } from './user-identity-utils'
 
 export async function resolveCanonicalUserId(
   sessionUserId: string,
@@ -37,10 +14,16 @@ export async function resolveCanonicalUserId(
     return sessionUserId
   }
 
-  if (!sessionEmail || sessionEmail.endsWith('@anonymous.local')) {
+  if (!shouldAttemptEmailFallback(sessionEmail)) {
     return sessionUserId
   }
 
   const userIdByEmail = await findSupabaseUserByEmail(sessionEmail)
+  if (userIdByEmail && userIdByEmail !== sessionUserId) {
+    console.warn('resolveCanonicalUserId fallback matched a different user id; identity-link migration still in use', {
+      sessionUserId,
+      fallbackUserId: userIdByEmail,
+    })
+  }
   return userIdByEmail ?? sessionUserId
 }
