@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { decryptKey } from '@/lib/apikey'
+import { evaluateTrialEntitlement } from '@/lib/entitlements'
 import { readMemoryFile, readModeFile } from '@/lib/memory'
 import { createClient } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
@@ -16,9 +17,9 @@ const MODE_TO_FILES: Record<string, { mode: string; memory: string[] }> = {
 }
 
 type UserProfileRow = {
-  is_guest: boolean
-  guest_expires_at: string | null
   api_key_enc: string | null
+  trial_started_at: string | null
+  trial_messages_used: number
 }
 
 export async function POST(request: NextRequest) {
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
     // If the row is missing (e.g., first session), bootstrap it instead of hard-failing.
     const { data: existingProfile, error: profileFetchError } = await supabase
       .from('user_profiles')
-      .select('is_guest, guest_expires_at, api_key_enc')
+      .select('api_key_enc, trial_started_at, trial_messages_used')
       .eq('id', userId)
       .maybeSingle()
 
@@ -55,22 +56,15 @@ export async function POST(request: NextRequest) {
 
     let userProfile: UserProfileRow | null = existingProfile
     if (!userProfile) {
-      const isGuest =
-        session.user?.name === 'Guest' ||
-        Boolean(session.user?.email?.endsWith('@anonymous.local'))
-      const guestExpiry = isGuest
-        ? new Date(Date.now() + 30 * 60 * 1000).toISOString()
-        : null
-
       const { data: createdProfile, error: createProfileError } = await supabase
         .from('user_profiles')
         .insert({
           id: userId,
-          is_guest: isGuest,
-          guest_expires_at: guestExpiry,
+          trial_started_at: null,
+          trial_messages_used: 0,
           last_active_at: new Date().toISOString(),
         })
-        .select('is_guest, guest_expires_at, api_key_enc')
+        .select('api_key_enc, trial_started_at, trial_messages_used')
         .single()
 
       if (createProfileError) {
@@ -87,50 +81,73 @@ export async function POST(request: NextRequest) {
       .update({ last_active_at: new Date().toISOString() })
       .eq('id', userId)
 
-    // 2. Guest enforcement
-    let apiKey = process.env.ANTHROPIC_API_KEY
-    
-    if (userProfile.is_guest) {
-      // Check 30-min TTL
-      if (userProfile.guest_expires_at && new Date() > new Date(userProfile.guest_expires_at)) {
-        return new Response(JSON.stringify({ 
-          error: 'session_expired', 
-          message: 'Your guest session has expired. Please log in to continue.' 
+    // 2. Validate session ownership if provided
+    if (sessionId) {
+      const { data: ownedSession } = await supabase
+        .from('chat_sessions')
+        .select('id')
+        .eq('id', sessionId)
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      if (!ownedSession) {
+        return new Response(JSON.stringify({
+          error: 'invalid_session',
+          message: 'Invalid chat session for this user.'
         }), { status: 403 })
       }
-      
-      // Check 5-message limit using active chat session ID
-      if (sessionId) {
-        const { data: sessionData } = await supabase
-          .from('chat_sessions')
-          .select('message_count')
-          .eq('id', sessionId)
-          .single()
-          
-        if (sessionData && sessionData.message_count >= 10) { // 5 user + 5 assistant messages
-          return new Response(JSON.stringify({ 
-            error: 'limit_reached',
-            message: 'You have reached your free message limit. Please log in to continue.'
-          }), { status: 403 })
-        }
-      }
-    } else {
-      // 3. Logged-in user: must provide their own key
-      if (!userProfile.api_key_enc) {
-         return new Response(JSON.stringify({ 
-           error: 'missing_api_key',
-           message: 'Please add your Anthropic API key in Settings to continue.'
-         }), { status: 403 })
-      }
+    }
+
+    // 3. Resolve key source: personal key unlocks unlimited usage, otherwise trial limits apply.
+    let apiKey: string | null = null
+    let usingTrialKey = false
+
+    if (userProfile.api_key_enc) {
       const decryptedKey = decryptKey(userProfile.api_key_enc)
       if (!decryptedKey) {
         return new Response(JSON.stringify({ error: 'Failed to decrypt API key' }), { status: 500 })
       }
       apiKey = decryptedKey
+    } else {
+      apiKey = process.env.ANTHROPIC_API_KEY || null
+      usingTrialKey = true
     }
 
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'API key not configured' }), { status: 500 })
+      return new Response(JSON.stringify({
+        error: 'missing_api_key',
+        message: 'No API key is configured. Please add your personal Anthropic API key in Settings.'
+      }), { status: 403 })
+    }
+
+    if (usingTrialKey) {
+      const trialState = evaluateTrialEntitlement({
+        trialStartedAt: userProfile.trial_started_at,
+        trialMessagesUsed: userProfile.trial_messages_used,
+      })
+
+      if (!trialState.allowed && trialState.code === 'trial_limit_reached') {
+        return new Response(JSON.stringify({
+          error: 'trial_limit_reached',
+          message: 'You have reached the 5-message trial limit. Add your own API key in Settings to continue.'
+        }), { status: 403 })
+      }
+
+      if (!trialState.allowed && trialState.code === 'trial_expired') {
+        return new Response(JSON.stringify({
+          error: 'trial_expired',
+          message: 'Your 30-minute trial window has expired. Add your own API key in Settings to continue.'
+        }), { status: 403 })
+      }
+
+      if (!userProfile.trial_started_at) {
+        const startedAt = new Date().toISOString()
+        userProfile.trial_started_at = startedAt
+        await supabase
+          .from('user_profiles')
+          .update({ trial_started_at: startedAt })
+          .eq('id', userId)
+      }
     }
 
     // Build system prompt from mode + memory files
@@ -202,6 +219,17 @@ export async function POST(request: NextRequest) {
           // Save to database asynchronously after stream closes
           if (sessionId && lastUserMessage) {
               const supabaseAction = await createClient()
+
+              const { data: ownedSession } = await supabaseAction
+                .from('chat_sessions')
+                .select('id')
+                .eq('id', sessionId)
+                .eq('user_id', userId)
+                .maybeSingle()
+
+              if (!ownedSession) {
+                return
+              }
               
               // Insert user message
               await supabaseAction.from('chat_messages').insert({
@@ -224,6 +252,15 @@ export async function POST(request: NextRequest) {
                  session_id_param: sessionId,
                  increment_by: 2
               })
+
+              if (usingTrialKey) {
+                const nextTrialCount = (userProfile?.trial_messages_used || 0) + 1
+                userProfile.trial_messages_used = nextTrialCount
+                await supabaseAction
+                  .from('user_profiles')
+                  .update({ trial_messages_used: nextTrialCount })
+                  .eq('id', userId)
+              }
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Stream error'
