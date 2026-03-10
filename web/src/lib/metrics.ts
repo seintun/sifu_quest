@@ -34,15 +34,15 @@ export async function computeMetrics(userId: string): Promise<DashboardMetrics> 
   ])
 
   // DSA metrics
-  const patterns = parseDSAPatterns(dsaContent)
-  const problems = parseProblemHistory(dsaContent)
+  const patterns = parseDSAPatterns(dsaContent) || []
+  const problems = parseProblemHistory(dsaContent) || []
 
-  const dsaPatternsTotal = patterns.length
-  const dsaPatternsMastered = patterns.filter(p => p.mastery === '🟢').length
-  const dsaPatternsInProgress = patterns.filter(p => p.mastery === '🟡').length
+  const dsaPatternsTotal = patterns.length ?? 0
+  const dsaPatternsMastered = patterns.filter(p => p.mastery === '🟢').length ?? 0
+  const dsaPatternsInProgress = patterns.filter(p => p.mastery === '🟡').length ?? 0
 
   // Job metrics
-  const applications = parseJobApplications(jobContent)
+  const applications = parseJobApplications(jobContent) || []
   const jobApplicationsByStatus: Record<string, number> = {}
   for (const app of applications) {
     jobApplicationsByStatus[app.status] = (jobApplicationsByStatus[app.status] || 0) + 1
@@ -68,7 +68,7 @@ export async function computeMetrics(userId: string): Promise<DashboardMetrics> 
   const dayIndex = getDay(new Date()) // 0=Sunday, 1=Monday, ...
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const todayName = dayNames[dayIndex]
-  const todayFocus = plan.weeklyRhythm.find(r =>
+  const todayFocus = (plan.weeklyRhythm ?? []).find(r =>
     r.day.toLowerCase() === todayName.toLowerCase()
   ) || null
 
@@ -101,21 +101,21 @@ export async function computeMetrics(userId: string): Promise<DashboardMetrics> 
   const progressMeta = getPlanProgressMeta(timelineMeta, profile.workspaceInitialized)
 
   return {
-    dsaPatternsTotal,
-    dsaPatternsMastered,
-    dsaPatternsInProgress,
-    dsaProblemsCompleted: problems.length,
-    jobApplicationsTotal: applications.length,
-    jobApplicationsByStatus,
-    systemDesignConceptsCovered: sysDesign.concepts.length,
-    planItemsTotal,
-    planItemsCompleted,
-    currentStreak,
+    dsaPatternsTotal: dsaPatternsTotal ?? 0,
+    dsaPatternsMastered: dsaPatternsMastered ?? 0,
+    dsaPatternsInProgress: dsaPatternsInProgress ?? 0,
+    dsaProblemsCompleted: problems.length ?? 0,
+    jobApplicationsTotal: applications.length ?? 0,
+    jobApplicationsByStatus: jobApplicationsByStatus ?? {},
+    systemDesignConceptsCovered: sysDesign.concepts?.length ?? 0,
+    planItemsTotal: planItemsTotal ?? 0,
+    planItemsCompleted: planItemsCompleted ?? 0,
+    currentStreak: currentStreak ?? 0,
     todayFocus,
-    weeklyRhythm: plan.weeklyRhythm,
-    planLabel: timelineMeta.planLabel,
-    currentMonth: progressMeta.currentMonth,
-    currentPlanPeriodLabel: progressMeta.currentPeriodLabel,
+    weeklyRhythm: plan.weeklyRhythm ?? [],
+    planLabel: timelineMeta.planLabel || 'Plan',
+    currentMonth: progressMeta.currentMonth ?? 1,
+    currentPlanPeriodLabel: progressMeta.currentPeriodLabel || 'Month 1',
   }
 }
 

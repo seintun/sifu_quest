@@ -1,19 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DOMAIN_COLORS } from '@/lib/theme'
 import {
-  Code2,
+  ArrowRight,
   Briefcase,
+  CheckCircle2,
+  Code2,
+  Flame,
   Network,
   Target,
-  Flame,
-  CheckCircle2,
-  ArrowRight,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 
 interface DashboardMetrics {
   dsaPatternsTotal: number
@@ -137,28 +137,28 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricCard
           title="DSA Problems"
-          value={metrics.dsaProblemsCompleted}
-          subtitle={`${metrics.dsaPatternsMastered}/${metrics.dsaPatternsTotal} patterns mastered`}
+          value={metrics.dsaProblemsCompleted ?? 0}
+          subtitle={`${metrics.dsaPatternsMastered ?? 0}/${metrics.dsaPatternsTotal ?? 0} patterns mastered`}
           icon={Code2}
           domain="dsa"
         />
         <MetricCard
           title="Applications"
-          value={metrics.jobApplicationsTotal}
+          value={metrics.jobApplicationsTotal ?? 0}
           subtitle={Object.entries(metrics.jobApplicationsByStatus ?? {}).map(([k, v]) => `${v} ${k}`).join(', ') || 'None yet'}
           icon={Briefcase}
           domain="jobs"
         />
         <MetricCard
           title="System Design"
-          value={metrics.systemDesignConceptsCovered}
+          value={metrics.systemDesignConceptsCovered ?? 0}
           subtitle="concepts covered"
           icon={Network}
           domain="design"
         />
         <MetricCard
           title="Streak"
-          value={`${metrics.currentStreak} days`}
+          value={`${metrics.currentStreak ?? 0} days`}
           icon={Flame}
           domain="streak"
         />
@@ -169,21 +169,21 @@ export default function DashboardPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-plan" />
-            {metrics.planLabel} Progress
+            {metrics.planLabel || 'Plan'} Progress
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <ProgressBar
             label="Overall Plan"
-            current={metrics.planItemsCompleted}
-            total={metrics.planItemsTotal}
+            current={metrics.planItemsCompleted ?? 0}
+            total={metrics.planItemsTotal ?? 0}
             startHex={DOMAIN_COLORS.plan.hex}
             endHex="#FB923C"
           />
           <ProgressBar
             label="DSA Patterns"
-            current={metrics.dsaPatternsMastered}
-            total={metrics.dsaPatternsTotal}
+            current={metrics.dsaPatternsMastered ?? 0}
+            total={metrics.dsaPatternsTotal ?? 0}
             startHex={DOMAIN_COLORS.dsa.hex}
             endHex={DOMAIN_COLORS.design.hex}
           />
@@ -218,7 +218,7 @@ export default function DashboardPage() {
           <Card className="border-border bg-surface hover:border-plan/30 hover:shadow-glow-plan transition-all duration-200 cursor-pointer">
             <CardContent className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-plan border-plan/30">{metrics.currentPlanPeriodLabel}</Badge>
+                <Badge variant="outline" className="text-plan border-plan/30">{metrics.currentPlanPeriodLabel || 'Plan'}</Badge>
                 <span className="text-sm">View Plan</span>
               </div>
               <ArrowRight className="h-4 w-4 text-muted-foreground" />
@@ -228,7 +228,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Weekly Rhythm */}
-      {metrics.weeklyRhythm.length > 0 && (
+      {metrics.weeklyRhythm?.length > 0 && (
         <Card className="border-border bg-surface">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Weekly Rhythm</CardTitle>
