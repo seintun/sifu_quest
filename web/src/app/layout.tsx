@@ -1,5 +1,5 @@
 import { OnboardingGuard } from "@/components/layout/OnboardingGuard";
-import { MobileSidebar, Sidebar } from "@/components/layout/Sidebar";
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
@@ -35,13 +35,7 @@ export default function RootLayout({
         className={`${inter.variable} ${geist.variable} ${geistMono.variable} antialiased`}
       >
         <OnboardingGuard>
-          <Sidebar />
-          <MobileSidebar />
-          <main className="md:ml-56 min-h-screen pt-14 md:pt-0">
-            <div className="p-6">
-              {children}
-            </div>
-          </main>
+          {children}
         </OnboardingGuard>
       </body>
     </html>

@@ -3,21 +3,10 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
-async function ensureSession(): Promise<void> {
-  // Check if we already have an active NextAuth session
+async function hasSession(): Promise<boolean> {
   const res = await fetch('/api/auth/session')
   const session = await res.json()
-  if (session?.user?.id) return
-
-  // No session — sign in anonymously via the credentials provider
-  const csrfRes = await fetch('/api/auth/csrf')
-  const { csrfToken } = await csrfRes.json()
-
-  await fetch('/api/auth/callback/anonymous', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ csrfToken, json: 'true' }),
-  })
+  return !!session?.user?.id
 }
 
 export function OnboardingGuard({ children }: { children: React.ReactNode }) {
@@ -26,17 +15,20 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const [checked, setChecked] = useState(false)
 
   useEffect(() => {
-    if (pathname === '/onboarding' || pathname.startsWith('/api')) {
+    if (pathname === '/login' || pathname === '/onboarding' || pathname.startsWith('/api')) {
       setChecked(true)
       return
     }
 
-    // Ensure a session exists first, then check onboarding state
-    ensureSession()
-      .then(() => Promise.all([
-        fetch('/api/setup').then(r => r.json()),
-        fetch('/api/memory?file=profile.md').then(r => r.json()),
-      ]))
+    // Check for session first
+    hasSession()
+      .then((isValidSession) => {
+        if (!isValidSession) throw new Error('No session')
+        return Promise.all([
+          fetch('/api/setup').then(r => r.json()),
+          fetch('/api/memory?file=profile.md').then(r => r.json()),
+        ])
+      })
       .then(([setup, profile]) => {
         const ready =
           setup.hasApiKey &&
@@ -47,10 +39,13 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
         } else {
           setChecked(true)
         }
-      }).catch(() => setChecked(true))
+      }).catch(() => {
+        // If session check fails or API fails, redirect to login
+        router.replace('/login')
+      })
   }, [pathname, router])
 
-  if (!checked && pathname !== '/onboarding') {
+  if (!checked && pathname !== '/onboarding' && pathname !== '/login') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-muted-foreground">Loading...</div>
