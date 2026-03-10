@@ -57,11 +57,14 @@ export function useChat(mode: string) {
        headers: { 'Content-Type': 'application/json' },
        body: JSON.stringify({ mode })
      })
-     const data = await res.json()
-     if (res.ok && data.session) {
-       setSessionId(data.session.id)
-       return data.session.id
-     }
+      const data = await res.json()
+      if (res.ok && data.session) {
+        setSessionId(data.session.id)
+        if (data.freeQuota) {
+          setFreeQuota(data.freeQuota)
+        }
+        return data.session.id
+      }
      throw new Error(data.error || 'Failed to create session')
   }
 
@@ -250,6 +253,9 @@ export function useChat(mode: string) {
       const data = await res.json()
       if (res.ok && data.session) {
         setSessionId(data.session.id)
+        if (data.freeQuota) {
+          setFreeQuota(data.freeQuota)
+        }
       }
     } catch (err) {
       console.error("Failed to clear history", err)

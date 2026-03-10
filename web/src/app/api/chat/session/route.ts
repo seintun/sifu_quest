@@ -137,6 +137,38 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
+    // 3. Re-calculate the free quota because this action creates a new session, but retains the global history count
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('is_guest, api_key_enc, free_quota_exhausted')
+      .eq('id', userId)
+      .maybeSingle()
+
+    let isFreeTier = true
+    if (userProfile && !userProfile.is_guest && userProfile.api_key_enc) {
+      isFreeTier = false
+    }
+
+    let freeQuota = null
+    if (isFreeTier && userProfile) {
+      if (userProfile.free_quota_exhausted) {
+        freeQuota = { isFreeTier: true, remaining: 0, total: 5 }
+      } else {
+        const { data: totalMessagesData } = await supabase
+          .from('chat_sessions')
+          .select('message_count')
+          .eq('user_id', userId)
+
+        const totalMessages = totalMessagesData?.reduce((sum, session) => sum + (session.message_count || 0), 0) || 0
+        const remaining = Math.max(0, 10 - totalMessages)
+        freeQuota = { isFreeTier: true, remaining: Math.floor(remaining / 2), total: 5 }
+      }
+    } else if (!isFreeTier) {
+       freeQuota = { isFreeTier: false, remaining: -1, total: -1 }
+    } else {
+       freeQuota = { isFreeTier: true, remaining: 5, total: 5 }
+    }
+
     if (error) {
        console.error(error)
        if (error.code === '23503') {
@@ -148,7 +180,7 @@ export async function POST(request: NextRequest) {
        return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
     }
 
-    return NextResponse.json({ session: newSession })
+    return NextResponse.json({ session: newSession, freeQuota })
 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
