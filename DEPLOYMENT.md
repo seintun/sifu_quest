@@ -20,4 +20,14 @@ To deploy this Next.js app to Vercel, you need to populate the following Environ
 
 ---
 
-**Once configured, simply trigger a Vercel deployment of the `main` branch to go live!**
+### Database Setup
+Before the app can save any data, you must push the schema to your hosted Supabase project:
+```bash
+npx supabase login
+npx supabase link --project-ref your-project-ref-id
+npx supabase db push
+```
+
+---
+
+**Once configured and the schema is pushed, simply trigger a Vercel deployment of the `main` branch to go live!**
