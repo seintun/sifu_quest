@@ -15,6 +15,12 @@ const MODE_TO_FILES: Record<string, { mode: string; memory: string[] }> = {
   'business-ideas': { mode: 'business-ideas.md', memory: ['profile.md', 'ideas.md'] },
 }
 
+type UserProfileRow = {
+  is_guest: boolean
+  guest_expires_at: string | null
+  api_key_enc: string | null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
@@ -34,17 +40,53 @@ export async function POST(request: NextRequest) {
     
     const supabase = await createClient()
     
-    // 1. Fetch user profile to check guest status and get API key
-    const { data: userProfile } = await supabase
+    // 1. Fetch user profile to check guest status and get API key.
+    // If the row is missing (e.g., first session), bootstrap it instead of hard-failing.
+    const { data: existingProfile, error: profileFetchError } = await supabase
       .from('user_profiles')
       .select('is_guest, guest_expires_at, api_key_enc')
       .eq('id', userId)
-      .single()
-      
-    if (!userProfile) {
-      return new Response(JSON.stringify({ error: 'User profile not found' }), { status: 404 })
+      .maybeSingle()
+
+    if (profileFetchError) {
+      console.error('Failed to fetch user profile:', profileFetchError)
+      return new Response(JSON.stringify({ error: 'Failed to load user profile' }), { status: 500 })
     }
-    
+
+    let userProfile: UserProfileRow | null = existingProfile
+    if (!userProfile) {
+      const isGuest =
+        session.user?.name === 'Guest' ||
+        Boolean(session.user?.email?.endsWith('@anonymous.local'))
+      const guestExpiry = isGuest
+        ? new Date(Date.now() + 30 * 60 * 1000).toISOString()
+        : null
+
+      const { data: createdProfile, error: createProfileError } = await supabase
+        .from('user_profiles')
+        .insert({
+          id: userId,
+          is_guest: isGuest,
+          guest_expires_at: guestExpiry,
+          last_active_at: new Date().toISOString(),
+        })
+        .select('is_guest, guest_expires_at, api_key_enc')
+        .single()
+
+      if (createProfileError) {
+        console.error('Failed to bootstrap user profile:', createProfileError)
+        return new Response(JSON.stringify({ error: 'Failed to initialize user profile' }), { status: 500 })
+      }
+
+      userProfile = createdProfile
+    }
+
+    // Keep heartbeat updated (non-blocking).
+    void supabase
+      .from('user_profiles')
+      .update({ last_active_at: new Date().toISOString() })
+      .eq('id', userId)
+
     // 2. Guest enforcement
     let apiKey = process.env.ANTHROPIC_API_KEY
     
