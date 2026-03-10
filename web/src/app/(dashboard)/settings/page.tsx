@@ -2,7 +2,7 @@
 
 import { signOut, useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 type ApiKeyStatus = {
   hasPersonalKey: boolean
@@ -31,7 +31,7 @@ export default function SettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [message, setMessage] = useState({ text: '', type: '' })
 
-  const refreshStatus = async () => {
+  const refreshStatus = useCallback(async () => {
     const [keyStatusRes, runtimeStatusRes] = await Promise.all([
       fetch('/api/auth/apikey'),
       fetch('/api/runtime-config-status'),
@@ -46,7 +46,7 @@ export default function SettingsPage() {
       const data = await runtimeStatusRes.json()
       setRuntimeStatus(data)
     }
-  }
+  }, [])
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -57,7 +57,7 @@ export default function SettingsPage() {
     if (status === 'authenticated') {
       void refreshStatus()
     }
-  }, [status, router])
+  }, [status, router, refreshStatus])
 
   const handleSaveKey = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -157,24 +157,24 @@ export default function SettingsPage() {
       <h1 className="text-3xl font-bold">Account Settings</h1>
 
       {message.text && (
-        <div className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+        <div className={`p-4 rounded-md border ${message.type === 'success' ? 'bg-streak/10 text-streak border-streak/30' : 'bg-warning/10 text-warning border-warning/30'}`}>
           {message.text}
         </div>
       )}
 
-      <section className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+      <section className="bg-surface p-6 rounded-lg shadow-sm border border-border">
         <h2 className="text-xl font-semibold mb-2">Usage & Entitlements</h2>
         {apiKeyStatus?.hasPersonalKey ? (
-          <p className="text-sm text-green-700">Unlimited mode active with your encrypted personal Anthropic API key.</p>
+          <p className="text-sm text-streak">Unlimited mode active with your encrypted personal Anthropic API key.</p>
         ) : (
-          <div className="text-sm text-slate-700 space-y-1">
+          <div className="text-sm text-foreground/80 space-y-1">
             <p>Trial mode active with the server guest key.</p>
             <p>Messages remaining: <strong>{trialStatus?.remainingMessages ?? 0}</strong> / 5</p>
             {trialStatus?.expiresAt && (
               <p>Trial expires at: <strong>{new Date(trialStatus.expiresAt).toLocaleString()}</strong></p>
             )}
-            {trialStatus?.code === 'trial_limit_reached' && <p className="text-red-700">Trial message limit reached. Add your own key to continue.</p>}
-            {trialStatus?.code === 'trial_expired' && <p className="text-red-700">Trial window expired. Add your own key to continue.</p>}
+            {trialStatus?.code === 'trial_limit_reached' && <p className="text-warning">Trial message limit reached. Add your own key to continue.</p>}
+            {trialStatus?.code === 'trial_expired' && <p className="text-warning">Trial window expired. Add your own key to continue.</p>}
           </div>
         )}
       </section>
@@ -182,7 +182,7 @@ export default function SettingsPage() {
       {isGuest && (
         <section className="bg-streak/10 p-6 rounded-lg shadow-sm border border-streak/30">
           <h2 className="text-xl font-semibold text-streak mb-2">Upgrade to Full Account</h2>
-          <p className="text-slate-600 mb-4 text-sm">
+          <p className="text-muted-foreground mb-4 text-sm">
             You are currently using a temporary Guest session. Link a Google account to permanently save your chat history, memory files, and progress metrics.
           </p>
           <button
@@ -194,15 +194,15 @@ export default function SettingsPage() {
         </section>
       )}
 
-      <section className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+      <section className="bg-surface p-6 rounded-lg shadow-sm border border-border">
         <h2 className="text-xl font-semibold mb-2">Personal Anthropic API Key</h2>
-        <p className="text-slate-600 mb-4 text-sm">
-          This is your personal key, encrypted at rest in Supabase (`api_key_enc`). It unlocks unlimited usage for your account.
+        <p className="text-muted-foreground mb-4 text-sm">
+          This is your personal key, encrypted at rest. It unlocks unlimited usage for your account.
         </p>
 
         <form onSubmit={handleSaveKey} className="space-y-4">
           <div>
-            <label htmlFor="apiKey" className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="apiKey" className="block text-sm font-medium text-foreground mb-1">
               API Key (sk-ant-...)
             </label>
             <input
@@ -211,7 +211,7 @@ export default function SettingsPage() {
               value={apiKey}
               onChange={(event) => setApiKey(event.target.value)}
               placeholder="Enter your personal key..."
-              className="w-full px-4 py-2 border border-slate-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2 border border-border bg-elevated rounded-md focus:ring-ring focus:border-ring"
               required
             />
           </div>
@@ -228,7 +228,7 @@ export default function SettingsPage() {
               type="button"
               onClick={handleDeleteKey}
               disabled={isSaving || !apiKeyStatus?.hasPersonalKey}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-md font-medium disabled:opacity-50 transition-colors"
+              className="bg-elevated hover:bg-elevated/80 text-foreground px-4 py-2 rounded-md font-medium disabled:opacity-50 transition-colors"
             >
               Remove Key
             </button>
@@ -236,16 +236,16 @@ export default function SettingsPage() {
         </form>
       </section>
 
-      <section className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+      <section className="bg-surface p-6 rounded-lg shadow-sm border border-border">
         <h2 className="text-xl font-semibold mb-2">Infra Environment Keys</h2>
-        <p className="text-slate-600 mb-4 text-sm">
+        <p className="text-muted-foreground mb-4 text-sm">
           Infrastructure keys are managed only in `.env.local` (local) or Vercel environment variables (deploy). This page only shows configured/missing status by key name.
         </p>
         <div className="space-y-3 text-sm">
           {runtimeStatus?.required.map((item) => (
             <div key={item.key} className="flex justify-between">
               <span className="font-mono">{item.key}</span>
-              <span className={item.configured ? 'text-green-700' : 'text-red-700'}>
+              <span className={item.configured ? 'text-streak' : 'text-warning'}>
                 {item.configured ? 'Configured' : 'Missing'}
               </span>
             </div>
@@ -253,16 +253,16 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      <section className="bg-white p-6 rounded-lg shadow-sm border border-red-200 mt-8">
-        <h2 className="text-xl font-semibold text-red-600 mb-2">Danger Zone</h2>
-        <p className="text-slate-600 mb-4 text-sm">
+      <section className="bg-surface p-6 rounded-lg shadow-sm border border-warning/40 mt-8">
+        <h2 className="text-xl font-semibold text-warning mb-2">Danger Zone</h2>
+        <p className="text-muted-foreground mb-4 text-sm">
           Permanently delete your account and all associated data (memories, chat history, progress logs). This action is irreversible.
         </p>
 
         <button
           onClick={handleDeleteAccount}
           disabled={isDeleting}
-          className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-4 py-2 rounded-md font-medium disabled:opacity-50 transition-colors"
+          className="bg-warning/10 hover:bg-warning/20 text-warning border border-warning/40 px-4 py-2 rounded-md font-medium disabled:opacity-50 transition-colors"
         >
           {isDeleting ? 'Deleting...' : 'Delete Account'}
         </button>
@@ -270,4 +270,3 @@ export default function SettingsPage() {
     </div>
   )
 }
-
