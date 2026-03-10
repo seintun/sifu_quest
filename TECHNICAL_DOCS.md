@@ -87,9 +87,10 @@ Authentication is managed by **NextAuth v5** (`src/auth.ts`) with two providers:
 ### 2. Anonymous (Guest)
 - Uses a `CredentialsProvider` with id `"anonymous"`.
 - On trigger, it calls `supabase.auth.signInAnonymously()` to create a temporary Supabase user.
-- Guest sessions are constrained:
-  - **30-minute session TTL** — enforced server-side via `guest_expires_at`.
-  - **5-message chat limit** — enforced server-side via `chat_sessions.message_count`.
+- Trial-mode sessions (users without personal keys) are constrained server-side:
+  - **30-minute window** — enforced via `user_profiles.trial_started_at`.
+  - **5 user-message limit** — enforced via `user_profiles.trial_messages_used`.
+- This trial policy applies to both guest and signed-in users until a personal key is saved.
 
 ### Guest → Google Upgrade
 - The `/settings` page detects guest users and shows a "Link Google Account" CTA.
@@ -109,8 +110,10 @@ The schema is defined in `supabase/migrations/20260309230058_init_schema.sql` an
 | `display_name`     | TEXT          | —                                           |
 | `avatar_url`       | TEXT          | —                                           |
 | `is_guest`         | BOOLEAN       | Default `false`                             |
-| `guest_expires_at` | TIMESTAMPTZ   | 30-min TTL for guests                       |
+| `guest_expires_at` | TIMESTAMPTZ   | Legacy guest field                          |
 | `api_key_enc`      | TEXT          | AES-256-CBC encrypted Anthropic API key     |
+| `trial_started_at` | TIMESTAMPTZ   | Trial window start timestamp                |
+| `trial_messages_used` | INT        | Number of user messages consumed in trial   |
 | `created_at`       | TIMESTAMPTZ   | —                                           |
 | `last_active_at`   | TIMESTAMPTZ   | —                                           |
 
@@ -143,7 +146,7 @@ Groups chat conversations by coaching mode.
 | `id`            | UUID     | PK, auto-generated            |
 | `user_id`       | UUID     | FK → `auth.users`             |
 | `mode`          | TEXT     | Coaching mode (e.g. `dsa`)    |
-| `message_count` | INT      | Tracks guest message limits   |
+| `message_count` | INT      | Conversation message count    |
 | `is_archived`   | BOOLEAN  | —                             |
 
 ### `chat_messages`
@@ -241,7 +244,7 @@ These files are read at runtime via `fs.readFile()` in `readModeFile()`. On Verc
 | ---------------------- | --------------------------------------------------------------------- |
 | **Data isolation**     | Supabase RLS on all user-facing tables (`auth.uid() = user_id`)       |
 | **API key storage**    | AES-256-CBC encryption with a random 16-byte IV per key. The encryption secret is a 32-byte hex string stored in env vars. Plaintext is **never stored or logged**. |
-| **Guest limits**       | 30-min TTL + 5-message cap, both enforced **server-side** in `/api/chat` |
+| **Trial limits**       | 30-min window + 5 user-message cap for users without personal keys, enforced **server-side** in `/api/chat` |
 | **GDPR compliance**    | `DELETE /api/account` wipes all 7 tables + the `auth.users` row via Supabase Admin |
 | **Session management** | JWT-based via NextAuth. Tokens carry only the user UUID.              |
 
