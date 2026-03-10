@@ -2,10 +2,23 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+export interface FreeQuota {
+  isFreeTier: boolean
+  remaining: number
+  total: number
+  isGuest?: boolean
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
 }
+
+const FREE_TIER_EXHAUSTED_MESSAGE =
+  'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your past conversation remains accessible here.'
+
+const GUEST_LIMIT_REACHED_MESSAGE =
+  'You have reached the guest limit. Please sign up to continue. After creating your account, add your own Anthropic API key in **Settings** to keep chatting securely.'
 
 export function useChat(mode: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -13,47 +26,69 @@ export function useChat(mode: string) {
   const [isStreaming, setIsStreaming] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
   const [upgradeRequired, setUpgradeRequired] = useState<string | null>(null)
+  const [freeQuota, setFreeQuota] = useState<FreeQuota | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   // Load history for the current mode from DB
   useEffect(() => {
+    const controller = new AbortController()
+    let cancelled = false
+
     setIsLoaded(false)
     abortRef.current?.abort()
     setIsStreaming(false)
     setSessionId(null)
     setUpgradeRequired(null)
     setMessages([])
+    setFreeQuota(null)
     
-    fetch(`/api/chat/session?mode=${mode}`)
-      .then(res => res.json())
+    fetch(`/api/chat/session?mode=${mode}`, { signal: controller.signal })
+      .then(async res => {
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          throw new Error((data as { error?: string }).error || 'Failed to load chat session')
+        }
+        return data
+      })
       .then(data => {
+        if (cancelled) return
         if (data.session) {
            setSessionId(data.session.id)
            setMessages(data.messages || [])
         }
+        setFreeQuota(data.freeQuota ?? null)
         setIsLoaded(true)
       })
       .catch(err => {
+        if (cancelled || (err instanceof Error && err.name === 'AbortError')) return
         console.error("Failed to load chat session", err)
         setIsLoaded(true)
       })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
   }, [mode])
 
   // Helper to ensure we have an active DB session before sending a message
-  const ensureSession = async (): Promise<string> => {
+  const ensureSession = useCallback(async (): Promise<string> => {
      if (sessionId) return sessionId
      const res = await fetch('/api/chat/session', {
        method: 'POST',
        headers: { 'Content-Type': 'application/json' },
        body: JSON.stringify({ mode })
      })
-     const data = await res.json()
-     if (res.ok && data.session) {
-       setSessionId(data.session.id)
-       return data.session.id
-     }
+      const data = await res.json()
+      if (res.ok && data.session) {
+        setSessionId(data.session.id)
+        if (data.freeQuota) {
+          setFreeQuota(data.freeQuota)
+        }
+        return data.session.id
+      }
      throw new Error(data.error || 'Failed to create session')
-  }
+  }, [sessionId, mode])
 
   const sendMessage = useCallback(async (userMessage: string) => {
     const newMessages: ChatMessage[] = [
@@ -62,6 +97,11 @@ export function useChat(mode: string) {
     ]
     setMessages(newMessages)
     setIsStreaming(true)
+
+    const previousQuota = freeQuota
+
+    // Optimistically decrement quota
+    setFreeQuota(prev => prev && prev.isFreeTier ? { ...prev, remaining: Math.max(0, prev.remaining - 1) } : prev)
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -81,6 +121,7 @@ export function useChat(mode: string) {
       })
 
       if (!res.ok) {
+        setFreeQuota(previousQuota)
         let errorMessage = 'Unknown error'
         let errorCode: string | null = null
         try {
@@ -91,6 +132,16 @@ export function useChat(mode: string) {
         
         if (res.status === 403) {
           setUpgradeRequired(errorCode || 'missing_api_key')
+          const isGuestBlocked = errorCode === 'guest_limit_reached' || errorCode === 'session_expired'
+          setMessages([
+            ...newMessages,
+            {
+              role: 'assistant',
+              content: isGuestBlocked ? GUEST_LIMIT_REACHED_MESSAGE : FREE_TIER_EXHAUSTED_MESSAGE,
+            },
+          ])
+          setIsStreaming(false)
+          return
         }
         
         setMessages([...newMessages, { role: 'assistant', content: `Error: ${errorMessage}` }])
@@ -99,7 +150,11 @@ export function useChat(mode: string) {
       }
 
       const reader = res.body?.getReader()
-      if (!reader) { setIsStreaming(false); return }
+      if (!reader) {
+        setFreeQuota(previousQuota)
+        setIsStreaming(false)
+        return
+      }
 
       const decoder = new TextDecoder()
       let assistantContent = ''
@@ -134,7 +189,11 @@ export function useChat(mode: string) {
         }
       }
     } catch (err) {
-      if (err instanceof Error && err.name !== 'AbortError') {
+      if (err instanceof Error) {
+        setFreeQuota(previousQuota)
+        if (err.name === 'AbortError') {
+          return
+        }
         setMessages([...newMessages, { role: 'assistant', content: `Error: ${err.message}` }])
       }
     } finally {
@@ -143,7 +202,7 @@ export function useChat(mode: string) {
         abortRef.current = null
       }
     }
-  }, [messages, mode, sessionId])
+  }, [messages, mode, ensureSession, freeQuota])
 
   const greet = useCallback(async () => {
     if (isStreaming) return
@@ -178,6 +237,8 @@ export function useChat(mode: string) {
         
         if (res.status === 403) {
           setUpgradeRequired(errorCode || 'missing_api_key')
+          setIsStreaming(false)
+          return
         }
         
         setMessages([{ role: 'assistant', content: `Error: ${errorMessage}` }])
@@ -222,7 +283,7 @@ export function useChat(mode: string) {
         abortRef.current = null
       }
     }
-  }, [isStreaming, mode, sessionId])
+  }, [isStreaming, mode, ensureSession])
 
   const clearHistory = useCallback(async () => {
     setMessages([])
@@ -237,6 +298,9 @@ export function useChat(mode: string) {
       const data = await res.json()
       if (res.ok && data.session) {
         setSessionId(data.session.id)
+        if (data.freeQuota) {
+          setFreeQuota(data.freeQuota)
+        }
       }
     } catch (err) {
       console.error("Failed to clear history", err)
@@ -247,5 +311,5 @@ export function useChat(mode: string) {
     abortRef.current?.abort()
   }, [])
 
-  return { messages, isStreaming, isLoaded, upgradeRequired, sendMessage, greet, clearHistory, stopStreaming }
+  return { messages, setMessages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming }
 }

@@ -14,11 +14,17 @@ import { ApiKeyPrompt } from '@/components/ApiKeyPrompt'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { useChat, type ChatMessage } from '@/hooks/useChat'
 import 'highlight.js/styles/github-dark.css'
-import { MessageCircle, Send, Square, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { MessageCircle, Send, Square, Trash2, Sparkles } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, type ComponentType, type HTMLAttributes } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
+
+const FREE_TIER_EXHAUSTED_MESSAGE =
+  'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your data remains fully encrypted and structurally private.'
+
+const GUEST_LIMIT_REACHED_MESSAGE =
+  'You have reached the guest limit. Please sign up to continue. After creating your account, add your own Anthropic API key in **Settings** to keep chatting securely.'
 
 const MODE_STARTERS: Record<string, string[]> = {
   dsa: ['Give me a medium array problem', 'Practice dynamic programming', 'Quiz me on graphs', 'Review sliding window'],
@@ -36,7 +42,12 @@ const MODES = [
   { value: 'business-ideas', label: 'Business Ideas' },
 ]
 
-function CodeBlock({ className, children, node, ...props }: any) {
+type CodeBlockProps = HTMLAttributes<HTMLElement> & {
+  node?: unknown
+}
+
+function CodeBlock({ className, children, node: _node, ...props }: CodeBlockProps) {
+  void _node
   const match = /language-(\w+)/.exec(className || '')
   const lang = match ? match[1] : null
   
@@ -109,7 +120,7 @@ function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreamin
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeHighlight]}
             components={{
-              code: CodeBlock as React.ComponentType<React.HTMLAttributes<HTMLElement>>,
+              code: CodeBlock as ComponentType<HTMLAttributes<HTMLElement>>,
               pre: ({ children }) => <>{children}</>,
             }}
           >
@@ -127,8 +138,10 @@ function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreamin
 export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
   const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
-  const { messages, isStreaming, isLoaded, upgradeRequired, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
+  const { messages, setMessages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
+  const isGuest = Boolean(freeQuota?.isGuest)
   const hasGreetedRef = useRef<string | null>(null)
+  const [dismissedPrompt, setDismissedPrompt] = useState(false)
   const [input, setInput] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -138,10 +151,18 @@ export default function CoachPage() {
   useEffect(() => {
     if (!isLoaded) return
     if (messages.length === 0 && hasGreetedRef.current !== mode && !upgradeRequired) {
+      if (freeQuota?.isFreeTier && freeQuota.remaining <= 0) {
+        hasGreetedRef.current = mode
+        setMessages([{
+          role: 'assistant',
+          content: isGuest ? GUEST_LIMIT_REACHED_MESSAGE : FREE_TIER_EXHAUSTED_MESSAGE
+        }])
+        return
+      }
       hasGreetedRef.current = mode
       greet()
     }
-  }, [mode, messages.length, greet, isLoaded, upgradeRequired])
+  }, [mode, messages.length, greet, isLoaded, upgradeRequired, freeQuota, setMessages, isGuest])
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
@@ -153,6 +174,38 @@ export default function CoachPage() {
   useEffect(() => {
     scrollToBottom()
   }, [messages, scrollToBottom])
+
+  // Auto-focus input when assistant finishes streaming
+  useEffect(() => {
+    if (!isStreaming && textareaRef.current && !(freeQuota?.isFreeTier && freeQuota.remaining <= 0)) {
+      textareaRef.current.focus()
+    }
+  }, [isStreaming, freeQuota])
+
+  // Automatically trigger the end-of-quota experience once the 5th message finishes streaming
+  useEffect(() => {
+    if (!isStreaming && freeQuota?.isFreeTier && freeQuota.remaining <= 0 && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1]
+      // Only append if we haven't already appended it
+      const hasLimitMessage =
+        lastMessage?.content.includes('exhausted your free messages') ||
+        lastMessage?.content.includes('reached the guest limit')
+
+      if (lastMessage && lastMessage.role === 'assistant' && !hasLimitMessage) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: isGuest
+              ? GUEST_LIMIT_REACHED_MESSAGE
+              : 'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your past conversation remains accessible here.'
+          }
+        ])
+        // Reveal the popup overlay after the stream finishes
+        queueMicrotask(() => setDismissedPrompt(false))
+      }
+    }
+  }, [isStreaming, freeQuota, messages, setMessages, isGuest])
 
   const handleClearHistory = () => {
     hasGreetedRef.current = null
@@ -212,6 +265,11 @@ export default function CoachPage() {
              </div>
           ) : (
             <>
+              {freeQuota?.isFreeTier && freeQuota.remaining <= 0 && !isStreaming && !dismissedPrompt && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+                  {isGuest ? <UpgradePrompt /> : <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />}
+                </div>
+              )}
               {/* Scrollable messages */}
               <div
                 ref={scrollContainerRef}
@@ -242,17 +300,27 @@ export default function CoachPage() {
           </div>
 
           {/* Input */}
-          <div className="border-t border-border p-3 shrink-0">
+          <div className="border-t border-border p-3 shrink-0 relative">
+            {freeQuota?.isFreeTier && (
+              <div className="absolute -top-11 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-background/95 backdrop-blur-sm border border-border/60 rounded-full px-3 py-1 shadow-sm text-xs font-medium text-foreground/80 z-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                <span>{freeQuota.remaining} / {freeQuota.total} free messages remaining</span>
+              </div>
+            )}
             <div className="flex gap-2">
               <Textarea
                 ref={textareaRef}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Type a message..."
+                placeholder={
+                  freeQuota?.isFreeTier && freeQuota.remaining <= 0
+                    ? (isGuest ? 'Guest limit reached' : 'Free limit reached')
+                    : 'Type a message...'
+                }
                 className="bg-elevated border-border resize-none min-h-[2.5rem] max-h-32"
                 rows={1}
-                disabled={isStreaming}
+                disabled={isStreaming || (freeQuota?.isFreeTier && freeQuota.remaining <= 0)}
               />
               {isStreaming ? (
                 <Button
@@ -267,7 +335,7 @@ export default function CoachPage() {
                 <Button
                   size="sm"
                   onClick={handleSend}
-                  disabled={!input.trim()}
+                  disabled={!input.trim() || (freeQuota?.isFreeTier && freeQuota.remaining <= 0)}
                   className="shrink-0 self-end"
                 >
                   <Send className="h-4 w-4" />
