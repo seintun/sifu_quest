@@ -135,11 +135,11 @@ npm run dev
 
 ## Contributing
 
-1. Fork the repo
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Commit your changes (`git commit -m 'feat: add my feature'`)
-4. Push to the branch (`git push origin feature/my-feature`)
-5. Open a Pull Request
+1. Read [AGENTS.md](./AGENTS.md) before starting feature work (proposal-first workflow is mandatory).
+2. Create a scoped branch (`feat/<slug>`, `fix/<slug>`, or `chore/<slug>`).
+3. Commit frequently with detailed, intent-focused messages.
+4. Push your branch and open a Pull Request using the project template.
+5. Fill out all relevant sections in [`.github/pull_request_template.md`](./.github/pull_request_template.md), including user stories and a test plan (or explicit rationale if not needed).
 
 ---
 
