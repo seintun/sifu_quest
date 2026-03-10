@@ -9,8 +9,10 @@ export async function GET() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  if (session.user.email?.endsWith('@anonymous.local')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const status = getRuntimeConfigStatus()
   return NextResponse.json(status)
 }
-
