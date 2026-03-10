@@ -1,23 +1,61 @@
 'use client'
 
 import { signOut, useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import React, { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import React, { useCallback, useEffect, useState } from 'react'
+import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
+
+type AccountStatus = {
+  userId: string
+  isGuest: boolean
+  isLinked: boolean
+  displayName: string | null
+  avatarUrl: string | null
+}
 
 export default function SettingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   
   const [apiKey, setApiKey] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null)
   const [message, setMessage] = useState({ text: '', type: '' })
+
+  const loadAccountStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/account/status')
+      const data = await res.json()
+      if (res.ok) {
+        setAccountStatus(data.account)
+      }
+    } catch {
+      // Best-effort: account status refresh failure should not block settings usage.
+    }
+  }, [])
   
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/api/auth/signin')
     }
   }, [status, router])
+
+  useEffect(() => {
+    if (status === 'authenticated') {
+      void loadAccountStatus()
+    }
+  }, [status, loadAccountStatus])
+
+  useEffect(() => {
+    if (searchParams.get('success') === 'linked') {
+      setMessage({ text: 'Google account linked. Your guest profile has been upgraded without losing any data.', type: 'success' })
+      void loadAccountStatus()
+    } else if (searchParams.get('error') === 'link_failed') {
+      setMessage({ text: 'Failed to link your Google account. Please try again.', type: 'error' })
+    }
+  }, [searchParams, loadAccountStatus])
 
   const handleSaveKey = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,7 +76,7 @@ export default function SettingsPage() {
       } else {
         setMessage({ text: data.error || 'Failed to save key.', type: 'error' })
       }
-    } catch (err) {
+    } catch {
       setMessage({ text: 'An unexpected error occurred.', type: 'error' })
     } finally {
       setIsSaving(false)
@@ -60,7 +98,7 @@ export default function SettingsPage() {
         setMessage({ text: data.error || 'Failed to delete account.', type: 'error' })
         setIsDeleting(false)
       }
-    } catch (err) {
+    } catch {
       setMessage({ text: 'An unexpected error occurred.', type: 'error' })
       setIsDeleting(false)
     }
@@ -69,24 +107,12 @@ export default function SettingsPage() {
   if (status === 'loading') return <div className="p-8">Loading...</div>
   if (!session) return null
 
-  // Check if this is an anonymous guest account (using our dummy local email format from NextAuth config)
-  const isGuest = session.user?.email?.endsWith('@anonymous.local')
+  const isGuest = Boolean(accountStatus?.isGuest)
 
   const handleLinkGoogle = async () => {
-    // We need to use the actual Supabase client here directly as NextAuth doesn't natively 
-    // expose linkIdentity.
-    const { createClientBrowser } = await import('@/lib/supabase-browser')
-    const supabase = createClientBrowser()
-    
-    const { error } = await supabase.auth.linkIdentity({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/api/link-google/callback`
-      }
-    })
-    
-    if (error) {
-      setMessage({ text: `Failed to link account: ${error.message}`, type: 'error' })
+    const result = await startGuestGoogleUpgrade(window.location.origin)
+    if (!result.ok) {
+      setMessage({ text: `Failed to link account: ${result.error}`, type: 'error' })
     }
   }
 

@@ -1,8 +1,9 @@
 import { createAdminClient } from '@/lib/supabase-admin'
+import { ensureUserProfile } from '@/lib/account-state'
+import { computeFreeQuota } from '@/lib/free-quota'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { FREE_TIER_MAX_MESSAGES, FREE_TIER_MAX_USER_MESSAGES } from '@/lib/quota'
 
 export const runtime = 'nodejs'
 
@@ -13,9 +14,6 @@ export async function GET(request: NextRequest) {
        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
-    const sessionIsGuest =
-      session.user?.name === 'Guest' ||
-      Boolean(session.user?.email?.endsWith('@anonymous.local'))
     
     const { searchParams } = new URL(request.url)
     const mode = searchParams.get('mode')
@@ -26,48 +24,8 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient()
 
-    // 1. Calculate free-tier quota limits globally across all sessions
-    const { data: userProfile, error: userProfileError } = await supabase
-      .from('user_profiles')
-      .select('is_guest, api_key_enc, free_quota_exhausted')
-      .eq('id', userId)
-      .maybeSingle()
-
-    if (userProfileError) {
-      console.error('Failed to load user profile for quota calculation:', userProfileError)
-      return NextResponse.json({ error: 'Failed to load user profile' }, { status: 500 })
-    }
-
-    let isFreeTier = true
-    if (userProfile && !userProfile.is_guest && userProfile.api_key_enc) {
-      isFreeTier = false
-    }
-
-    let freeQuota = null
-    if (isFreeTier && userProfile) {
-      if (userProfile.free_quota_exhausted) {
-        freeQuota = { isFreeTier: true, remaining: 0, total: FREE_TIER_MAX_USER_MESSAGES, isGuest: Boolean(userProfile.is_guest) }
-      } else {
-        const { data: totalMessagesData, error: totalMessagesError } = await supabase
-          .from('chat_sessions')
-          .select('message_count')
-          .eq('user_id', userId)
-
-        if (totalMessagesError) {
-          console.error(totalMessagesError)
-          return NextResponse.json({ error: 'Database error calculating free quota' }, { status: 500 })
-        }
-
-        const totalMessages = totalMessagesData?.reduce((sum, session) => sum + (session.message_count || 0), 0) || 0
-        const remaining = Math.max(0, FREE_TIER_MAX_MESSAGES - totalMessages)
-        freeQuota = { isFreeTier: true, remaining: Math.floor(remaining / 2), total: FREE_TIER_MAX_USER_MESSAGES, isGuest: Boolean(userProfile.is_guest) }
-      }
-    } else if (!isFreeTier) {
-       freeQuota = { isFreeTier: false, remaining: -1, total: -1, isGuest: Boolean(userProfile?.is_guest ?? sessionIsGuest) }
-    } else {
-       // no profile yet
-       freeQuota = { isFreeTier: true, remaining: FREE_TIER_MAX_USER_MESSAGES, total: FREE_TIER_MAX_USER_MESSAGES, isGuest: Boolean(sessionIsGuest) }
-    }
+    const userProfile = await ensureUserProfile(userId, session.user.email)
+    const freeQuota = computeFreeQuota(userProfile)
 
     // Find the most recent unarchived session for this mode 
     // In a multi-session UI, we would return a list. For now, we return the active one.
@@ -122,9 +80,6 @@ export async function POST(request: NextRequest) {
        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
-    const sessionIsGuest =
-      session.user?.name === 'Guest' ||
-      Boolean(session.user?.email?.endsWith('@anonymous.local'))
     const { mode, title } = await request.json()
 
     if (!mode) {
@@ -154,47 +109,8 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    // 3. Re-calculate the free quota because this action creates a new session, but retains the global history count
-    const { data: userProfile, error: userProfileError } = await supabase
-      .from('user_profiles')
-      .select('is_guest, api_key_enc, free_quota_exhausted')
-      .eq('id', userId)
-      .maybeSingle()
-
-    if (userProfileError) {
-      console.error('Failed to load user profile for quota calculation:', userProfileError)
-      return NextResponse.json({ error: 'Failed to load user profile' }, { status: 500 })
-    }
-
-    let isFreeTier = true
-    if (userProfile && !userProfile.is_guest && userProfile.api_key_enc) {
-      isFreeTier = false
-    }
-
-    let freeQuota = null
-    if (isFreeTier && userProfile) {
-      if (userProfile.free_quota_exhausted) {
-        freeQuota = { isFreeTier: true, remaining: 0, total: FREE_TIER_MAX_USER_MESSAGES, isGuest: Boolean(userProfile.is_guest) }
-      } else {
-        const { data: totalMessagesData, error: totalMessagesError } = await supabase
-          .from('chat_sessions')
-          .select('message_count')
-          .eq('user_id', userId)
-
-        if (totalMessagesError) {
-          console.error(totalMessagesError)
-          return NextResponse.json({ error: 'Database error calculating free quota' }, { status: 500 })
-        }
-
-        const totalMessages = totalMessagesData?.reduce((sum, session) => sum + (session.message_count || 0), 0) || 0
-        const remaining = Math.max(0, FREE_TIER_MAX_MESSAGES - totalMessages)
-        freeQuota = { isFreeTier: true, remaining: Math.floor(remaining / 2), total: FREE_TIER_MAX_USER_MESSAGES, isGuest: Boolean(userProfile.is_guest) }
-      }
-    } else if (!isFreeTier) {
-       freeQuota = { isFreeTier: false, remaining: -1, total: -1, isGuest: Boolean(userProfile?.is_guest ?? sessionIsGuest) }
-    } else {
-       freeQuota = { isFreeTier: true, remaining: FREE_TIER_MAX_USER_MESSAGES, total: FREE_TIER_MAX_USER_MESSAGES, isGuest: Boolean(sessionIsGuest) }
-    }
+    const userProfile = await ensureUserProfile(userId, session.user.email)
+    const freeQuota = computeFreeQuota(userProfile)
 
     if (error) {
        console.error(error)
