@@ -1,5 +1,6 @@
 import { writeMemoryFile } from '@/lib/memory'
 import { getPlanTimelineMeta } from '@/lib/profile-timeline'
+import { assertRequiredEnv } from '@/lib/env'
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
@@ -25,6 +26,8 @@ interface OnboardingData {
 
 export async function POST(request: NextRequest) {
   try {
+    assertRequiredEnv(['ANTHROPIC_API_KEY'])
+
     const session = await auth()
     if (!session?.user?.id) {
        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -236,4 +239,3 @@ Format as clean markdown suitable for rendering.`
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
-

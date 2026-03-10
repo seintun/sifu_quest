@@ -6,7 +6,7 @@ import { Progress } from '@/components/ui/progress'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -234,11 +234,6 @@ export default function OnboardingPage() {
     })
   }
 
-  // API key phase
-  const [needsApiKey, setNeedsApiKey] = useState<boolean | null>(null)
-  const [apiKey, setApiKey] = useState('')
-  const [savingKey, setSavingKey] = useState(false)
-
   // Profile phase
   const [step, setStep] = useState(0)
   // freeText: plain text answers (input/textarea, and extra fields on chip/radio steps)
@@ -246,13 +241,6 @@ export default function OnboardingPage() {
   // chipSel: selected chip labels per step key
   const [chipSel, setChipSel] = useState<Record<string, string[]>>({})
   const [generating, setGenerating] = useState(false)
-
-  useEffect(() => {
-    fetch('/api/setup')
-      .then(r => r.json())
-      .then(data => setNeedsApiKey(!data.hasApiKey))
-      .catch(() => setNeedsApiKey(false))
-  }, [])
 
   // Build the final string answer for a step
   function getAnswer(s: AnyStep): string {
@@ -279,27 +267,6 @@ export default function OnboardingPage() {
         return { ...prev, [key]: cur.includes(label) ? [] : [label] }
       }
     })
-  }
-
-  const handleSaveApiKey = async () => {
-    setSavingKey(true)
-    try {
-      const res = await fetch('/api/setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey }),
-      })
-      const data = await res.json()
-      if (!res.ok) { 
-        toast.error('Invalid API Key', {
-          description: data.error || 'Failed to save API key',
-        })
-        return 
-      }
-      setNeedsApiKey(false)
-    } finally {
-      setSavingKey(false)
-    }
   }
 
   const handleNext = async () => {
@@ -346,43 +313,6 @@ export default function OnboardingPage() {
   }
 
   // ── Loading / API key screens ────────────────────────────────────────────────
-
-  if (needsApiKey === null) {
-    return <div className="min-h-screen flex items-center justify-center -m-6"><div className="text-muted-foreground">Loading...</div></div>
-  }
-
-  if (needsApiKey) {
-    return (
-      <div className="min-h-screen flex items-center justify-center -m-6">
-        <div className="w-full max-w-lg p-8">
-          <div className="mb-8">
-            <h1 className="font-display text-2xl font-bold mb-2">Set up your workspace</h1>
-            <p className="text-muted-foreground text-sm">Step 1 of 2 — Connect your API key</p>
-            <Progress value={50} className="mt-3 h-1.5" />
-          </div>
-          <label className="block text-lg font-medium mb-2">Enter your Anthropic API key</label>
-          <p className="text-muted-foreground text-sm mb-4">
-            Get yours at <span className="text-foreground font-mono text-xs">console.anthropic.com</span>.
-            Saved locally in <span className="font-mono text-xs">.env.local</span> — never leaves your machine.
-          </p>
-          <Input
-            type="password"
-            value={apiKey}
-            onChange={e => setApiKey(e.target.value)}
-            placeholder="sk-ant-..."
-            className="bg-surface border-border font-mono"
-            onKeyDown={e => { if (e.key === 'Enter' && apiKey.startsWith('sk-ant-')) { e.preventDefault(); handleSaveApiKey() } }}
-            autoFocus
-          />
-          <div className="flex justify-end mt-8">
-            <Button onClick={handleSaveApiKey} disabled={!apiKey.startsWith('sk-ant-') || savingKey}>
-              {savingKey ? 'Verifying...' : 'Next'}
-            </Button>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   if (generating) {
     return (

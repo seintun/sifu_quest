@@ -24,14 +24,10 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
     hasSession()
       .then((isValidSession) => {
         if (!isValidSession) throw new Error('No session')
-        return Promise.all([
-          fetch('/api/setup').then(r => r.json()),
-          fetch('/api/memory?file=profile.md').then(r => r.json()),
-        ])
+        return fetch('/api/memory?file=profile.md').then(r => r.json())
       })
-      .then(([setup, profile]) => {
+      .then((profile) => {
         const ready =
-          setup.hasApiKey &&
           profile.content &&
           profile.content.includes('**Name:**')
         if (!ready) {
