@@ -22,10 +22,13 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
 
     // Check for session first
     hasSession()
-      .then(() => Promise.all([
-        fetch('/api/setup').then(r => r.json()),
-        fetch('/api/memory?file=profile.md').then(r => r.json()),
-      ]))
+      .then((isValidSession) => {
+        if (!isValidSession) throw new Error('No session')
+        return Promise.all([
+          fetch('/api/setup').then(r => r.json()),
+          fetch('/api/memory?file=profile.md').then(r => r.json()),
+        ])
+      })
       .then(([setup, profile]) => {
         const ready =
           setup.hasApiKey &&
