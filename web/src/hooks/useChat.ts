@@ -30,6 +30,7 @@ export function useChat(mode: string) {
     setSessionId(null)
     setUpgradeRequired(null)
     setMessages([])
+    setFreeQuota(null)
     
     fetch(`/api/chat/session?mode=${mode}`)
       .then(res => res.json())
@@ -40,6 +41,8 @@ export function useChat(mode: string) {
         }
         if (data.freeQuota) {
            setFreeQuota(data.freeQuota)
+        } else {
+           setFreeQuota(null)
         }
         setIsLoaded(true)
       })
@@ -76,6 +79,8 @@ export function useChat(mode: string) {
     setMessages(newMessages)
     setIsStreaming(true)
 
+    const previousQuota = freeQuota
+
     // Optimistically decrement quota
     setFreeQuota(prev => prev && prev.isFreeTier ? { ...prev, remaining: Math.max(0, prev.remaining - 1) } : prev)
 
@@ -97,6 +102,7 @@ export function useChat(mode: string) {
       })
 
       if (!res.ok) {
+        setFreeQuota(previousQuota)
         let errorMessage = 'Unknown error'
         let errorCode: string | null = null
         try {
@@ -154,6 +160,7 @@ export function useChat(mode: string) {
       }
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
+        setFreeQuota(previousQuota)
         setMessages([...newMessages, { role: 'assistant', content: `Error: ${err.message}` }])
       }
     } finally {

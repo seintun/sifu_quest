@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { decryptKey } from '@/lib/apikey'
+import { FREE_TIER_MAX_MESSAGES } from '@/lib/quota'
 import { readMemoryFile, readModeFile } from '@/lib/memory'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest) {
           }
       }
 
-      // Check total messages across ALL sessions for this user (max 10 = 5 user + 5 assistant)
+      // Check total messages across ALL sessions for this user
       const { data: totalMessagesData, error: countError } = await supabase
         .from('chat_sessions')
         .select('message_count')
@@ -153,7 +154,7 @@ export async function POST(request: NextRequest) {
       } else if (totalMessagesData) {
         const totalMessages = totalMessagesData.reduce((sum, session) => sum + (session.message_count || 0), 0)
         
-        if (totalMessages >= 10) { 
+        if (totalMessages >= FREE_TIER_MAX_MESSAGES) { 
           // Update the specific flag so we don't need to compute this sum every time
           await supabase.from('user_profiles').update({ free_quota_exhausted: true }).eq('id', userId)
 
