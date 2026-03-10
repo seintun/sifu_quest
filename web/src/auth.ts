@@ -1,33 +1,18 @@
 import { createClient } from "@/lib/supabase"
-import { randomBytes } from "crypto"
-import { readFileSync, writeFileSync } from "fs"
+import { assertRequiredEnv, getAuthSecret } from "@/lib/env"
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
-import { join } from "path"
 
-// Auto-generate AUTH_SECRET if missing — writes to .env.local so it persists
-function getOrCreateSecret(): string {
-  if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET
-
-  const secret = randomBytes(32).toString('base64')
-  process.env.AUTH_SECRET = secret
-
-  const envPath = join(process.cwd(), '.env.local')
-  try {
-    const existing = readFileSync(envPath, 'utf-8')
-    if (!existing.includes('AUTH_SECRET=')) {
-      writeFileSync(envPath, existing.trimEnd() + `\nAUTH_SECRET=${secret}\n`, 'utf-8')
-    }
-  } catch {
-    writeFileSync(envPath, `AUTH_SECRET=${secret}\n`, 'utf-8')
-  }
-
-  return secret
-}
+assertRequiredEnv([
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+])
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  secret: getOrCreateSecret(),
+  secret: getAuthSecret(),
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
