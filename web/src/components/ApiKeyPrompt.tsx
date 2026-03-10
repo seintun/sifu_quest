@@ -1,13 +1,25 @@
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { KeyRound, ShieldCheck } from 'lucide-react'
+import { KeyRound, ShieldCheck, X } from 'lucide-react'
 import Link from 'next/link'
 
-export function ApiKeyPrompt() {
+interface ApiKeyPromptProps {
+  onClose?: () => void
+}
+
+export function ApiKeyPrompt({ onClose }: ApiKeyPromptProps = {}) {
   return (
     <div className="flex justify-center my-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <Card className="max-w-md w-full border-primary/30 bg-primary/5 shadow-lg shadow-primary/10 backdrop-blur-sm">
+      <Card className="max-w-md w-full border-primary/30 bg-primary/5 shadow-lg shadow-primary/10 backdrop-blur-sm relative">
+        {onClose && (
+          <button 
+            onClick={onClose}
+            className="absolute top-3 right-3 p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
         <CardHeader className="pb-3 text-center">
           <div className="mx-auto bg-primary/10 p-3 rounded-full w-14 h-14 flex items-center justify-center mb-2">
             <KeyRound className="w-8 h-8 text-primary" />

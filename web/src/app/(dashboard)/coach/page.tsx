@@ -129,6 +129,7 @@ export default function CoachPage() {
   const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
   const { messages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
   const hasGreetedRef = useRef<string | null>(null)
+  const [dismissedPrompt, setDismissedPrompt] = useState(false)
   const [input, setInput] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -212,6 +213,11 @@ export default function CoachPage() {
              </div>
           ) : (
             <>
+              {freeQuota?.isFreeTier && freeQuota.remaining <= 0 && !dismissedPrompt && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+                  <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />
+                </div>
+              )}
               {/* Scrollable messages */}
               <div
                 ref={scrollContainerRef}
