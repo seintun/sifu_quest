@@ -14,6 +14,8 @@ export async function GET() {
 
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const profile = await ensureUserProfile(userId, session.user.email)
+    const sessionName = typeof session.user.name === 'string' ? session.user.name.trim() : ''
+    const prefillName = profile.display_name ? null : (sessionName || null)
 
     return NextResponse.json({
       account: {
@@ -21,6 +23,8 @@ export async function GET() {
         isGuest: profile.is_guest,
         isLinked: !profile.is_guest,
         displayName: profile.display_name,
+        hasApiKey: Boolean(profile.api_key_enc),
+        prefillName,
         avatarUrl: profile.avatar_url,
       },
     })

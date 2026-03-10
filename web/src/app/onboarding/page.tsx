@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { getOnboardingPrefillName } from '@/lib/onboarding-name'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -17,6 +18,13 @@ type TextareaStep = StepBase & { type: 'textarea'; placeholder: string }
 type ChipsStep    = StepBase & { type: 'chips';    options: string[]; multi: boolean; extraPlaceholder?: string }
 type RadioStep    = StepBase & { type: 'radio';    options: string[]; customPlaceholder?: string }
 type AnyStep = InputStep | TextareaStep | ChipsStep | RadioStep
+
+type AccountStatusResponse = {
+  account?: {
+    displayName?: string | null
+    prefillName?: string | null
+  }
+}
 
 // ── Step definitions ──────────────────────────────────────────────────────────
 
@@ -242,6 +250,39 @@ export default function OnboardingPage() {
   const [chipSel, setChipSel] = useState<Record<string, string[]>>({})
   const [generating, setGenerating] = useState(false)
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadAccountStatusPrefill() {
+      try {
+        const res = await fetch('/api/account/status')
+        if (!res.ok || cancelled) {
+          return
+        }
+
+        const data = (await res.json()) as AccountStatusResponse
+        const namePrefill = getOnboardingPrefillName(data.account?.displayName, data.account?.prefillName)
+        if (!namePrefill) {
+          return
+        }
+
+        setFreeText((prev) => {
+          if ((prev.name ?? '').trim().length > 0) {
+            return prev
+          }
+          return { ...prev, name: namePrefill }
+        })
+      } catch {
+        // No-op: onboarding can continue without prefill.
+      }
+    }
+
+    void loadAccountStatusPrefill()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   // Build the final string answer for a step
   function getAnswer(s: AnyStep): string {
     const chips = chipSel[s.key] || []
@@ -367,6 +408,7 @@ export default function OnboardingPage() {
               }}
               placeholder={(current as InputStep).placeholder}
               className="bg-surface border-border"
+              maxLength={current.key === 'name' ? 80 : undefined}
               onKeyDown={e => { if (e.key === 'Enter' && complete) { e.preventDefault(); handleNext() } }}
               autoFocus
             />
