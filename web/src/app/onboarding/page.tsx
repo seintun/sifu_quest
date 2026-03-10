@@ -241,6 +241,9 @@ export default function OnboardingPage() {
   // chipSel: selected chip labels per step key
   const [chipSel, setChipSel] = useState<Record<string, string[]>>({})
   const [generating, setGenerating] = useState(false)
+  const [personalApiKey, setPersonalApiKey] = useState('')
+  const [isSavingPersonalKey, setIsSavingPersonalKey] = useState(false)
+  const [showUnlockBanner, setShowUnlockBanner] = useState(true)
 
   // Build the final string answer for a step
   function getAnswer(s: AnyStep): string {
@@ -336,9 +339,75 @@ export default function OnboardingPage() {
   const chips = chipSel[current.key] || []
   const complete = isStepComplete(current)
 
+  const handleSavePersonalKey = async () => {
+    if (!personalApiKey.startsWith('sk-ant-')) {
+      toast.error('Invalid API key format', {
+        description: 'Anthropic keys must start with sk-ant-',
+      })
+      return
+    }
+
+    setIsSavingPersonalKey(true)
+    try {
+      await ensureSession()
+      const res = await fetch('/api/auth/apikey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: personalApiKey }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error('Failed to save key', {
+          description: data.error || 'Please try again.',
+        })
+        return
+      }
+
+      setPersonalApiKey('')
+      setShowUnlockBanner(false)
+      toast.success('Personal API key saved. Unlimited usage unlocked.')
+    } catch {
+      toast.error('Failed to save key', {
+        description: 'Please check your connection and try again.',
+      })
+    } finally {
+      setIsSavingPersonalKey(false)
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center -m-6">
       <div className="w-full max-w-lg p-8">
+
+        {showUnlockBanner && (
+          <div className="mb-5 rounded-lg border border-border bg-surface p-4 space-y-3">
+            <p className="text-sm font-medium">Unlock unlimited usage (optional)</p>
+            <p className="text-xs text-muted-foreground">
+              Without a personal API key, your account uses the shared trial key (5 messages / 30 minutes).
+              Add your key now to remove limits.
+            </p>
+            <Input
+              type="password"
+              value={personalApiKey}
+              onChange={e => setPersonalApiKey(e.target.value)}
+              placeholder="sk-ant-..."
+              className="bg-background border-border font-mono text-sm"
+            />
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                onClick={handleSavePersonalKey}
+                disabled={isSavingPersonalKey || !personalApiKey.startsWith('sk-ant-')}
+              >
+                {isSavingPersonalKey ? 'Saving...' : 'Save Personal Key'}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setShowUnlockBanner(false)}>
+                Skip for now
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Header */}
         <div className="mb-8">
