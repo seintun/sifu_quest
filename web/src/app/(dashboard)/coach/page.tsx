@@ -127,7 +127,7 @@ function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreamin
 export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
   const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
-  const { messages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
+  const { messages, setMessages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
   const hasGreetedRef = useRef<string | null>(null)
   const [dismissedPrompt, setDismissedPrompt] = useState(false)
   const [input, setInput] = useState('')
@@ -141,12 +141,16 @@ export default function CoachPage() {
     if (messages.length === 0 && hasGreetedRef.current !== mode && !upgradeRequired) {
       if (freeQuota?.isFreeTier && freeQuota.remaining <= 0) {
         hasGreetedRef.current = mode
+        setMessages([{
+          role: 'assistant',
+          content: 'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your data remains fully encrypted and structurally private.'
+        }])
         return
       }
       hasGreetedRef.current = mode
       greet()
     }
-  }, [mode, messages.length, greet, isLoaded, upgradeRequired, freeQuota])
+  }, [mode, messages.length, greet, isLoaded, upgradeRequired, freeQuota, setMessages])
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {

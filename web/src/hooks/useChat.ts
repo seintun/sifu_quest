@@ -266,5 +266,5 @@ export function useChat(mode: string) {
     abortRef.current?.abort()
   }, [])
 
-  return { messages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming }
+  return { messages, setMessages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming }
 }
