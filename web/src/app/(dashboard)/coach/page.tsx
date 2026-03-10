@@ -221,7 +221,7 @@ export default function CoachPage() {
              </div>
           ) : (
             <>
-              {freeQuota?.isFreeTier && freeQuota.remaining <= 0 && !dismissedPrompt && (
+              {freeQuota?.isFreeTier && freeQuota.remaining <= 0 && messages.length === 0 && !dismissedPrompt && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
                   <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />
                 </div>

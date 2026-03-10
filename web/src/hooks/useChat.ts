@@ -107,6 +107,9 @@ export function useChat(mode: string) {
         
         if (res.status === 403) {
           setUpgradeRequired(errorCode || 'missing_api_key')
+          setMessages([...newMessages, { role: 'assistant', content: 'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your past conversation remains accessible here.' }])
+          setIsStreaming(false)
+          return
         }
         
         setMessages([...newMessages, { role: 'assistant', content: `Error: ${errorMessage}` }])
