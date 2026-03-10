@@ -1,9 +1,51 @@
 import { encryptKey } from '@/lib/apikey'
+import { evaluateTrialEntitlement } from '@/lib/entitlements'
 import { createClient } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 
 export const runtime = 'nodejs'
+
+export async function GET() {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const userId = session.user.id
+    const supabase = await createClient()
+    const { data: profile, error } = await supabase
+      .from('user_profiles')
+      .select('api_key_enc, trial_started_at, trial_messages_used')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (error) {
+      console.error("Failed to fetch API key status:", error)
+      return NextResponse.json({ error: 'Failed to fetch API key status' }, { status: 500 })
+    }
+
+    const hasPersonalKey = Boolean(profile?.api_key_enc)
+    const trial = evaluateTrialEntitlement({
+      trialStartedAt: profile?.trial_started_at || null,
+      trialMessagesUsed: profile?.trial_messages_used || 0,
+    })
+
+    return NextResponse.json({
+      hasPersonalKey,
+      trial: {
+        active: trial.allowed,
+        code: trial.code || null,
+        remainingMessages: trial.remainingMessages,
+        expiresAt: trial.expiresAt,
+      }
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,11 +64,16 @@ export async function POST(request: NextRequest) {
     
     const supabase = await createClient()
     
-    // Update the user_profiles table with the encrypted key
+    // Upsert the profile row so key save works even before onboarding bootstrap.
     const { error } = await supabase
       .from('user_profiles')
-      .update({ api_key_enc: encryptedKey })
-      .eq('id', userId)
+      .upsert({
+        id: userId,
+        api_key_enc: encryptedKey,
+        last_active_at: new Date().toISOString(),
+      }, {
+        onConflict: 'id',
+      })
       
     if (error) {
       console.error("Failed to save API key:", error)
