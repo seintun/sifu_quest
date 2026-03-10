@@ -17,13 +17,16 @@ export type TrialCheckResult = {
 export function evaluateTrialEntitlement(input: TrialCheckInput): TrialCheckResult {
   const now = input.now ?? new Date()
   const remainingMessages = Math.max(TRIAL_MESSAGE_LIMIT - input.trialMessagesUsed, 0)
+  const expiresAt = input.trialStartedAt
+    ? new Date(new Date(input.trialStartedAt).getTime() + TRIAL_WINDOW_MS).toISOString()
+    : null
 
   if (input.trialMessagesUsed >= TRIAL_MESSAGE_LIMIT) {
     return {
       allowed: false,
       code: 'trial_limit_reached',
       remainingMessages: 0,
-      expiresAt: input.trialStartedAt,
+      expiresAt,
     }
   }
 
@@ -37,21 +40,20 @@ export function evaluateTrialEntitlement(input: TrialCheckInput): TrialCheckResu
 
   const trialStart = new Date(input.trialStartedAt)
   const expiresAtDate = new Date(trialStart.getTime() + TRIAL_WINDOW_MS)
-  const expiresAt = expiresAtDate.toISOString()
+  const computedExpiresAt = expiresAtDate.toISOString()
 
   if (now.getTime() > expiresAtDate.getTime()) {
     return {
       allowed: false,
       code: 'trial_expired',
       remainingMessages,
-      expiresAt,
+      expiresAt: computedExpiresAt,
     }
   }
 
   return {
     allowed: true,
     remainingMessages,
-    expiresAt,
+    expiresAt: computedExpiresAt,
   }
 }
-

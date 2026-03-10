@@ -20,6 +20,7 @@ test('trial blocks when message limit reached', () => {
 
   assert.equal(result.allowed, false)
   assert.equal(result.code, 'trial_limit_reached')
+  assert.equal(result.expiresAt, '2026-03-10T00:30:00.000Z')
 })
 
 test('trial blocks when 30-minute window is exceeded', () => {
@@ -32,4 +33,3 @@ test('trial blocks when 30-minute window is exceeded', () => {
   assert.equal(result.allowed, false)
   assert.equal(result.code, 'trial_expired')
 })
-

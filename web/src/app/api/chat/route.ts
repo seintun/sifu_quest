@@ -142,11 +142,20 @@ export async function POST(request: NextRequest) {
 
       if (!userProfile.trial_started_at) {
         const startedAt = new Date().toISOString()
-        userProfile.trial_started_at = startedAt
-        await supabase
+        const { error: trialUpdateError } = await supabase
           .from('user_profiles')
           .update({ trial_started_at: startedAt })
           .eq('id', userId)
+
+        if (trialUpdateError) {
+          console.error('Failed to persist trial_started_at for user', userId, trialUpdateError)
+          return new Response(JSON.stringify({
+            error: 'trial_start_failed',
+            message: 'We could not start your trial due to a server error. Please try again later.'
+          }), { status: 500 })
+        }
+
+        userProfile.trial_started_at = startedAt
       }
     }
 
@@ -254,12 +263,19 @@ export async function POST(request: NextRequest) {
               })
 
               if (usingTrialKey) {
-                const nextTrialCount = (userProfile?.trial_messages_used || 0) + 1
-                userProfile.trial_messages_used = nextTrialCount
-                await supabaseAction
-                  .from('user_profiles')
-                  .update({ trial_messages_used: nextTrialCount })
-                  .eq('id', userId)
+                const { data: trialUpdateResult, error: trialUpdateError } = await supabaseAction.rpc(
+                  'increment_trial_messages_used',
+                  {
+                    user_id_param: userId,
+                    increment_by: 1,
+                  }
+                )
+
+                if (trialUpdateError) {
+                  console.error('Failed to atomically increment trial_messages_used', trialUpdateError)
+                } else if (Array.isArray(trialUpdateResult) && trialUpdateResult[0]?.trial_messages_used !== undefined) {
+                  userProfile.trial_messages_used = trialUpdateResult[0].trial_messages_used
+                }
               }
           }
         } catch (error) {
