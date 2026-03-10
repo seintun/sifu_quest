@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
+import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -219,6 +219,20 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
 export default function OnboardingPage() {
   const router = useRouter()
 
+  // Ensure a NextAuth session exists (auto anonymous sign-in)
+  async function ensureSession(): Promise<void> {
+    const res = await fetch('/api/auth/session')
+    const session = await res.json()
+    if (session?.user?.id) return
+    const csrfRes = await fetch('/api/auth/csrf')
+    const { csrfToken } = await csrfRes.json()
+    await fetch('/api/auth/callback/anonymous', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ csrfToken, json: 'true' }),
+    })
+  }
+
   // API key phase
   const [needsApiKey, setNeedsApiKey] = useState<boolean | null>(null)
   const [apiKey, setApiKey] = useState('')
@@ -297,9 +311,10 @@ export default function OnboardingPage() {
       return
     }
 
-    // Final step — build payload and submit
+    // Final step — ensure session then build payload and submit
     setGenerating(true)
     try {
+      await ensureSession()
       const payload: Record<string, string> = {}
       for (const s of STEPS) payload[s.key] = getAnswer(s)
 
