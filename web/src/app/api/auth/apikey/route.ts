@@ -1,5 +1,6 @@
 import { encryptKey } from '@/lib/apikey'
-import { createClient } from '@/lib/supabase'
+import { createAdminClient } from '@/lib/supabase-admin'
+import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 
@@ -17,19 +18,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid Anthropic API key' }, { status: 400 })
     }
     
-    const userId = session.user.id
+    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const encryptedKey = encryptKey(apiKey)
     
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     
-    // Update the user_profiles table with the encrypted key
+    // Upsert ensures a profile row exists even before first chat bootstrap.
     const { error } = await supabase
       .from('user_profiles')
-      .update({ api_key_enc: encryptedKey })
-      .eq('id', userId)
+      .upsert({
+        id: userId,
+        api_key_enc: encryptedKey,
+        last_active_at: new Date().toISOString(),
+      }, { onConflict: 'id' })
       
     if (error) {
       console.error("Failed to save API key:", error)
+      if (error.code === '23503') {
+        return NextResponse.json(
+          { error: 'Session identity is out of sync. Please sign out and sign in again.', code: 'identity_mismatch' },
+          { status: 409 },
+        )
+      }
       return NextResponse.json({ error: 'Failed to save API key' }, { status: 500 })
     }
     
@@ -48,23 +58,32 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   try {
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    const userId = session.user.id
-    const supabase = await createClient()
+    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
+    const supabase = createAdminClient()
     
     const { error } = await supabase
       .from('user_profiles')
-      .update({ api_key_enc: null })
-      .eq('id', userId)
+      .upsert({
+        id: userId,
+        api_key_enc: null,
+        last_active_at: new Date().toISOString(),
+      }, { onConflict: 'id' })
       
     if (error) {
       console.error("Failed to delete API key:", error)
+      if (error.code === '23503') {
+        return NextResponse.json(
+          { error: 'Session identity is out of sync. Please sign out and sign in again.', code: 'identity_mismatch' },
+          { status: 409 },
+        )
+      }
       return NextResponse.json({ error: 'Failed to delete API key' }, { status: 500 })
     }
     

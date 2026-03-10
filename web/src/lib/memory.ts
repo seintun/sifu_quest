@@ -19,6 +19,18 @@ const ALLOWED_MODE_FILES = [
   'business-ideas.md',
 ]
 
+export class MemoryWriteError extends Error {
+  filename: string
+  dbCode?: string
+
+  constructor(filename: string, dbCode?: string) {
+    super(`Failed to save ${filename}`)
+    this.name = 'MemoryWriteError'
+    this.filename = filename
+    this.dbCode = dbCode
+  }
+}
+
 function validateMemoryFile(filename: string): void {
   if (!ALLOWED_MEMORY_FILES.includes(filename)) {
     throw new Error(`File not allowed: ${filename}`)
@@ -103,7 +115,7 @@ export async function writeMemoryFile(
 
   if (error) {
     console.error(`Error writing memory file ${filename}:`, error)
-    throw new Error(`Failed to save ${filename}`)
+    throw new MemoryWriteError(filename, error.code)
   }
 
   // The database trigger 'snapshot_memory_version' will automatically record 

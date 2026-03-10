@@ -1,6 +1,7 @@
-import { readMemoryFile, writeMemoryFile } from '@/lib/memory'
+import { MemoryWriteError, readMemoryFile, writeMemoryFile } from '@/lib/memory'
 import { togglePlanItem } from '@/lib/parsers/plan-parser'
 import { logAuditEvent, logProgressEvent } from '@/lib/progress'
+import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) {
        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const userId = session.user.id
+    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
 
     const { itemId, checked } = await request.json()
 
@@ -29,6 +30,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    if (error instanceof MemoryWriteError && error.dbCode === '23503') {
+      return NextResponse.json(
+        { error: 'Session identity is out of sync. Please sign out and sign in again.', code: 'identity_mismatch' },
+        { status: 409 },
+      )
+    }
+
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
   }

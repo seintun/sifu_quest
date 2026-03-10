@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { listMemoryFiles, readMemoryFile } from '@/lib/memory'
+import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const userId = session.user.id
+  const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
 
   const file = request.nextUrl.searchParams.get('file')
 
