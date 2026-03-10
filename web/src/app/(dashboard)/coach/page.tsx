@@ -163,6 +163,13 @@ export default function CoachPage() {
     scrollToBottom()
   }, [messages, scrollToBottom])
 
+  // Auto-focus input when assistant finishes streaming
+  useEffect(() => {
+    if (!isStreaming && textareaRef.current && !(freeQuota?.isFreeTier && freeQuota.remaining <= 0)) {
+      textareaRef.current.focus()
+    }
+  }, [isStreaming, freeQuota])
+
   // Automatically trigger the end-of-quota experience once the 5th message finishes streaming
   useEffect(() => {
     if (!isStreaming && freeQuota?.isFreeTier && freeQuota.remaining <= 0 && messages.length > 0) {

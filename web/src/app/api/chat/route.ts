@@ -284,6 +284,7 @@ export async function POST(request: NextRequest) {
 
               // If they just hit exactly their limit on this turn, eagerly flag the account as exhausted
               // so the backend tracking matches the frontend lock regardless of whether they refresh or switch modes.
+              console.log(`[QUOTA DEBUG] End of stream! currentTotalMessages: ${currentTotalMessages}, usingFreeKey: ${usingFreeKey}, threshold: ${FREE_TIER_MAX_MESSAGES}`)
               if (usingFreeKey && currentTotalMessages + 2 >= FREE_TIER_MAX_MESSAGES) {
                 await supabaseAction.from('user_profiles').update({ free_quota_exhausted: true }).eq('id', userId)
               }
