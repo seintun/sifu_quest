@@ -53,7 +53,7 @@
 
 1. User opens a page → Next.js serves the React app (static or dynamic).
 2. Client-side actions hit `/api/*` routes running on Node.js serverless functions.
-3. Each API route authenticates the user via **NextAuth** (`src/auth.ts`).
+3. Each API route authenticates the user via **NextAuth** (`web/src/auth.ts`).
 4. Authenticated routes read/write data to **Supabase PostgreSQL** via `@supabase/ssr`.
 5. Chat routes stream responses from the **Anthropic Claude API**.
 6. Errors across all runtimes are captured by **Sentry**.
@@ -78,7 +78,7 @@
 
 ## Authentication Flow
 
-Authentication is managed by **NextAuth v5** (`src/auth.ts`) with two providers:
+Authentication is managed by **NextAuth v5** (`web/src/auth.ts`) with two providers:
 
 ### 1. Google OAuth
 - Standard OAuth 2.0 flow via Google Cloud Console credentials.
@@ -101,7 +101,11 @@ Authentication is managed by **NextAuth v5** (`src/auth.ts`) with two providers:
 
 ## Supabase Database Schema
 
-The schema is defined in `supabase/migrations/20260309230058_init_schema.sql` and contains **7 tables**:
+The schema is defined across:
+- `supabase/migrations/20260309230058_init_schema.sql` (base tables/policies)
+- `supabase/migrations/20260310093000_add_trial_entitlements.sql` (trial columns)
+
+It contains **7 tables**:
 
 ### `user_profiles`
 | Column             | Type          | Notes                                       |
@@ -185,7 +189,7 @@ RLS is **enabled on all tables** except `audit_log`. Each policy enforces `auth.
 
 ## API Route Reference
 
-All routes live under `src/app/api/` and require authentication via `auth()` from `src/auth.ts`.
+All routes live under `src/app/api/` and require authentication via `auth()` from `web/src/auth.ts`.
 
 | Route                            | Method | Purpose                                        |
 | -------------------------------- | ------ | ---------------------------------------------- |
