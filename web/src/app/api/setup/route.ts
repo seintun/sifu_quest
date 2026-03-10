@@ -41,16 +41,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid API key format' }, { status: 400 })
     }
 
-    let vars: Record<string, string> = {}
+    let content = ''
     try {
-      const content = await fs.readFile(ENV_PATH, 'utf-8')
-      vars = parseEnvFile(content)
+      content = await fs.readFile(ENV_PATH, 'utf-8')
     } catch {
       // file doesn't exist yet — start fresh
     }
 
-    vars.ANTHROPIC_API_KEY = apiKey
-    await fs.writeFile(ENV_PATH, serializeEnvFile(vars), 'utf-8')
+    // Replace inline or append if missing, preserving all other comments and empty lines
+    const lines = content.split('\n')
+    let found = false
+    const newLines = lines.map(line => {
+      if (line.trim().startsWith('ANTHROPIC_API_KEY=')) {
+        found = true
+        return `ANTHROPIC_API_KEY=${apiKey}`
+      }
+      return line
+    })
+
+    if (!found) {
+      newLines.push(`ANTHROPIC_API_KEY=${apiKey}`)
+    }
+
+    await fs.writeFile(ENV_PATH, newLines.join('\n'), 'utf-8')
 
     return NextResponse.json({ success: true })
   } catch (error) {
