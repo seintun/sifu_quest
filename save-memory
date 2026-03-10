@@ -1,5 +1,5 @@
 #!/bin/bash
-cd ~/.claude-memory/claude_thinking_buddy
+cd ~/.claude-memory/sifu_quest_buddy
 git add -A
 git diff --cached --quiet && echo "No memory changes to save." && exit 0
 git commit -m "Memory snapshot: $(date '+%Y-%m-%d %H:%M')"

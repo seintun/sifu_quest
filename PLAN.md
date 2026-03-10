@@ -2,7 +2,7 @@
 
 ## Context
 
-Thinking-buddy repo is a markdown-based Claude Code coaching workspace (no existing code). The goal is to build a local web app (Next.js) that serves as a visual diary and dashboard for the job search journey — showing progress metrics, a calendar, domain-specific trackers, an interactive 3-month plan, and an integrated coaching chat. All data lives in the existing `/memory/*.md` files, which the app reads and selectively updates through structured UI interactions. The Memory Viewer page is **read-only** — no freeform editing. Updates to memory happen only through structured UI actions (plan checkboxes, DSA problem logging, job app forms) and the coaching chat.
+Sifu Quest repo is a markdown-based Claude Code coaching workspace (no existing code). The goal is to build a local web app (Next.js) that serves as a visual diary and dashboard for the job search journey — showing progress metrics, a calendar, domain-specific trackers, an interactive plan, and an integrated coaching chat. All data lives in the existing `/memory/*.md` files, which the app reads and selectively updates through structured UI interactions. The Memory Viewer page is **read-only** — no freeform editing. Updates to memory happen only through structured UI actions (plan checkboxes, DSA problem logging, job app forms) and the coaching chat.
 
 ---
 
@@ -351,7 +351,7 @@ const KANBAN_COLORS = {
 ## Project Structure
 
 ```
-claude_thinking_buddy/
+sifu_quest/
 └── web/
     ├── .env.local                  ← ANTHROPIC_API_KEY, MEMORY_DIR, MODES_DIR
     ├── src/
@@ -452,7 +452,7 @@ On first launch, if `memory/profile.md` has no name/content yet, the app shows a
 ### Step 1 — Scaffold
 
 ```bash
-cd /Users/seintun/code/claude_thinking_buddy
+cd /Users/seintun/code/sifu_quest
 npx create-next-app@latest web --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"
 cd web
 npx shadcn-ui@latest init   # select: zinc base color, CSS variables: yes

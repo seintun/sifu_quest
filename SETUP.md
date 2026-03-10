@@ -79,7 +79,7 @@ service_role key: eyJ...  ← use as SUPABASE_SERVICE_ROLE_KEY
 
 #### Enable Google Provider in Supabase Auth
 
-1. In the Supabase dashboard → **Authentication → Configuration → Providers**.
+1. In the Supabase dashboard → **Authentication → Configuration → Sign In / Providers → Auth providers**.
 2. Find **Google** and toggle it **ON**.
 3. Paste your `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (see [Section 2](#2-google-oauth) below).
 4. Add your production URL to the **Redirect URLs** list:
@@ -206,8 +206,8 @@ Once you have all the keys from the sections above:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/seintun/claude_thinking_buddy.git
-cd claude_thinking_buddy
+git clone https://github.com/seintun/sifu_quest_buddy.git
+cd sifu_quest_buddy
 
 # 2. Start the local Supabase emulator (requires Docker running)
 npx supabase start
@@ -292,7 +292,7 @@ npx supabase db push
 
 1. Go to [vercel.com](https://vercel.com) and sign in.
 2. Click **Add New → Project**.
-3. Select the `claude_thinking_buddy` GitHub repository.
+3. Select the `sifu_quest_buddy` GitHub repository.
 4. Under **Configure Project**:
    - **Root Directory**: `web`
    - **Framework Preset**: `Next.js`
