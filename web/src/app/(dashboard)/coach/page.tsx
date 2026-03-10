@@ -21,7 +21,7 @@ import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 
 const FREE_TIER_EXHAUSTED_MESSAGE =
-  'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your data remains fully encrypted and structurally private.'
+  'You have exhausted your free messages. To continue your mastery journey, go to **Settings** and add your own Anthropic API key. Your key is encrypted with AES-256-CBC before storage and used only for your Claude requests.'
 
 const GUEST_LIMIT_REACHED_MESSAGE =
   'You have reached the guest limit. Please sign up to continue. After creating your account, add your own Anthropic API key in **Settings** to keep chatting securely.'
@@ -198,7 +198,7 @@ export default function CoachPage() {
             role: 'assistant',
             content: isGuest
               ? GUEST_LIMIT_REACHED_MESSAGE
-              : 'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your past conversation remains accessible here.'
+              : 'You have exhausted your free messages. To continue your mastery journey, go to **Settings** and add your own Anthropic API key. Your key is encrypted with AES-256-CBC before storage, and your past conversation remains accessible here.'
           }
         ])
         // Reveal the popup overlay after the stream finishes

@@ -26,7 +26,7 @@ export function ApiKeyPrompt({ onClose }: ApiKeyPromptProps = {}) {
           </div>
           <CardTitle className="text-xl">Free Messages Exhausted</CardTitle>
           <CardDescription className="text-foreground/80">
-            You've reached the free-tier limit on the shared platform key. 
+            You&apos;ve reached the free-tier limit on the shared platform key. 
             To continue chatting, please provide your own Anthropic API key.
           </CardDescription>
         </CardHeader>
@@ -34,7 +34,7 @@ export function ApiKeyPrompt({ onClose }: ApiKeyPromptProps = {}) {
           <div className="bg-background/80 rounded-lg p-4 space-y-3 border border-border/50 text-sm">
              <div className="flex items-start gap-3">
                <div className="bg-green-500/10 p-1.5 rounded-md shrink-0"><ShieldCheck className="w-4 h-4 text-green-500" /></div>
-               <p className="leading-snug"><strong>Secure Storage:</strong> Your key is AES-256 encrypted at rest and never shared.</p>
+               <p className="leading-snug"><strong>Secure Storage:</strong> Your key is encrypted with AES-256-CBC before storage, plaintext is never stored or logged, and it is only used for your Claude requests.</p>
              </div>
           </div>
           <div className="pt-2">

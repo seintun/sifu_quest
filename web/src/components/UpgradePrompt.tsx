@@ -38,7 +38,7 @@ export function UpgradePrompt() {
              </div>
              <div className="flex items-start gap-3">
                <div className="bg-primary/10 p-1.5 rounded-md shrink-0"><KeyRound className="w-4 h-4 text-primary" /></div>
-               <p className="leading-snug"><strong>Secure Keys:</strong> Supply your own API key which is AES-256 encrypted at rest.</p>
+               <p className="leading-snug"><strong>Secure Keys:</strong> Enter only your Anthropic key (`sk-ant-...`). It is encrypted with AES-256-CBC before storage and used only for your Claude calls.</p>
              </div>
           </div>
           {errorText && <p className="text-sm text-red-400">{errorText}</p>}

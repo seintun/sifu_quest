@@ -152,7 +152,8 @@ These are cryptographic secrets generated locally — they don't come from any e
 
 #### `API_KEY_ENCRYPTION_SECRET`
 
-A 32-byte hex string used for AES-256-CBC encryption of user Anthropic API keys stored in the database.
+A server-only 32-byte hex string used to encrypt/decrypt user Anthropic API keys at rest.
+End users do not provide this value; they only paste their Anthropic key (`sk-ant-...`) in Settings.
 
 ```bash
 openssl rand -hex 32
@@ -160,7 +161,7 @@ openssl rand -hex 32
 
 Example output: `a1b2c3d4e5f6...` (64 hex characters)
 
-> ⚠️ **Critical:** Use the **same secret** across all environments. If you rotate this, all previously encrypted API keys become unreadable.
+> ⚠️ **Critical:** Use the **same secret** across all environments. If you rotate this, all previously encrypted user keys become unreadable until users re-save them.
 
 #### `NEXTAUTH_SECRET`
 

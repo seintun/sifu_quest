@@ -42,7 +42,8 @@ A visual dashboard shows your current streak, DSA patterns mastered, system desi
 - **Trial mode** uses the server key for users without a personal key (guest or signed-in): **5 user messages in 30 minutes**
 - **Personal key unlock** — add your Anthropic API key in **Settings** to remove trial limits
 - **Infrastructure secrets** (`Supabase`, `Google OAuth`, shared `ANTHROPIC_API_KEY`) are env-only (`.env.local` or Vercel env vars)
-- **Personal Anthropic keys** are encrypted and stored per user in Supabase
+- **Personal Anthropic keys** are encrypted before storage per user in Supabase, plaintext keys are never stored or logged
+- **Server-side encryption secret** (`API_KEY_ENCRYPTION_SECRET`) is managed by app operators only; end users never provide it
 - **GDPR compliant** — delete your account and all data with one click
 
 ---
@@ -61,7 +62,7 @@ Sifu Quest was designed from day one with data privacy and security as non-negot
 
 | Layer | How It's Protected |
 |-------|-------------------|
-| **API Key Storage** | User-provided Anthropic API keys are encrypted with **AES-256-CBC** using a unique random initialization vector (IV) per key before being stored. Plaintext keys are **never logged or persisted**. |
+| **API Key Storage** | Users provide only `sk-ant-...`. Keys are encrypted server-side with **AES-256-CBC** and a unique random IV before storage. Plaintext keys are **never stored, logged, or shared**. |
 | **Data Isolation** | Every database table uses Supabase **Row Level Security (RLS)**, guaranteeing that User A can never access User B's data — even through direct database queries. |
 | **Authentication** | Google OAuth 2.0 via NextAuth.js with JWT-based sessions. Tokens carry only the user's UUID — no sensitive data in the session payload. |
 | **Trial Guardrails** | Accounts without personal keys are sandboxed to **5 user messages in 30 minutes**, enforced server-side in chat entitlement checks. |

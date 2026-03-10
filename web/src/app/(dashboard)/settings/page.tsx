@@ -138,7 +138,14 @@ export default function SettingsPage() {
         setMessage({ text: 'API key saved successfully.', type: 'success' })
         setApiKey('')
       } else {
-        setMessage({ text: data.error || 'Failed to save API key.', type: 'error' })
+        if (data.code === 'apikey_config_error') {
+          setMessage({
+            text: 'Secure key storage is temporarily unavailable. Your key was not saved. Please try again later.',
+            type: 'error',
+          })
+        } else {
+          setMessage({ text: data.error || 'Failed to save API key.', type: 'error' })
+        }
       }
     } catch {
       setMessage({ text: 'An unexpected error occurred while saving API key.', type: 'error' })
@@ -289,7 +296,7 @@ export default function SettingsPage() {
             Anthropic API Key
           </CardTitle>
           <CardDescription>
-            Your key is encrypted at rest and only used to communicate with Claude on your behalf.
+            You only provide your Anthropic key (`sk-ant-...`). We encrypt it with AES-256-CBC before storage, never store or log plaintext, and use it only to call Claude on your behalf.
           </CardDescription>
         </CardHeader>
         <CardContent>

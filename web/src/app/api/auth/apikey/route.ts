@@ -6,6 +6,24 @@ import { auth } from '@/auth'
 
 export const runtime = 'nodejs'
 
+function isApiKeyEncryptionConfigError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.includes('API_KEY_ENCRYPTION_SECRET')
+}
+
+function buildSafeApiKeySaveError(error: unknown): { error: string; code?: string } {
+  if (isApiKeyEncryptionConfigError(error)) {
+    return {
+      error: 'Secure key storage is temporarily unavailable. Please try again shortly.',
+      code: 'apikey_config_error',
+    }
+  }
+
+  return {
+    error: 'Failed to save API key. Please try again.',
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
@@ -14,12 +32,14 @@ export async function POST(request: NextRequest) {
     }
     
     const { apiKey } = await request.json()
-    if (!apiKey || typeof apiKey !== 'string' || !apiKey.startsWith('sk-ant-')) {
+    const normalizedApiKey = typeof apiKey === 'string' ? apiKey.trim() : ''
+
+    if (!normalizedApiKey || !normalizedApiKey.startsWith('sk-ant-')) {
       return NextResponse.json({ error: 'Invalid Anthropic API key' }, { status: 400 })
     }
     
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
-    const encryptedKey = encryptKey(apiKey)
+    const encryptedKey = encryptKey(normalizedApiKey)
     
     const supabase = createAdminClient()
     
@@ -53,8 +73,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true })
     
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('Failed to process API key save request:', error)
+    return NextResponse.json(buildSafeApiKeySaveError(error), { status: 500 })
   }
 }
 
@@ -96,7 +116,7 @@ export async function DELETE() {
     return NextResponse.json({ success: true })
     
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('Failed to process API key delete request:', error)
+    return NextResponse.json({ error: 'Failed to remove API key. Please try again.' }, { status: 500 })
   }
 }

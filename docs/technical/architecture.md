@@ -90,7 +90,7 @@ Located in `src/lib/`:
 | `supabase.ts`        | Creates a **server-side** Supabase client using `@supabase/ssr` with cookie-based auth. Only usable in Server Components and API routes. |
 | `supabase-browser.ts`| Creates a **browser-side** Supabase client using `createBrowserClient`. Used in Client Components (e.g., Settings page for `linkIdentity`). |
 | `memory.ts`          | Reads/writes memory files from Supabase. Reads mode files from the filesystem (`src/modes/`). |
-| `apikey.ts`          | Encrypts user API keys with **AES-256-CBC** before storage. Decrypts at chat-time. Uses a `randomBytes(16)` IV per encryption. |
+| `apikey.ts`          | Encrypts user-provided Anthropic keys (`sk-ant-...`) with **AES-256-CBC** before storage. Decrypts only at chat-time to call Anthropic. Uses a `randomBytes(16)` IV per encryption. |
 | `progress.ts`        | Helper functions `logProgressEvent()` and `logAuditEvent()` for inserting rows into `progress_events` and `audit_log`. |
 | `metrics.ts`         | Computes dashboard metrics (current streak, total activity days) by querying `progress_events` from Supabase. |
 
