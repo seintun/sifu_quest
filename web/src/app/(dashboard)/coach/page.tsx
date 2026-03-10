@@ -15,6 +15,7 @@ import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { useChat, type ChatMessage } from '@/hooks/useChat'
 import 'highlight.js/styles/github-dark.css'
 import { MessageCircle, Send, Square, Trash2, Sparkles } from 'lucide-react'
+import { useSession } from 'next-auth/react'
 import { useCallback, useEffect, useRef, useState, type ComponentType, type HTMLAttributes } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
@@ -138,13 +139,19 @@ function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreamin
 export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
   const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
+  const { data: session } = useSession()
   const { messages, setMessages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
-  const isGuest = Boolean(freeQuota?.isGuest)
+  const isAuthenticatedUser = Boolean(session?.user?.email && !session.user.email.endsWith('@anonymous.local'))
+  const isGuest = Boolean(freeQuota?.isGuest) && !isAuthenticatedUser
   const hasGreetedRef = useRef<string | null>(null)
   const [dismissedPrompt, setDismissedPrompt] = useState(false)
   const [input, setInput] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    setDismissedPrompt(false)
+  }, [mode])
 
   // Auto-greet only after encrypted history has been loaded — prevents a spurious
   // greeting from firing against the empty initial state before async decrypt completes
@@ -259,9 +266,13 @@ export default function CoachPage() {
       {/* Chat Area */}
       <Card className="flex-1 border-border bg-background overflow-hidden flex flex-col min-h-0">
         <CardContent className="p-0 flex-1 flex flex-col min-h-0">
-          {upgradeRequired ? (
+          {upgradeRequired && !dismissedPrompt ? (
              <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-center min-h-0">
-                 {upgradeRequired === 'missing_api_key' ? <ApiKeyPrompt /> : <UpgradePrompt />}
+                 {upgradeRequired === 'missing_api_key' || (!isGuest && upgradeRequired === 'guest_limit_reached') ? (
+                   <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />
+                 ) : (
+                   <UpgradePrompt />
+                 )}
              </div>
           ) : (
             <>
