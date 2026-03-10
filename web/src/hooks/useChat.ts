@@ -124,7 +124,6 @@ export function useChat(mode: string) {
       })
 
       if (!res.ok) {
-        setFreeQuota(previousQuota)
         let errorMessage = 'Unknown error'
         let errorCode: string | null = null
         try {
@@ -134,6 +133,15 @@ export function useChat(mode: string) {
         } catch { /* ignore */ }
         
         if (res.status === 403) {
+          if (errorCode === 'guest_limit_reached' || errorCode === 'missing_api_key' || errorCode === 'session_expired') {
+            setFreeQuota((prev) =>
+              prev && prev.isFreeTier
+                ? { ...prev, remaining: 0 }
+                : prev,
+            )
+          } else {
+            setFreeQuota(previousQuota)
+          }
           setUpgradeRequired(errorCode || 'missing_api_key')
           const isGuestBlocked = errorCode === 'guest_limit_reached' || errorCode === 'session_expired'
           setMessages([
@@ -147,6 +155,7 @@ export function useChat(mode: string) {
           return
         }
 
+        setFreeQuota(previousQuota)
         const safeMessage = res.status >= 500 ? CHAT_TEMPORARY_ERROR_MESSAGE : errorMessage
         setMessages([...newMessages, { role: 'assistant', content: safeMessage }])
         setIsStreaming(false)

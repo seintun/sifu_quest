@@ -1,5 +1,7 @@
 import { MemoryWriteError, writeMemoryFile } from '@/lib/memory'
+import { getPersistableOnboardingDisplayName } from '@/lib/onboarding-name'
 import { getPlanTimelineMeta } from '@/lib/profile-timeline'
+import { createAdminClient } from '@/lib/supabase-admin'
 import { assertRequiredEnv, MissingEnvironmentVariableError } from '@/lib/env'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import Anthropic from '@anthropic-ai/sdk'
@@ -35,6 +37,37 @@ export async function POST(request: NextRequest) {
     }
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const data: OnboardingData = await request.json()
+    const displayName = getPersistableOnboardingDisplayName(data.name)
+    const supabaseAdmin = createAdminClient()
+
+    const profileUpsertPayload: { id: string; display_name?: string; last_active_at: string } = {
+      id: userId,
+      last_active_at: new Date().toISOString(),
+    }
+    if (displayName) {
+      profileUpsertPayload.display_name = displayName
+    }
+
+    const { error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .upsert(
+        profileUpsertPayload,
+        { onConflict: 'id' },
+      )
+
+    if (profileError) {
+      console.error('Failed to persist onboarding display_name', profileError)
+      if (profileError.code === '23503') {
+        return NextResponse.json(
+          { error: 'Session identity is out of sync. Please sign out and sign in again.', code: 'identity_mismatch' },
+          { status: 409 },
+        )
+      }
+      return NextResponse.json(
+        { error: 'Unable to save your profile information right now. Please try again.' },
+        { status: 500 },
+      )
+    }
 
     const profileContent = `# User Profile
 

@@ -3,7 +3,9 @@
 import { signOut } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { canSaveAnthropicApiKey, shouldShowRemoveApiKey } from '@/lib/account-settings-ui'
 import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
+import { getOnboardingPrefillName } from '@/lib/onboarding-name'
 import { validateFullName } from '@/lib/profile-name'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,6 +25,8 @@ type AccountStatus = {
   isGuest: boolean
   isLinked: boolean
   displayName: string | null
+  hasApiKey: boolean
+  prefillName: string | null
   avatarUrl: string | null
 }
 
@@ -33,6 +37,7 @@ export default function SettingsPage() {
   const searchParams = useSearchParams()
 
   const [apiKey, setApiKey] = useState('')
+  const [apiKeyFieldError, setApiKeyFieldError] = useState('')
   const [fullName, setFullName] = useState('')
 
   const [isSavingName, setIsSavingName] = useState(false)
@@ -60,7 +65,7 @@ export default function SettingsPage() {
       const data = await res.json()
       if (res.ok) {
         setAccountStatus(data.account)
-        setFullName(data.account?.displayName || '')
+        setFullName(getOnboardingPrefillName(data.account?.displayName, data.account?.prefillName))
       } else if (res.status === 401) {
         router.push('/api/auth/signin')
         return
@@ -125,6 +130,7 @@ export default function SettingsPage() {
     e.preventDefault()
     setIsSavingKey(true)
     setMessage(null)
+    setApiKeyFieldError('')
 
     try {
       const res = await fetch('/api/auth/apikey', {
@@ -137,18 +143,16 @@ export default function SettingsPage() {
       if (res.ok) {
         setMessage({ text: 'API key saved successfully.', type: 'success' })
         setApiKey('')
+        await loadAccountStatus()
       } else {
         if (data.code === 'apikey_config_error') {
-          setMessage({
-            text: 'Secure key storage is temporarily unavailable. Your key was not saved. Please try again later.',
-            type: 'error',
-          })
+          setApiKeyFieldError('Secure key storage is temporarily unavailable. Your key was not saved. Please try again later.')
         } else {
-          setMessage({ text: data.error || 'Failed to save API key.', type: 'error' })
+          setApiKeyFieldError(data.error || 'Failed to save API key.')
         }
       }
     } catch {
-      setMessage({ text: 'An unexpected error occurred while saving API key.', type: 'error' })
+      setApiKeyFieldError('An unexpected error occurred while saving API key.')
     } finally {
       setIsSavingKey(false)
     }
@@ -166,6 +170,7 @@ export default function SettingsPage() {
         return
       }
       setMessage({ text: 'API key removed.', type: 'success' })
+      await loadAccountStatus()
     } catch {
       setMessage({ text: 'An unexpected error occurred while removing API key.', type: 'error' })
     } finally {
@@ -207,6 +212,7 @@ export default function SettingsPage() {
 
   const normalizedCurrentName = useMemo(() => (accountStatus?.displayName ?? '').trim(), [accountStatus?.displayName])
   const normalizedInputName = useMemo(() => fullName.trim().replace(/\s+/g, ' '), [fullName])
+  const canSaveApiKey = useMemo(() => canSaveAnthropicApiKey(apiKey), [apiKey])
   const isNameDirty = normalizedInputName !== normalizedCurrentName
 
   if (!isAccountStatusInitialized) return <div className="p-8 text-muted-foreground">Loading settings...</div>
@@ -309,20 +315,32 @@ export default function SettingsPage() {
                 id="apiKey"
                 type="password"
                 value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                onChange={(e) => {
+                  setApiKey(e.target.value)
+                  if (apiKeyFieldError) {
+                    setApiKeyFieldError('')
+                  }
+                }}
                 placeholder="Paste your Anthropic key"
                 className="bg-elevated/50"
                 required
                 disabled={isSavingKey}
               />
+              {apiKeyFieldError && (
+                <p className="text-xs text-danger" role="alert">
+                  {apiKeyFieldError}
+                </p>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="submit" disabled={isSavingKey || isRemovingKey}>
+              <Button type="submit" disabled={!canSaveApiKey || isSavingKey || isRemovingKey}>
                 {isSavingKey ? 'Saving...' : 'Save API Key'}
               </Button>
-              <Button type="button" variant="outline" onClick={handleRemoveKey} disabled={isSavingKey || isRemovingKey}>
-                {isRemovingKey ? 'Removing...' : 'Remove Key'}
-              </Button>
+              {shouldShowRemoveApiKey(accountStatus?.hasApiKey) && (
+                <Button type="button" variant="outline" onClick={handleRemoveKey} disabled={isSavingKey || isRemovingKey}>
+                  {isRemovingKey ? 'Removing...' : 'Remove Key'}
+                </Button>
+              )}
             </div>
           </form>
         </CardContent>

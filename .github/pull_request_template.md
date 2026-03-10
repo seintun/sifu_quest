@@ -49,6 +49,19 @@
 ## Architecture / Flow Diagram (Mermaid, if helpful)
 
 <!-- If needed, add a Mermaid diagram. Omit this section if no diagram improves clarity. -->
+<!-- Mermaid reliability rules (GitHub):
+- Use quoted labels: A["label text"].
+- Avoid shape shorthand with special chars in labels (do NOT use A[/api/path], A[(text)], etc.).
+- Avoid raw `/`, `()`, `[]`, `|` inside unquoted labels.
+- If render fails, keep diagram in fenced code block and link a follow-up fix.
+-->
+<!-- Safe example:
+```mermaid
+flowchart TD
+  UI["Settings / Onboarding / Coach"] --> STATUS["/api/account/status"]
+  STATUS --> PROFILE["user_profiles"]
+```
+-->
 
 ## Test Plan
 

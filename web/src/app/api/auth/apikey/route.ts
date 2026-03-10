@@ -1,4 +1,5 @@
 import { encryptKey } from '@/lib/apikey'
+import { validateAnthropicApiKey } from '@/lib/apikey-validation'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
@@ -36,6 +37,14 @@ export async function POST(request: NextRequest) {
 
     if (!normalizedApiKey || !normalizedApiKey.startsWith('sk-ant-')) {
       return NextResponse.json({ error: 'Invalid Anthropic API key' }, { status: 400 })
+    }
+
+    const keyValidation = await validateAnthropicApiKey(normalizedApiKey)
+    if (!keyValidation.ok) {
+      if (keyValidation.code === 'invalid_key') {
+        return NextResponse.json({ error: keyValidation.error, code: keyValidation.code }, { status: 400 })
+      }
+      return NextResponse.json({ error: keyValidation.error, code: keyValidation.code }, { status: 503 })
     }
     
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)

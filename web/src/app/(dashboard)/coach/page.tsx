@@ -139,12 +139,46 @@ export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
   const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
   const { messages, setMessages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
-  const isGuest = Boolean(freeQuota?.isGuest)
+  const [accountIsGuest, setAccountIsGuest] = useState<boolean | null>(null)
+  const [isAnonymousSession, setIsAnonymousSession] = useState<boolean | null>(null)
+  const isGuest = isAnonymousSession === null ? (accountIsGuest ?? Boolean(freeQuota?.isGuest)) : isAnonymousSession
   const hasGreetedRef = useRef<string | null>(null)
   const [dismissedPrompt, setDismissedPrompt] = useState(false)
   const [input, setInput] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    setDismissedPrompt(false)
+  }, [mode])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadAccountStatus() {
+      try {
+        const res = await fetch('/api/account/status')
+        if (!res.ok || cancelled) {
+          return
+        }
+
+        const data = (await res.json()) as { account?: { isGuest?: boolean; isAnonymousSession?: boolean } }
+        if (typeof data.account?.isGuest === 'boolean') {
+          setAccountIsGuest(data.account.isGuest)
+        }
+        if (typeof data.account?.isAnonymousSession === 'boolean') {
+          setIsAnonymousSession(data.account.isAnonymousSession)
+        }
+      } catch {
+        // No-op: fallback to freeQuota.isGuest behavior.
+      }
+    }
+
+    void loadAccountStatus()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Auto-greet only after encrypted history has been loaded — prevents a spurious
   // greeting from firing against the empty initial state before async decrypt completes
@@ -259,15 +293,19 @@ export default function CoachPage() {
       {/* Chat Area */}
       <Card className="flex-1 border-border bg-background overflow-hidden flex flex-col min-h-0">
         <CardContent className="p-0 flex-1 flex flex-col min-h-0">
-          {upgradeRequired ? (
+          {upgradeRequired && !dismissedPrompt ? (
              <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-center min-h-0">
-                 {upgradeRequired === 'missing_api_key' ? <ApiKeyPrompt /> : <UpgradePrompt />}
+                 {upgradeRequired === 'missing_api_key' || (!isGuest && upgradeRequired === 'guest_limit_reached') ? (
+                   <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />
+                 ) : (
+                   <UpgradePrompt onClose={() => setDismissedPrompt(true)} />
+                 )}
              </div>
           ) : (
             <>
               {freeQuota?.isFreeTier && freeQuota.remaining <= 0 && !isStreaming && !dismissedPrompt && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-                  {isGuest ? <UpgradePrompt /> : <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />}
+                  {isGuest ? <UpgradePrompt onClose={() => setDismissedPrompt(true)} /> : <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />}
                 </div>
               )}
               {/* Scrollable messages */}
