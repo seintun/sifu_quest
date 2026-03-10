@@ -23,10 +23,11 @@ function getGuestExpiryISOString(): string {
 
 export async function ensureUserProfile(userId: string, sessionEmail?: string | null): Promise<UserProfileState> {
   const supabaseAdmin = createAdminClient()
+  const selectProfileFields = 'id, is_guest, guest_expires_at, api_key_enc, free_quota_exhausted, free_user_messages_used, display_name, avatar_url'
 
   const { data: profile, error } = await supabaseAdmin
     .from('user_profiles')
-    .select('id, is_guest, guest_expires_at, api_key_enc, free_quota_exhausted, free_user_messages_used, display_name, avatar_url')
+    .select(selectProfileFields)
     .eq('id', userId)
     .maybeSingle()
 
@@ -53,10 +54,30 @@ export async function ensureUserProfile(userId: string, sessionEmail?: string | 
       free_quota_exhausted: false,
       free_user_messages_used: 0,
     })
-    .select('id, is_guest, guest_expires_at, api_key_enc, free_quota_exhausted, free_user_messages_used, display_name, avatar_url')
+    .select(selectProfileFields)
     .single()
 
   if (createError || !createdProfile) {
+    if (createError?.code === '23505') {
+      const { data: existingProfile, error: refetchError } = await supabaseAdmin
+        .from('user_profiles')
+        .select(selectProfileFields)
+        .eq('id', userId)
+        .maybeSingle()
+
+      if (refetchError) {
+        throw new Error(`Failed to load user profile after duplicate insert: ${refetchError.message}`)
+      }
+
+      if (existingProfile) {
+        return {
+          ...existingProfile,
+          free_user_messages_used: existingProfile.free_user_messages_used ?? 0,
+          free_quota_exhausted: Boolean(existingProfile.free_quota_exhausted),
+        }
+      }
+    }
+
     throw new Error(`Failed to initialize user profile: ${createError?.message ?? 'unknown error'}`)
   }
 

@@ -22,17 +22,25 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null)
+  const [isAccountStatusLoading, setIsAccountStatusLoading] = useState(false)
+  const [accountStatusError, setAccountStatusError] = useState('')
   const [message, setMessage] = useState({ text: '', type: '' })
 
   const loadAccountStatus = useCallback(async () => {
+    setIsAccountStatusLoading(true)
+    setAccountStatusError('')
     try {
       const res = await fetch('/api/account/status')
       const data = await res.json()
       if (res.ok) {
         setAccountStatus(data.account)
+      } else {
+        setAccountStatusError(data.error || 'Unable to load account status right now.')
       }
     } catch {
-      // Best-effort: account status refresh failure should not block settings usage.
+      setAccountStatusError('Unable to load account status right now.')
+    } finally {
+      setIsAccountStatusLoading(false)
     }
   }, [])
   
@@ -108,6 +116,7 @@ export default function SettingsPage() {
   if (!session) return null
 
   const isGuest = Boolean(accountStatus?.isGuest)
+  const showGuestUpgradeSection = isGuest || Boolean(accountStatusError)
 
   const handleLinkGoogle = async () => {
     const result = await startGuestGoogleUpgrade(window.location.origin)
@@ -127,14 +136,22 @@ export default function SettingsPage() {
       )}
 
       {/* Guest Upgrade Section */}
-      {isGuest && (
+      {showGuestUpgradeSection && (
         <section className="bg-streak/10 p-6 rounded-lg shadow-sm border border-streak/30">
           <h2 className="text-xl font-semibold text-streak mb-2">Upgrade to Full Account</h2>
-          <p className="text-slate-600 mb-4 text-sm">
-            You are currently using a temporary Guest session. Link a Google account to permanently save your chat history, memory files, and progress metrics.
-          </p>
+          {accountStatusError ? (
+            <p className="text-red-700 bg-red-100 rounded px-3 py-2 mb-4 text-sm">
+              {accountStatusError}
+            </p>
+          ) : (
+            <p className="text-slate-600 mb-4 text-sm">
+              You are currently using a temporary Guest session. Link a Google account to permanently save your chat history, memory files, and progress metrics.
+            </p>
+          )}
+          <div className="flex items-center gap-2">
           <button
             onClick={handleLinkGoogle}
+            disabled={isAccountStatusLoading}
             className="bg-streak hover:opacity-90 text-white px-4 py-2 rounded-md font-medium transition-opacity flex items-center gap-2"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -145,6 +162,14 @@ export default function SettingsPage() {
             </svg>
             Link Google Account
           </button>
+          <button
+            onClick={() => void loadAccountStatus()}
+            disabled={isAccountStatusLoading}
+            className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-4 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
+          >
+            {isAccountStatusLoading ? 'Refreshing...' : 'Retry Status'}
+          </button>
+          </div>
         </section>
       )}
 

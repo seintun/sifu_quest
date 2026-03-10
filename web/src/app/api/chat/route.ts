@@ -142,6 +142,7 @@ export async function POST(request: NextRequest) {
     const encoder = new TextEncoder()
     const readableStream = new ReadableStream({
       async start(controller) {
+        let streamClosed = false
         try {
           for await (const event of stream) {
             if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
@@ -151,6 +152,7 @@ export async function POST(request: NextRequest) {
           }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
           controller.close()
+          streamClosed = true
           
           // Save to database asynchronously after stream closes
           if (sessionId && lastUserMessage) {
@@ -190,13 +192,21 @@ export async function POST(request: NextRequest) {
               })
 
               if (usingFreeKey) {
-                await incrementFreeUserMessagesUsed(userId, 1)
+                try {
+                  await incrementFreeUserMessagesUsed(userId, 1)
+                } catch (quotaError) {
+                  console.error('Failed to increment free quota usage', quotaError)
+                }
               }
           }
         } catch (error) {
-          const message = error instanceof Error ? error.message : 'Stream error'
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: message })}\n\n`))
-          controller.close()
+          if (!streamClosed) {
+            const message = error instanceof Error ? error.message : 'Stream error'
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: message })}\n\n`))
+            controller.close()
+            return
+          }
+          console.error('Post-stream persistence failed after stream closed', error)
         }
       },
     })

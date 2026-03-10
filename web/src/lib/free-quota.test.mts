@@ -1,26 +1,26 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { computeFreeQuota, getQuotaError, isUsingFreeTier } from './free-quota-policy.ts'
+import { computeFreeQuotaForLimit, getQuotaErrorForLimit, isUsingFreeTier } from './free-quota-policy-core.ts'
 
 test('computeFreeQuota returns unlimited when user has BYOK and is not guest', () => {
-  const quota = computeFreeQuota({
+  const quota = computeFreeQuotaForLimit({
     is_guest: false,
     api_key_enc: 'encrypted-key',
     free_quota_exhausted: false,
     free_user_messages_used: 0,
-  })
+  }, 5)
 
   assert.deepEqual(quota, { isFreeTier: false, remaining: -1, total: -1, isGuest: false })
 })
 
 test('computeFreeQuota returns remaining turns for free-tier guest', () => {
-  const quota = computeFreeQuota({
+  const quota = computeFreeQuotaForLimit({
     is_guest: true,
     api_key_enc: null,
     free_quota_exhausted: false,
     free_user_messages_used: 2,
-  })
+  }, 5)
 
   assert.equal(quota.isFreeTier, true)
   assert.equal(quota.remaining, 3)
@@ -29,12 +29,12 @@ test('computeFreeQuota returns remaining turns for free-tier guest', () => {
 })
 
 test('getQuotaError blocks exhausted guest users', () => {
-  const error = getQuotaError({
+  const error = getQuotaErrorForLimit({
     is_guest: true,
     api_key_enc: null,
     free_quota_exhausted: true,
     free_user_messages_used: 5,
-  })
+  }, 5)
 
   assert.deepEqual(error, {
     error: 'guest_limit_reached',
@@ -43,12 +43,12 @@ test('getQuotaError blocks exhausted guest users', () => {
 })
 
 test('getQuotaError blocks exhausted signed-in free users', () => {
-  const error = getQuotaError({
+  const error = getQuotaErrorForLimit({
     is_guest: false,
     api_key_enc: null,
     free_quota_exhausted: false,
     free_user_messages_used: 5,
-  })
+  }, 5)
 
   assert.deepEqual(error, {
     error: 'missing_api_key',

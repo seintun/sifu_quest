@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test --experimental-strip-types src/**/*.test.mts",
+    "test": "node --test --experimental-strip-types --experimental-specifier-resolution=node src/**/*.test.mts",
     "setup": "node scripts/setup.mjs"
   },
   "dependencies": {
