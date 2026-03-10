@@ -36,10 +36,14 @@ const MODES = [
   { value: 'business-ideas', label: 'Business Ideas' },
 ]
 
-function CodeBlock({ className, children, ...props }: React.HTMLAttributes<HTMLElement>) {
+function CodeBlock({ className, children, node, ...props }: any) {
   const match = /language-(\w+)/.exec(className || '')
   const lang = match ? match[1] : null
-  const isInline = !className
+  
+  // ReactMarkdown v10 removed the `inline` prop. Un-languaged code blocks
+  // don't have a className. If it contains newlines, treat it as a block.
+  const contentStr = String(children || '')
+  const isInline = !className && !contentStr.includes('\n')
 
   if (isInline) {
     return (
@@ -53,7 +57,7 @@ function CodeBlock({ className, children, ...props }: React.HTMLAttributes<HTMLE
   }
 
   return (
-    <div className="relative my-3 rounded-lg overflow-hidden border border-border/60 bg-[#0d1117]">
+    <div className="relative my-3 w-full rounded-lg overflow-hidden border border-border/60 bg-[#0d1117]">
       {lang && (
         <div className="flex items-center justify-between px-4 py-1.5 bg-elevated/50 border-b border-border/40">
           <span className="text-[11px] uppercase tracking-wider text-dim font-mono">{lang}</span>
