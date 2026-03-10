@@ -137,9 +137,10 @@ npm run dev
 
 1. Read [AGENTS.md](./AGENTS.md) before starting feature work (proposal-first workflow is mandatory).
 2. Create a scoped branch (`feat/<slug>`, `fix/<slug>`, or `chore/<slug>`).
-3. Commit frequently with detailed, intent-focused messages.
-4. Push your branch and open a Pull Request using the project template.
-5. Fill out all relevant sections in [`.github/pull_request_template.md`](./.github/pull_request_template.md), including user stories and a test plan (or explicit rationale if not needed).
+3. Write your proposal with [Feature Proposal Template](./docs/project/feature-proposal-template.md) for feature or major behavior changes.
+4. For medium/large changes, run an interactive review using [Plan Review Template](./docs/project/plan-review-template.md) before coding.
+5. Commit frequently with detailed, intent-focused messages.
+6. Push your branch and open a Pull Request using [`.github/pull_request_template.md`](./.github/pull_request_template.md).
 
 ---
 

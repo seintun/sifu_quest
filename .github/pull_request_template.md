@@ -2,6 +2,10 @@
 
 <!-- What changed and why? Include business/product context briefly. -->
 
+## Proposal / Design Links
+
+<!-- Link proposal and design/plan review artifacts. If exempt, explain why. -->
+
 ## Problem Statement
 
 <!-- What user or system problem does this PR solve? -->
@@ -30,16 +34,21 @@
 
 <!-- Key technical decisions, tradeoffs, and constraints -->
 
+## Alternatives Considered
+
+<!-- Include 2-3 options and why the selected option won. -->
+
+## Edge Cases and Failure Modes
+
+<!-- What non-happy paths were explicitly handled and how? -->
+
+## DRY / Tech Debt Impact
+
+<!-- What duplication was removed/introduced? Any new debt accepted? -->
+
 ## Architecture / Flow Diagram (Mermaid, if helpful)
 
-```mermaid
-%% Add a diagram when it improves review quality. Remove this block if not needed.
-flowchart TD
-  A[User action] --> B[App/API]
-  B --> C[Data/Service]
-  C --> B
-  B --> D[User-visible result]
-```
+<!-- If needed, add a Mermaid diagram. Omit this section if no diagram improves clarity. -->
 
 ## Test Plan
 
@@ -55,13 +64,12 @@ flowchart TD
 Commands run:
 
 ```bash
-# example
-# npm test
+# Paste exact commands used (one per line)
 ```
 
 Results:
 
-<!-- Paste concise output summary -->
+<!-- Paste concise pass/fail summary and key assertions verified -->
 
 ### Manual Verification
 
@@ -80,4 +88,3 @@ Results:
 ## Follow-ups
 
 <!-- Deferred work, cleanup, or future enhancements -->
-
