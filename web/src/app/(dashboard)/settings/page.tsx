@@ -1,6 +1,6 @@
 'use client'
 
-import { signOut, useSession } from 'next-auth/react'
+import { signOut } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import React, { useCallback, useEffect, useState } from 'react'
 import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
@@ -14,7 +14,6 @@ type AccountStatus = {
 }
 
 export default function SettingsPage() {
-  const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -23,6 +22,7 @@ export default function SettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null)
   const [isAccountStatusLoading, setIsAccountStatusLoading] = useState(false)
+  const [isAccountStatusInitialized, setIsAccountStatusInitialized] = useState(false)
   const [accountStatusError, setAccountStatusError] = useState('')
   const [message, setMessage] = useState({ text: '', type: '' })
 
@@ -34,6 +34,9 @@ export default function SettingsPage() {
       const data = await res.json()
       if (res.ok) {
         setAccountStatus(data.account)
+      } else if (res.status === 401) {
+        router.push('/api/auth/signin')
+        return
       } else {
         setAccountStatusError(data.error || 'Unable to load account status right now.')
       }
@@ -41,20 +44,13 @@ export default function SettingsPage() {
       setAccountStatusError('Unable to load account status right now.')
     } finally {
       setIsAccountStatusLoading(false)
+      setIsAccountStatusInitialized(true)
     }
-  }, [])
-  
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/api/auth/signin')
-    }
-  }, [status, router])
+  }, [router])
 
   useEffect(() => {
-    if (status === 'authenticated') {
-      void loadAccountStatus()
-    }
-  }, [status, loadAccountStatus])
+    void loadAccountStatus()
+  }, [loadAccountStatus])
 
   useEffect(() => {
     if (searchParams.get('success') === 'linked') {
@@ -112,8 +108,7 @@ export default function SettingsPage() {
     }
   }
 
-  if (status === 'loading') return <div className="p-8">Loading...</div>
-  if (!session) return null
+  if (!isAccountStatusInitialized) return <div className="p-8">Loading...</div>
 
   const isGuest = Boolean(accountStatus?.isGuest)
   const showGuestUpgradeSection = isGuest || Boolean(accountStatusError)
