@@ -91,7 +91,17 @@ export default async function LoginPage() {
   )
 }
 
-function Feature({ icon: Icon, title, description, color }: any) {
+function Feature({
+  icon: Icon,
+  title,
+  description,
+  color,
+}: {
+  icon: React.ElementType
+  title: string
+  description: string
+  color: (typeof DOMAIN_COLORS)[keyof typeof DOMAIN_COLORS]
+}) {
   return (
     <div className="flex gap-4 items-start group">
       <div 
