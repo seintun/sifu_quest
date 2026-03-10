@@ -271,7 +271,21 @@ npm run build
 
 ## Vercel Production Deployment
 
-### 1. Import the Repository
+### 1. Push Database Schema
+
+Before the app can save any data, you must push the schema to your hosted Supabase project:
+
+```bash
+# Link your local repo to your hosted Supabase project
+npx supabase link --project-ref your-project-ref-id
+
+# Push the schema to create the tables
+npx supabase db push
+```
+
+> You can find your **Project ID** in the Supabase Dashboard URL (e.g., `https://supabase.com/dashboard/project/your-project-ref-id`).
+
+### 2. Import the Repository
 
 1. Go to [vercel.com](https://vercel.com) and sign in.
 2. Click **Add New → Project**.
