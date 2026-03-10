@@ -298,14 +298,14 @@ export default function CoachPage() {
                  {upgradeRequired === 'missing_api_key' || (!isGuest && upgradeRequired === 'guest_limit_reached') ? (
                    <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />
                  ) : (
-                   <UpgradePrompt />
+                   <UpgradePrompt onClose={() => setDismissedPrompt(true)} />
                  )}
              </div>
           ) : (
             <>
               {freeQuota?.isFreeTier && freeQuota.remaining <= 0 && !isStreaming && !dismissedPrompt && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-                  {isGuest ? <UpgradePrompt /> : <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />}
+                  {isGuest ? <UpgradePrompt onClose={() => setDismissedPrompt(true)} /> : <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />}
                 </div>
               )}
               {/* Scrollable messages */}

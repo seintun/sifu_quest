@@ -3,10 +3,14 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
-import { KeyRound, Rocket, UserPlus } from 'lucide-react'
+import { KeyRound, Rocket, UserPlus, X } from 'lucide-react'
 import { useState } from 'react'
 
-export function UpgradePrompt() {
+interface UpgradePromptProps {
+  onClose?: () => void
+}
+
+export function UpgradePrompt({ onClose }: UpgradePromptProps = {}) {
   const [errorText, setErrorText] = useState('')
 
   const handleUpgrade = async () => {
@@ -19,7 +23,16 @@ export function UpgradePrompt() {
 
   return (
     <div className="flex justify-center my-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <Card className="max-w-md w-full border-blue-500/30 bg-blue-500/5 shadow-lg shadow-blue-500/10 backdrop-blur-sm">
+      <Card className="max-w-md w-full border-blue-500/30 bg-blue-500/5 shadow-lg shadow-blue-500/10 backdrop-blur-sm relative">
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full transition-colors"
+            aria-label="Dismiss upgrade prompt"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
         <CardHeader className="pb-3 text-center">
           <div className="mx-auto bg-blue-500/10 p-3 rounded-full w-14 h-14 flex items-center justify-center mb-2">
             <Rocket className="w-8 h-8 text-blue-500" />
