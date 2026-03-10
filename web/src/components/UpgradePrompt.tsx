@@ -26,6 +26,7 @@ export function UpgradePrompt({ onClose }: UpgradePromptProps = {}) {
       <Card className="max-w-md w-full border-blue-500/30 bg-blue-500/5 shadow-lg shadow-blue-500/10 backdrop-blur-sm relative">
         {onClose && (
           <button
+            type="button"
             onClick={onClose}
             className="absolute top-3 right-3 p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full transition-colors"
             aria-label="Dismiss upgrade prompt"

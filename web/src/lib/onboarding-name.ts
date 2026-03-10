@@ -1,4 +1,4 @@
-const ONBOARDING_MAX_FULL_NAME_LENGTH = 80
+export const ONBOARDING_MAX_FULL_NAME_LENGTH = 80
 
 function normalizeName(input: string): string {
   return input.trim().replace(/\s+/g, ' ')

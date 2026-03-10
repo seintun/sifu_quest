@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import { getOnboardingPrefillName } from '@/lib/onboarding-name'
+import { getOnboardingPrefillName, ONBOARDING_MAX_FULL_NAME_LENGTH } from '@/lib/onboarding-name'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -408,7 +408,7 @@ export default function OnboardingPage() {
               }}
               placeholder={(current as InputStep).placeholder}
               className="bg-surface border-border"
-              maxLength={current.key === 'name' ? 80 : undefined}
+              maxLength={current.key === 'name' ? ONBOARDING_MAX_FULL_NAME_LENGTH : undefined}
               onKeyDown={e => { if (e.key === 'Enter' && complete) { e.preventDefault(); handleNext() } }}
               autoFocus
             />
