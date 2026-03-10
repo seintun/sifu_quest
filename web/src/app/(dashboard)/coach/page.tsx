@@ -81,8 +81,8 @@ function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreamin
 
   return (
     <div className="flex justify-start">
-      <div className="bg-surface border border-coach/15 rounded-xl p-4 text-sm max-w-[85%] shadow-sm">
-        <div className="chat-prose prose prose-invert prose-sm max-w-none
+      <div className="bg-surface border border-coach/15 rounded-xl p-4 text-sm max-w-[85%] shadow-sm overflow-x-auto">
+        <div className="chat-prose prose prose-invert prose-sm max-w-none whitespace-pre-wrap
           prose-headings:font-display prose-headings:text-foreground
           prose-h2:text-base prose-h2:font-semibold prose-h2:mt-5 prose-h2:mb-2 prose-h2:pb-1 prose-h2:border-b prose-h2:border-border/40
           prose-h3:text-sm prose-h3:font-semibold prose-h3:mt-4 prose-h3:mb-1.5
