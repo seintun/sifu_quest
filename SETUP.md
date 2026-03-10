@@ -64,27 +64,29 @@ service_role key: eyJ...  ← use as SUPABASE_SERVICE_ROLE_KEY
 | Dashboard Field         | Environment Variable              |
 | ----------------------- | --------------------------------- |
 | **Project URL**         | `NEXT_PUBLIC_SUPABASE_URL`        |
-| **anon / public** key   | `NEXT_PUBLIC_SUPABASE_ANON_KEY`   |
+| **anon / public** key   | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`   |
 | **service_role** key    | `SUPABASE_SERVICE_ROLE_KEY`       |
 
 > ⚠️ **Important:** The `service_role` key has full admin access to your database. Never expose it to the client. In Vercel, mark it as **Server only**.
 
 #### Enable Anonymous Sign-In
 
-1. In the Supabase dashboard → **Authentication → Providers**.
-2. Scroll to **Anonymous Sign-Ins** and toggle it **ON**.
+1. In the Supabase dashboard → **Authentication → Configuration → Providers**.
+2. Scroll to **Anonymous** and toggle **Enable Anonymous Sign-ins** to **ON**.
 3. Click **Save**.
+
+> 💡 **Why?** Sifu Quest requires this for guest sessions before users link a Google account. If disabled, onboarding will fail with an `anonymous_provider_disabled` error.
 
 #### Enable Google Provider in Supabase Auth
 
-1. In the Supabase dashboard → **Authentication → Providers**.
+1. In the Supabase dashboard → **Authentication → Configuration → Providers**.
 2. Find **Google** and toggle it **ON**.
 3. Paste your `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (see [Section 2](#2-google-oauth) below).
 4. Add your production URL to the **Redirect URLs** list:
    ```
    https://your-app.vercel.app/api/link-google/callback
    ```
-5. Under **Authentication → URL Configuration**, set:
+5. Under **Authentication → Configuration → URL Configuration**, set:
    - **Site URL**: `https://your-app.vercel.app`
 
 ---
