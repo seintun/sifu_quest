@@ -127,6 +127,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    let currentTotalMessages = 0
+
     if (usingFreeKey) {
       if (userProfile.free_quota_exhausted) {
           if (userProfile.is_guest) {
@@ -152,9 +154,9 @@ export async function POST(request: NextRequest) {
         console.error('Failed to fetch chat session message counts for free tier checking', countError)
         return new Response(JSON.stringify({ error: 'Failed to verify free tier limits' }), { status: 500 })
       } else if (totalMessagesData) {
-        const totalMessages = totalMessagesData.reduce((sum, session) => sum + (session.message_count || 0), 0)
+        currentTotalMessages = totalMessagesData.reduce((sum, session) => sum + (session.message_count || 0), 0)
         
-        if (totalMessages >= FREE_TIER_MAX_MESSAGES) { 
+        if (currentTotalMessages >= FREE_TIER_MAX_MESSAGES) { 
           // Update the specific flag so we don't need to compute this sum every time
           await supabase.from('user_profiles').update({ free_quota_exhausted: true }).eq('id', userId)
 
@@ -279,6 +281,12 @@ export async function POST(request: NextRequest) {
                  session_id_param: sessionId,
                  increment_by: 2
               })
+
+              // If they just hit exactly their limit on this turn, eagerly flag the account as exhausted
+              // so the backend tracking matches the frontend lock regardless of whether they refresh or switch modes.
+              if (usingFreeKey && currentTotalMessages + 2 >= FREE_TIER_MAX_MESSAGES) {
+                await supabaseAction.from('user_profiles').update({ free_quota_exhausted: true }).eq('id', userId)
+              }
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Stream error'
