@@ -139,10 +139,14 @@ export default function CoachPage() {
   useEffect(() => {
     if (!isLoaded) return
     if (messages.length === 0 && hasGreetedRef.current !== mode && !upgradeRequired) {
+      if (freeQuota?.isFreeTier && freeQuota.remaining <= 0) {
+        hasGreetedRef.current = mode
+        return
+      }
       hasGreetedRef.current = mode
       greet()
     }
-  }, [mode, messages.length, greet, isLoaded, upgradeRequired])
+  }, [mode, messages.length, greet, isLoaded, upgradeRequired, freeQuota])
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
