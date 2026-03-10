@@ -70,7 +70,7 @@ Sifu Quest was designed from day one with data privacy and security as non-negot
 | **Error Monitoring** | Sentry captures errors across client, server, and edge runtimes with configurable sampling rates, providing observability without exposing user data. |
 | **Transport Security** | All traffic is served over **HTTPS** via Vercel's automatic TLS. Supabase connections use encrypted channels. |
 
-> For the full technical breakdown of the security model, see [TECHNICAL_DOCS.md](./TECHNICAL_DOCS.md#security-model).
+> For the full technical breakdown of the security model, see [docs/technical/database.md](./docs/technical/database.md).
 
 ## How It Works
 
@@ -105,7 +105,7 @@ npm install
 npm run dev
 ```
 
-> **Full setup instructions** (including how to get API keys from Google, Supabase, Anthropic, and Sentry) are in the **[Setup Guide](./SETUP.md)**.
+> **Full setup instructions** (including how to get API keys from Google, Supabase, Anthropic, and Sentry) are in the **[Setup Guide](./docs/setup/local-development.md)**.
 
 ---
 
@@ -113,9 +113,9 @@ npm run dev
 
 | Document | What's Inside |
 |----------|--------------|
-| **[SETUP.md](./SETUP.md)** | Step-by-step local dev and Vercel production setup, including how to obtain every API key |
-| **[TECHNICAL_DOCS.md](./TECHNICAL_DOCS.md)** | Architecture diagrams, database schema, API reference, security model |
-| **[DEPLOYMENT.md](./DEPLOYMENT.md)** | Quick-reference for Vercel environment variables |
+| **[docs/technical/](./docs/technical/)** | Architecture diagrams, database schema, API reference, security model |
+| **[docs/setup/](./docs/setup/)** | Step-by-step local development setup and Vercel production deployment |
+| **[docs/project/roadmap.md](./docs/project/roadmap.md)** | The comprehensive product roadmap and design system for Sifu Quest |
 
 ---
 

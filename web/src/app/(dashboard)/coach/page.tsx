@@ -10,6 +10,7 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { ApiKeyPrompt } from '@/components/ApiKeyPrompt'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { useChat, type ChatMessage } from '@/hooks/useChat'
 import 'highlight.js/styles/github-dark.css'
@@ -132,11 +133,11 @@ export default function CoachPage() {
   // greeting from firing against the empty initial state before async decrypt completes
   useEffect(() => {
     if (!isLoaded) return
-    if (messages.length === 0 && hasGreetedRef.current !== mode) {
+    if (messages.length === 0 && hasGreetedRef.current !== mode && !upgradeRequired) {
       hasGreetedRef.current = mode
       greet()
     }
-  }, [mode, messages.length, greet, isLoaded])
+  }, [mode, messages.length, greet, isLoaded, upgradeRequired])
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
@@ -202,9 +203,9 @@ export default function CoachPage() {
       <Card className="flex-1 border-border bg-background overflow-hidden flex flex-col min-h-0">
         <CardContent className="p-0 flex-1 flex flex-col min-h-0">
           {upgradeRequired ? (
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-center min-h-0">
-               <UpgradePrompt />
-            </div>
+             <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-center min-h-0">
+                 {upgradeRequired === 'missing_api_key' ? <ApiKeyPrompt /> : <UpgradePrompt />}
+             </div>
           ) : (
             <>
               {/* Scrollable messages */}

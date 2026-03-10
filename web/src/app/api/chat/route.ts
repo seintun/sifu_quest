@@ -20,6 +20,7 @@ type UserProfileRow = {
   is_guest: boolean
   guest_expires_at: string | null
   api_key_enc: string | null
+  free_quota_exhausted: boolean
 }
 
 export async function POST(request: NextRequest) {
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     // If the row is missing (e.g., first session), bootstrap it instead of hard-failing.
     const { data: existingProfile, error: profileFetchError } = await supabase
       .from('user_profiles')
-      .select('is_guest, guest_expires_at, api_key_enc')
+      .select('is_guest, guest_expires_at, api_key_enc, free_quota_exhausted')
       .eq('id', userId)
       .maybeSingle()
 
@@ -70,8 +71,9 @@ export async function POST(request: NextRequest) {
           is_guest: isGuest,
           guest_expires_at: guestExpiry,
           last_active_at: new Date().toISOString(),
+          free_quota_exhausted: false,
         })
-        .select('is_guest, guest_expires_at, api_key_enc')
+        .select('is_guest, guest_expires_at, api_key_enc, free_quota_exhausted')
         .single()
 
       if (createProfileError) {
@@ -83,12 +85,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Keep heartbeat updated (non-blocking).
-    void supabase
-      .from('user_profiles')
-      .update({ last_active_at: new Date().toISOString() })
-      .eq('id', userId)
+    void (async () => {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ last_active_at: new Date().toISOString() })
+        .eq('id', userId)
+        
+      if (error) {
+        console.error('Failed to update user last_active_at heartbeat:', error)
+      }
+    })().catch((err: unknown) => {
+      console.error('Unexpected error during user last_active_at heartbeat:', err)
+    })
 
-    // 2. Guest enforcement
+    // 2. Guest enforcement and Free tier enforcement
     let apiKey = process.env.ANTHROPIC_API_KEY
     
     if (userProfile.is_guest) {
@@ -99,36 +109,67 @@ export async function POST(request: NextRequest) {
           message: 'Your guest session has expired. Please log in to continue.' 
         }), { status: 403 })
       }
-      
-      // Check 5-message limit using active chat session ID
-      if (sessionId) {
-        const { data: sessionData } = await supabase
-          .from('chat_sessions')
-          .select('message_count')
-          .eq('id', sessionId)
-          .eq('user_id', userId)
-          .single()
-          
-        if (sessionData && sessionData.message_count >= 10) { // 5 user + 5 assistant messages
-          return new Response(JSON.stringify({ 
-            error: 'limit_reached',
-            message: 'You have reached your free message limit. Please log in to continue.'
-          }), { status: 403 })
+    }
+
+    // Determine if we need to use the free key or user's key
+    let usingFreeKey = true;
+    if (!userProfile.is_guest && userProfile.api_key_enc) {
+      const decryptedKey = decryptKey(userProfile.api_key_enc)
+      if (decryptedKey) {
+        apiKey = decryptedKey
+        usingFreeKey = false;
+      } else {
+        return new Response(JSON.stringify({
+          error: 'invalid_api_key',
+          message: 'Your saved API key could not be decrypted. Please re-add it in Settings to continue.'
+        }), { status: 403 })
+      }
+    }
+
+    if (usingFreeKey) {
+      if (userProfile.free_quota_exhausted) {
+          if (userProfile.is_guest) {
+            return new Response(JSON.stringify({ 
+              error: 'guest_limit_reached',
+              message: 'You have reached your free message limit as a guest. Please log in to continue.'
+            }), { status: 403 })
+          } else {
+             return new Response(JSON.stringify({ 
+               error: 'missing_api_key',
+               message: 'You have exhausted your free messages. Please add your Anthropic API key in Settings to continue.'
+             }), { status: 403 })
+          }
+      }
+
+      // Check total messages across ALL sessions for this user (max 10 = 5 user + 5 assistant)
+      const { data: totalMessagesData, error: countError } = await supabase
+        .from('chat_sessions')
+        .select('message_count')
+        .eq('user_id', userId)
+        
+      if (countError) {
+        console.error('Failed to fetch chat session message counts for free tier checking', countError)
+        return new Response(JSON.stringify({ error: 'Failed to verify free tier limits' }), { status: 500 })
+      } else if (totalMessagesData) {
+        const totalMessages = totalMessagesData.reduce((sum, session) => sum + (session.message_count || 0), 0)
+        
+        if (totalMessages >= 10) { 
+          // Update the specific flag so we don't need to compute this sum every time
+          await supabase.from('user_profiles').update({ free_quota_exhausted: true }).eq('id', userId)
+
+          if (userProfile.is_guest) {
+            return new Response(JSON.stringify({ 
+              error: 'guest_limit_reached',
+              message: 'You have reached your free message limit as a guest. Please log in to continue.'
+            }), { status: 403 })
+          } else {
+             return new Response(JSON.stringify({ 
+               error: 'missing_api_key',
+               message: 'You have exhausted your free messages. Please add your Anthropic API key in Settings to continue.'
+             }), { status: 403 })
+          }
         }
       }
-    } else {
-      // 3. Logged-in user: must provide their own key
-      if (!userProfile.api_key_enc) {
-         return new Response(JSON.stringify({ 
-           error: 'missing_api_key',
-           message: 'Please add your Anthropic API key in Settings to continue.'
-         }), { status: 403 })
-      }
-      const decryptedKey = decryptKey(userProfile.api_key_enc)
-      if (!decryptedKey) {
-        return new Response(JSON.stringify({ error: 'Failed to decrypt API key' }), { status: 500 })
-      }
-      apiKey = decryptedKey
     }
 
     if (!apiKey) {
