@@ -1,6 +1,7 @@
 import { writeMemoryFile } from '@/lib/memory'
 import { getPlanTimelineMeta } from '@/lib/profile-timeline'
 import { assertRequiredEnv, MissingEnvironmentVariableError } from '@/lib/env'
+import { resolveCanonicalUserId } from '@/lib/user-identity'
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) {
        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const userId = session.user.id
+    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const data: OnboardingData = await request.json()
 
     const profileContent = `# User Profile

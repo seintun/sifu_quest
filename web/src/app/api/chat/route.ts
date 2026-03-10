@@ -1,7 +1,8 @@
 import { auth } from '@/auth'
 import { decryptKey } from '@/lib/apikey'
 import { readMemoryFile, readModeFile } from '@/lib/memory'
-import { createClient } from '@/lib/supabase'
+import { createAdminClient } from '@/lib/supabase-admin'
+import { resolveCanonicalUserId } from '@/lib/user-identity'
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest } from 'next/server'
 
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     }
     
-    const userId = session.user.id
+    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const { messages, mode, isGreeting, sessionId } = await request.json()
 
     if (!messages || !Array.isArray(messages)) {
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
       })
     }
     
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     
     // 1. Fetch user profile to check guest status and get API key.
     // If the row is missing (e.g., first session), bootstrap it instead of hard-failing.
@@ -105,6 +106,7 @@ export async function POST(request: NextRequest) {
           .from('chat_sessions')
           .select('message_count')
           .eq('id', sessionId)
+          .eq('user_id', userId)
           .single()
           
         if (sessionData && sessionData.message_count >= 10) { // 5 user + 5 assistant messages
@@ -201,7 +203,18 @@ export async function POST(request: NextRequest) {
           
           // Save to database asynchronously after stream closes
           if (sessionId && lastUserMessage) {
-              const supabaseAction = await createClient()
+              const supabaseAction = createAdminClient()
+
+              const { data: ownedSession } = await supabaseAction
+                .from('chat_sessions')
+                .select('id')
+                .eq('id', sessionId)
+                .eq('user_id', userId)
+                .maybeSingle()
+
+              if (!ownedSession) {
+                return
+              }
               
               // Insert user message
               await supabaseAction.from('chat_messages').insert({

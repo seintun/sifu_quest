@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase'
+import { createAdminClient } from '@/lib/supabase-admin'
+import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
     if (!session?.user?.id) {
        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const userId = session.user.id
+    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     
     const { searchParams } = new URL(request.url)
     const mode = searchParams.get('mode')
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Mode is required' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     // Find the most recent unarchived session for this mode 
     // In a multi-session UI, we would return a list. For now, we return the active one.
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
       .from('chat_messages')
       .select('role, content, created_at')
       .eq('session_id', chatSession.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: true })
 
     if (messagesError) {
@@ -71,14 +73,14 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) {
        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const userId = session.user.id
+    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const { mode, title } = await request.json()
 
     if (!mode) {
       return NextResponse.json({ error: 'Mode is required' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     // 1. Mark existing sessions for this mode as archived (optional, depends on UX)
     // If we want a linear history per mode, we can archive old ones or just keep appending.
@@ -103,6 +105,12 @@ export async function POST(request: NextRequest) {
 
     if (error) {
        console.error(error)
+       if (error.code === '23503') {
+         return NextResponse.json(
+           { error: 'Unable to create chat session for this account. Please sign out and sign in again.' },
+           { status: 409 },
+         )
+       }
        return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
     }
 
