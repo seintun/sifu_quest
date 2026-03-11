@@ -66,9 +66,35 @@ function shouldShowPlanStatusBanner(status: OnboardingPlanStatus | null): boolea
 
 function PlanUpToDateBadge() {
   return (
-    <Badge variant="outline" className="h-8 cursor-default pointer-events-none border-success/40 bg-success/10 px-3 text-xs font-medium text-success">
+    <Badge variant="outline" className="h-8 cursor-default pointer-events-none border-border/60 bg-elevated/70 px-3 text-xs font-medium text-muted-foreground">
       Plan up to date
     </Badge>
+  )
+}
+
+function PlanHeader({
+  title,
+  mobileTitle,
+  subtitle,
+  showPlanUpToDate,
+}: {
+  title: string
+  mobileTitle: { heading: string; subtitle: string | null }
+  subtitle: string
+  showPlanUpToDate: boolean
+}) {
+  return (
+    <div>
+      <h1 className="font-display hidden text-2xl font-bold leading-tight sm:block">{title}</h1>
+      <h1 className="font-display text-[1.7rem] font-bold leading-tight sm:hidden">{mobileTitle.heading}</h1>
+      {mobileTitle.subtitle && <p className="mt-1 text-xs text-muted-foreground sm:hidden">{mobileTitle.subtitle}</p>}
+      <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+      {showPlanUpToDate && (
+        <div className="mt-2 flex justify-end">
+          <PlanUpToDateBadge />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -196,6 +222,10 @@ function MonthProgress({ items }: { items: PlanItem[] }) {
 function extractTitle(content: string): string {
   const match = content.match(/^# (.+)/m)
   return match ? match[1].trim() : 'My Plan'
+}
+
+function stripLeadingHeading(content: string): string {
+  return content.replace(/^# .+\n{1,2}/, '').trim()
 }
 
 function hasStructuredContent(plan: ParsedPlan): boolean {
@@ -330,22 +360,18 @@ export default function PlanPage() {
   const canRequestRefresh = planStatus !== null && planStatus !== 'queued' && planStatus !== 'running'
   const showPlanStatusBanner = shouldShowPlanStatusBanner(planStatus)
   const showPlanUpToDate = planStatus === 'ready'
+  const fallbackMarkdownContent = stripLeadingHeading(rawContent)
 
   // AI-generated plan: fall back to markdown rendering
   if (!hasStructuredContent(plan)) {
     return (
       <div className="max-w-4xl space-y-4 sm:space-y-6">
-        <div>
-          <h1 className="font-display hidden text-2xl font-bold leading-tight sm:block">{title}</h1>
-          <h1 className="font-display text-[1.7rem] font-bold leading-tight sm:hidden">{mobileTitle.heading}</h1>
-          {mobileTitle.subtitle && <p className="mt-1 text-xs text-muted-foreground sm:hidden">{mobileTitle.subtitle}</p>}
-          <p className="text-muted-foreground text-sm mt-1">Your personalized roadmap</p>
-          {showPlanUpToDate && (
-            <div className="mt-2">
-              <PlanUpToDateBadge />
-            </div>
-          )}
-        </div>
+        <PlanHeader
+          title={title}
+          mobileTitle={mobileTitle}
+          subtitle="Your personalized roadmap"
+          showPlanUpToDate={showPlanUpToDate}
+        />
         {showPlanStatusBanner && (
           <PlanStatusControls
             planStatus={planStatus}
@@ -355,11 +381,11 @@ export default function PlanPage() {
             onQueuePlanRefresh={() => void queuePlanRefresh()}
           />
         )}
-        {rawContent ? (
+        {fallbackMarkdownContent ? (
           <Card className="border-border bg-surface">
             <CardContent className="px-4 py-4 sm:px-6 sm:py-5">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-                {rawContent}
+                {fallbackMarkdownContent}
               </ReactMarkdown>
             </CardContent>
           </Card>
@@ -372,17 +398,12 @@ export default function PlanPage() {
 
   return (
     <div className="max-w-4xl space-y-4 sm:space-y-6">
-      <div>
-        <h1 className="font-display hidden text-2xl font-bold leading-tight sm:block">{title}</h1>
-        <h1 className="font-display text-[1.7rem] font-bold leading-tight sm:hidden">{mobileTitle.heading}</h1>
-        {mobileTitle.subtitle && <p className="mt-1 text-xs text-muted-foreground sm:hidden">{mobileTitle.subtitle}</p>}
-        <p className="text-muted-foreground text-sm mt-1">Your structured roadmap to interview success</p>
-        {showPlanUpToDate && (
-          <div className="mt-2">
-            <PlanUpToDateBadge />
-          </div>
-        )}
-      </div>
+      <PlanHeader
+        title={title}
+        mobileTitle={mobileTitle}
+        subtitle="Your structured roadmap to interview success"
+        showPlanUpToDate={showPlanUpToDate}
+      />
       {showPlanStatusBanner && (
         <PlanStatusControls
           planStatus={planStatus}
