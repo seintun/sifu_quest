@@ -244,12 +244,13 @@ export default function CoachPage() {
             selectedMode={mode}
             onModeChange={handleModeChange}
             onClear={handleClearHistory}
+            byokNotice={isAnthropicLocked ? 'BYOK in Settings for unlimited chat.' : null}
           />
         </div>
       </div>
 
       {isAnthropicLocked && anthropicProvider?.reason && (
-        <div className="mb-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] text-warning flex items-center justify-between gap-2 shrink-0">
+        <div className="hidden md:flex mb-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] text-warning items-center justify-between gap-2 shrink-0">
           <span className="inline-flex items-center gap-1.5 flex-1 min-w-0 whitespace-nowrap">
             <KeyRound className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">BYOK in Settings for unlimited chat.</span>

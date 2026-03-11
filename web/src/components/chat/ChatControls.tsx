@@ -18,6 +18,7 @@ import {
 import { getAnthropicModelCostTier } from '@/lib/chat-provider-config'
 import type { ChatModelOption, ChatProviderOption } from '@/hooks/useChat'
 import { Coins, Settings2, Trash2 } from 'lucide-react'
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 
 export type ModeOption = {
@@ -36,6 +37,7 @@ type SharedControlProps = {
   selectedMode: string
   onModeChange: (value: string) => void
   onClear: () => void
+  byokNotice?: string | null
 }
 
 function CostTierIcons({ tier }: { tier: 1 | 2 | 3 }) {
@@ -58,6 +60,7 @@ function ControlsBody({
   selectedMode,
   onModeChange,
   onClear,
+  byokNotice,
 }: SharedControlProps) {
   const selectedModelOption = useMemo(() => models.find((model) => model.id === selectedModel), [models, selectedModel])
   const selectedTier = selectedModelOption?.provider === 'anthropic'
@@ -66,6 +69,15 @@ function ControlsBody({
 
   return (
     <div className="grid gap-3">
+      {byokNotice && (
+        <div className="rounded-md border border-warning/30 bg-warning/10 px-2.5 py-2 text-[11px] text-warning flex items-center justify-between gap-2">
+          <span className="truncate">{byokNotice}</span>
+          <Link href="/settings" className="underline underline-offset-2 whitespace-nowrap hover:text-warning/90 shrink-0">
+            Settings
+          </Link>
+        </div>
+      )}
+
       <label className="grid gap-1 text-xs text-muted-foreground">
         Provider
         <Select value={selectedProvider} onValueChange={(value) => onProviderChange(value as 'openrouter' | 'anthropic')}>
