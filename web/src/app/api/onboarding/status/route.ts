@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const kickRequested = request.nextUrl.searchParams.get('kick') === 'true'
 
     const state = await loadOnboardingState(userId)
-    if (kickRequested && state.plan.status === 'queued') {
+    if (kickRequested && (state.plan.status === 'queued' || state.plan.status === 'running')) {
       await runOnboardingPlanJobForUser(userId)
     }
 

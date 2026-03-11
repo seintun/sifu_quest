@@ -149,7 +149,7 @@ export default function SettingsPage() {
 
   const loadOnboardingStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/onboarding/status')
+      const res = await fetch('/api/onboarding/status?kick=true')
       if (!res.ok) {
         return
       }

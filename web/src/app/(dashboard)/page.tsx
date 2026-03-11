@@ -174,7 +174,7 @@ export default function DashboardPage() {
   useEffect(() => {
     Promise.all([
       fetch('/api/progress').then((res) => res.json()),
-      fetch('/api/onboarding/status')
+      fetch('/api/onboarding/status?kick=true')
         .then((res) => (res.ok ? res.json() : null))
         .catch(() => null),
     ])
@@ -307,7 +307,7 @@ export default function DashboardPage() {
         return
       }
 
-      const refreshed = await fetch('/api/onboarding/status').then((res) => res.json())
+      const refreshed = await fetch('/api/onboarding/status?kick=true').then((res) => res.json())
       const typed = refreshed as OnboardingStateResponse
       setOnboardingState(typed)
       setEnrichmentDraft((prev) => ({

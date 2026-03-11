@@ -38,6 +38,24 @@ const CATEGORY_DOMAINS: Record<string, keyof typeof DOMAIN_COLORS> = {
   'Job Search': 'jobs',
 }
 
+type OnboardingPlanStatus = 'not_queued' | 'queued' | 'running' | 'ready' | 'failed'
+
+type OnboardingStatusResponse = {
+  plan: {
+    status: OnboardingPlanStatus
+    lastErrorCode: string | null
+  }
+}
+
+const PLAN_PLACEHOLDER_MARKER = 'being generated in the background'
+
+function formatPlanStatus(status: OnboardingPlanStatus): string {
+  return status
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
 function PlanCheckItem({
   item,
   onToggle,
@@ -106,20 +124,80 @@ function hasStructuredContent(plan: ParsedPlan): boolean {
 export default function PlanPage() {
   const [plan, setPlan] = useState<ParsedPlan | null>(null)
   const [rawContent, setRawContent] = useState('')
+  const [planStatus, setPlanStatus] = useState<OnboardingPlanStatus>('not_queued')
+  const [planErrorCode, setPlanErrorCode] = useState<string | null>(null)
+  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false)
 
-  const fetchPlan = useCallback(() => {
-    fetch('/api/memory?file=plan.md')
-      .then(res => res.json())
-      .then(data => {
-        setRawContent(data.content || '')
-        setPlan(parsePlan(data.content || ''))
-      })
-      .catch(() => {})
+  const fetchPlan = useCallback(async () => {
+    try {
+      const res = await fetch('/api/memory?file=plan.md')
+      const data = await res.json().catch(() => ({}))
+      const content = typeof data.content === 'string' ? data.content : ''
+      setRawContent(content)
+      setPlan(parsePlan(content))
+      return content
+    } catch {
+      return ''
+    }
+  }, [])
+
+  const fetchOnboardingStatus = useCallback(async (kick: boolean) => {
+    setIsRefreshingStatus(true)
+    try {
+      const res = await fetch(kick ? '/api/onboarding/status?kick=true' : '/api/onboarding/status')
+      if (!res.ok) {
+        return null
+      }
+      const data = (await res.json()) as OnboardingStatusResponse
+      setPlanStatus(data.plan.status)
+      setPlanErrorCode(data.plan.lastErrorCode ?? null)
+      return data
+    } catch {
+      return null
+    } finally {
+      setIsRefreshingStatus(false)
+    }
   }, [])
 
   useEffect(() => {
-    fetchPlan()
-  }, [fetchPlan])
+    void (async () => {
+      await fetchPlan()
+      await fetchOnboardingStatus(true)
+      await fetchPlan()
+    })()
+  }, [fetchPlan, fetchOnboardingStatus])
+
+  const isPlanPlaceholder = rawContent.toLowerCase().includes(PLAN_PLACEHOLDER_MARKER)
+
+  useEffect(() => {
+    if (!isPlanPlaceholder || planStatus === 'failed') {
+      return
+    }
+
+    let isActive = true
+    const tick = async () => {
+      await fetchOnboardingStatus(true)
+      if (!isActive) {
+        return
+      }
+      await fetchPlan()
+    }
+
+    void tick()
+    const intervalId = window.setInterval(() => {
+      void tick()
+    }, 15000)
+
+    return () => {
+      isActive = false
+      window.clearInterval(intervalId)
+    }
+  }, [fetchOnboardingStatus, fetchPlan, isPlanPlaceholder, planStatus])
+
+  const refreshPlanStatus = useCallback(async () => {
+    await fetchOnboardingStatus(true)
+    await fetchPlan()
+  }, [fetchOnboardingStatus, fetchPlan])
 
   const handleToggle = async (itemId: string, checked: boolean) => {
     try {
@@ -151,6 +229,26 @@ export default function PlanPage() {
           <h1 className="font-display text-2xl font-bold">{title}</h1>
           <p className="text-muted-foreground text-sm mt-1">Your personalized roadmap</p>
         </div>
+        {isPlanPlaceholder && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="border-plan/30 bg-plan/10 text-plan">
+              Status: {formatPlanStatus(planStatus)}
+            </Badge>
+            {planErrorCode && (
+              <Badge variant="outline" className="border-danger/40 bg-danger/10 text-danger">
+                Error: {planErrorCode}
+              </Badge>
+            )}
+            <button
+              type="button"
+              onClick={() => void refreshPlanStatus()}
+              disabled={isRefreshingStatus}
+              className="rounded-md border border-border bg-elevated px-3 py-1.5 text-xs text-foreground hover:bg-elevated/70 disabled:opacity-50"
+            >
+              {isRefreshingStatus ? 'Checking...' : 'Check generation status'}
+            </button>
+          </div>
+        )}
         {rawContent ? (
           <Card className="border-border bg-surface">
             <CardContent className="px-6 py-5">

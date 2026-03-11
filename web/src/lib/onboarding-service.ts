@@ -54,6 +54,8 @@ function getBackoffDelayMs(attemptCount: number): number {
   return minutes * 60 * 1000
 }
 
+const PLAN_JOB_STALE_MS = 10 * 60 * 1000
+
 function toErrorCode(error: unknown): string {
   if (error instanceof MemoryWriteError && error.dbCode === '23503') {
     return 'identity_mismatch'
@@ -505,6 +507,25 @@ async function markPlanJobSuccess(userId: string, attemptCount: number): Promise
   await logProgressEvent(userId, 'plan_ready', 'onboarding')
 }
 
+async function markPlanJobRunning(userId: string): Promise<void> {
+  const supabaseAdmin = createAdminClient()
+  const now = new Date().toISOString()
+
+  const { error: profileError } = await supabaseAdmin
+    .from('user_profiles')
+    .update({
+      onboarding_plan_status: 'running',
+      onboarding_plan_error_code: null,
+      onboarding_plan_last_attempt_at: now,
+      last_active_at: now,
+    })
+    .eq('id', userId)
+
+  if (profileError) {
+    throw new Error(`Failed to update user profile while plan is running: ${profileError.message}`)
+  }
+}
+
 async function markPlanJobFailure(
   userId: string,
   attemptCount: number,
@@ -565,18 +586,71 @@ async function markPlanJobFailure(
 async function runPlanJobForUser(userId: string): Promise<boolean> {
   const supabaseAdmin = createAdminClient()
   const now = new Date().toISOString()
-  const { data: job, error: jobError } = await supabaseAdmin
+  const { data: initialJob, error: jobError } = await supabaseAdmin
     .from('onboarding_plan_jobs')
-    .select('user_id, status, payload, attempt_count, available_at')
+    .select('user_id, status, payload, attempt_count, available_at, updated_at')
     .eq('user_id', userId)
     .maybeSingle()
 
   if (jobError) {
     throw new Error(`Failed to fetch onboarding plan job: ${jobError.message}`)
   }
-  if (!job || job.status !== 'queued') {
+  if (!initialJob) {
     return false
   }
+
+  let job = initialJob
+
+  // If a worker died mid-run, recover stale running jobs so a kick can resume processing.
+  if (job.status === 'running') {
+    const updatedAtMs = job.updated_at ? new Date(job.updated_at).getTime() : NaN
+    const isStale = Number.isNaN(updatedAtMs) || Date.now() - updatedAtMs > PLAN_JOB_STALE_MS
+    if (!isStale) {
+      return false
+    }
+
+    const { data: requeuedJob, error: requeueError } = await supabaseAdmin
+      .from('onboarding_plan_jobs')
+      .update({
+        status: 'queued',
+        available_at: now,
+        updated_at: now,
+        last_error_code: 'stale_running_requeued',
+      })
+      .eq('user_id', userId)
+      .eq('status', 'running')
+      .select('user_id, status, payload, attempt_count, available_at, updated_at')
+      .maybeSingle()
+
+    if (requeueError) {
+      throw new Error(`Failed to requeue stale onboarding plan job: ${requeueError.message}`)
+    }
+
+    if (!requeuedJob) {
+      return false
+    }
+
+    const { error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .update({
+        onboarding_plan_status: 'queued',
+        onboarding_plan_error_code: 'stale_running_requeued',
+        onboarding_plan_last_attempt_at: now,
+        last_active_at: now,
+      })
+      .eq('id', userId)
+
+    if (profileError) {
+      throw new Error(`Failed to sync profile after stale plan job requeue: ${profileError.message}`)
+    }
+
+    job = requeuedJob
+  }
+
+  if (job.status !== 'queued') {
+    return false
+  }
+
   if (job.available_at && new Date(job.available_at).getTime() > Date.now()) {
     return false
   }
@@ -603,6 +677,8 @@ async function runPlanJobForUser(userId: string): Promise<boolean> {
   }
 
   try {
+    await markPlanJobRunning(userId)
+
     const payload = isRecord(claimedJob.payload) ? claimedJob.payload : {}
     const draft = parsePersistedOnboardingDraftRelaxed(payload)
     const legacy = toLegacyOnboardingPayload(draft.core, draft.enrichment)
