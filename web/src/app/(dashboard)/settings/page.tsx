@@ -6,6 +6,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { canSaveAnthropicApiKey, shouldShowRemoveApiKey } from '@/lib/account-settings-ui'
 import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
 import { getOnboardingPrefillName } from '@/lib/onboarding-name'
+import {
+  type OnboardingEnrichmentAnswers,
+  LEARNING_STYLE_OPTIONS,
+  STRENGTH_OPTIONS,
+  TARGET_COMPANY_OPTIONS,
+  TECH_STACK_OPTIONS,
+  createEmptyEnrichmentAnswers,
+} from '@/lib/onboarding-v2'
 import { validateFullName } from '@/lib/profile-name'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -51,6 +59,22 @@ type AccountUsage = {
 
 type FlashMessage = { text: string; type: 'success' | 'error' } | null
 
+type EnrichmentPromptKey = 'techStack' | 'targetCompanies' | 'learningStyle' | 'strengths'
+
+type OnboardingStateResponse = {
+  onboarding: {
+    status: 'not_started' | 'in_progress' | 'core_complete' | 'enriched_complete'
+    nextPromptKey: EnrichmentPromptKey | null
+  }
+  plan: {
+    status: 'not_queued' | 'queued' | 'running' | 'ready' | 'failed'
+    lastErrorCode: string | null
+  }
+  draft: {
+    enrichment?: Partial<OnboardingEnrichmentAnswers>
+  }
+}
+
 export default function SettingsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -71,6 +95,9 @@ export default function SettingsPage() {
   const [usage, setUsage] = useState<AccountUsage | null>(null)
   const [isUsageLoading, setIsUsageLoading] = useState(false)
   const [usageError, setUsageError] = useState('')
+  const [onboardingState, setOnboardingState] = useState<OnboardingStateResponse | null>(null)
+  const [enrichmentDraft, setEnrichmentDraft] = useState<OnboardingEnrichmentAnswers>(createEmptyEnrichmentAnswers())
+  const [isSavingEnrichment, setIsSavingEnrichment] = useState(false)
 
   const [message, setMessage] = useState<FlashMessage>(null)
 
@@ -120,19 +147,38 @@ export default function SettingsPage() {
     }
   }, [])
 
+  const loadOnboardingStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/onboarding/status')
+      if (!res.ok) {
+        return
+      }
+      const data = (await res.json()) as OnboardingStateResponse
+      setOnboardingState(data)
+      setEnrichmentDraft((prev) => ({
+        ...prev,
+        ...(data.draft?.enrichment ?? {}),
+      }))
+    } catch {
+      // Non-blocking in settings.
+    }
+  }, [])
+
   useEffect(() => {
     void loadAccountStatus()
     void loadUsage()
-  }, [loadAccountStatus, loadUsage])
+    void loadOnboardingStatus()
+  }, [loadAccountStatus, loadUsage, loadOnboardingStatus])
 
   useEffect(() => {
     if (searchParams.get('success') === 'linked') {
       setMessage({ text: 'Google account linked. Your guest profile has been upgraded without losing any data.', type: 'success' })
       void loadAccountStatus()
+      void loadOnboardingStatus()
     } else if (searchParams.get('error') === 'link_failed') {
       setMessage({ text: 'Failed to link your Google account. Please try again.', type: 'error' })
     }
-  }, [searchParams, loadAccountStatus])
+  }, [searchParams, loadAccountStatus, loadOnboardingStatus])
 
   const handleSaveName = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -248,6 +294,94 @@ export default function SettingsPage() {
     }
   }
 
+  const enrichmentPromptConfig: Record<
+    EnrichmentPromptKey,
+    {
+      title: string
+      hint: string
+      options: Array<{ value: string; label: string }>
+      valuesField: keyof OnboardingEnrichmentAnswers
+      customField: keyof OnboardingEnrichmentAnswers
+      max: number
+    }
+  > = {
+    techStack: {
+      title: 'Add your primary tech stack',
+      hint: 'Pick up to 8 technologies.',
+      options: TECH_STACK_OPTIONS,
+      valuesField: 'techStack',
+      customField: 'techStackCustom',
+      max: 8,
+    },
+    targetCompanies: {
+      title: 'Add target companies or tiers',
+      hint: 'Pick up to 8 targets.',
+      options: TARGET_COMPANY_OPTIONS,
+      valuesField: 'targetCompanies',
+      customField: 'targetCompaniesCustom',
+      max: 8,
+    },
+    learningStyle: {
+      title: 'Set your learning style preferences',
+      hint: 'Pick up to 3 style preferences.',
+      options: LEARNING_STYLE_OPTIONS,
+      valuesField: 'learningStyle',
+      customField: 'learningStyleCustom',
+      max: 3,
+    },
+    strengths: {
+      title: 'Capture your strongest technical areas',
+      hint: 'Pick up to 3 strengths.',
+      options: STRENGTH_OPTIONS,
+      valuesField: 'strengths',
+      customField: 'strengthsCustom',
+      max: 3,
+    },
+  }
+
+  const nextPromptKey = onboardingState?.onboarding.nextPromptKey ?? null
+  const activePrompt = nextPromptKey ? enrichmentPromptConfig[nextPromptKey] : null
+
+  const toggleEnrichmentValue = useCallback(
+    (field: keyof OnboardingEnrichmentAnswers, value: string, maxCount: number) => {
+      setEnrichmentDraft((prev) => {
+        const current = Array.isArray(prev[field]) ? (prev[field] as string[]) : []
+        const next = current.includes(value)
+          ? current.filter((item) => item !== value)
+          : current.length >= maxCount
+            ? current
+            : [...current, value]
+        return {
+          ...prev,
+          [field]: next,
+        }
+      })
+    },
+    [],
+  )
+
+  const saveEnrichment = useCallback(async () => {
+    setIsSavingEnrichment(true)
+    try {
+      const res = await fetch('/api/onboarding/enrichment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enrichment: enrichmentDraft }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setMessage({ text: data.error || 'Failed to save onboarding enrichment.', type: 'error' })
+        return
+      }
+      setMessage({ text: 'Onboarding profile enrichment saved.', type: 'success' })
+      await loadOnboardingStatus()
+    } catch {
+      setMessage({ text: 'Failed to save onboarding enrichment.', type: 'error' })
+    } finally {
+      setIsSavingEnrichment(false)
+    }
+  }, [enrichmentDraft, loadOnboardingStatus])
+
   const isGuest = Boolean(accountStatus?.isGuest)
   const showGuestUpgradeSection = isGuest || Boolean(accountStatusError)
 
@@ -301,6 +435,55 @@ export default function SettingsPage() {
             >
               {isAccountStatusLoading ? 'Refreshing...' : 'Retry Status'}
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {onboardingState?.onboarding.status === 'core_complete' && activePrompt && (
+        <Card className="border-plan/30 bg-plan/10">
+          <CardHeader>
+            <CardTitle>{activePrompt.title}</CardTitle>
+            <CardDescription>{activePrompt.hint}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {activePrompt.options.map((option) => {
+                const values = enrichmentDraft[activePrompt.valuesField] as string[]
+                const selected = values.includes(option.value)
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() =>
+                      toggleEnrichmentValue(activePrompt.valuesField, option.value, activePrompt.max)
+                    }
+                    className={`px-3.5 py-1.5 rounded-full text-sm border transition-all duration-150 cursor-pointer ${
+                      selected
+                        ? 'bg-primary text-primary-foreground border-primary font-medium'
+                        : 'bg-surface border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                )
+              })}
+            </div>
+            <Input
+              value={String(enrichmentDraft[activePrompt.customField] ?? '')}
+              onChange={(event) =>
+                setEnrichmentDraft((prev) => ({
+                  ...prev,
+                  [activePrompt.customField]: event.target.value,
+                }))
+              }
+              placeholder="Optional custom detail"
+              className="bg-elevated/50"
+            />
+            <div className="flex justify-end">
+              <Button onClick={() => void saveEnrichment()} disabled={isSavingEnrichment}>
+                {isSavingEnrichment ? 'Saving...' : 'Save Enrichment'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
