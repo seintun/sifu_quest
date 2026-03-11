@@ -127,6 +127,7 @@ export default function PlanPage() {
   const [planStatus, setPlanStatus] = useState<OnboardingPlanStatus>('not_queued')
   const [planErrorCode, setPlanErrorCode] = useState<string | null>(null)
   const [isRefreshingStatus, setIsRefreshingStatus] = useState(false)
+  const [isQueueingPlanRefresh, setIsQueueingPlanRefresh] = useState(false)
 
   const fetchPlan = useCallback(async () => {
     try {
@@ -170,7 +171,12 @@ export default function PlanPage() {
   const isPlanPlaceholder = rawContent.toLowerCase().includes(PLAN_PLACEHOLDER_MARKER)
 
   useEffect(() => {
-    if (!isPlanPlaceholder || planStatus === 'failed') {
+    const shouldPoll =
+      planStatus === 'queued' ||
+      planStatus === 'running' ||
+      (isPlanPlaceholder && planStatus !== 'failed')
+
+    if (!shouldPoll) {
       return
     }
 
@@ -199,6 +205,29 @@ export default function PlanPage() {
     await fetchPlan()
   }, [fetchOnboardingStatus, fetchPlan])
 
+  const queuePlanRefresh = useCallback(async () => {
+    setIsQueueingPlanRefresh(true)
+    try {
+      const res = await fetch('/api/onboarding/plan/refresh', {
+        method: 'POST',
+      })
+      const data = await res.json().catch(() => ({})) as {
+        error?: string
+        plan?: { status?: OnboardingPlanStatus }
+      }
+      if (!res.ok) {
+        setPlanErrorCode(data.error ?? 'plan_refresh_failed')
+        return
+      }
+
+      setPlanStatus(data.plan?.status ?? 'queued')
+      setPlanErrorCode(null)
+      void refreshPlanStatus()
+    } finally {
+      setIsQueueingPlanRefresh(false)
+    }
+  }, [refreshPlanStatus])
+
   const handleToggle = async (itemId: string, checked: boolean) => {
     try {
       const res = await fetch('/api/plan/toggle', {
@@ -220,6 +249,7 @@ export default function PlanPage() {
 
   const title = extractTitle(rawContent)
   const firstMonthValue = plan.months[0] ? `month${plan.months[0].month}` : ''
+  const canRequestRefresh = planStatus !== 'queued' && planStatus !== 'running'
 
   // AI-generated plan: fall back to markdown rendering
   if (!hasStructuredContent(plan)) {
@@ -229,8 +259,13 @@ export default function PlanPage() {
           <h1 className="font-display text-2xl font-bold">{title}</h1>
           <p className="text-muted-foreground text-sm mt-1">Your personalized roadmap</p>
         </div>
-        {isPlanPlaceholder && (
+        {(isPlanPlaceholder || planStatus === 'not_queued') && (
           <div className="flex flex-wrap items-center gap-2">
+            {planStatus === 'not_queued' && (
+              <Badge variant="outline" className="border-streak/40 bg-streak/10 text-streak">
+                New profile updates available
+              </Badge>
+            )}
             <Badge variant="outline" className="border-plan/30 bg-plan/10 text-plan">
               Status: {formatPlanStatus(planStatus)}
             </Badge>
@@ -239,6 +274,14 @@ export default function PlanPage() {
                 Error: {planErrorCode}
               </Badge>
             )}
+            <button
+              type="button"
+              onClick={() => void queuePlanRefresh()}
+              disabled={!canRequestRefresh || isQueueingPlanRefresh}
+              className="rounded-md border border-streak/40 bg-streak/10 px-3 py-1.5 text-xs font-medium text-streak hover:bg-streak/20 disabled:opacity-50"
+            >
+              {isQueueingPlanRefresh ? 'Queueing refresh...' : 'Refresh Game Plan'}
+            </button>
             <button
               type="button"
               onClick={() => void refreshPlanStatus()}
@@ -269,6 +312,44 @@ export default function PlanPage() {
       <div>
         <h1 className="font-display text-2xl font-bold">{title}</h1>
         <p className="text-muted-foreground text-sm mt-1">Your structured roadmap to interview success</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {planStatus === 'not_queued' && (
+          <Badge variant="outline" className="border-streak/40 bg-streak/10 text-streak">
+            New profile updates available
+          </Badge>
+        )}
+        {(planStatus === 'queued' || planStatus === 'running') && (
+          <Badge variant="outline" className="border-plan/30 bg-plan/10 text-plan">
+            Status: {formatPlanStatus(planStatus)}
+          </Badge>
+        )}
+        {planStatus === 'failed' && (
+          <Badge variant="outline" className="border-danger/40 bg-danger/10 text-danger">
+            Plan generation failed
+          </Badge>
+        )}
+        {planErrorCode && (
+          <Badge variant="outline" className="border-danger/40 bg-danger/10 text-danger">
+            Error: {planErrorCode}
+          </Badge>
+        )}
+        <button
+          type="button"
+          onClick={() => void queuePlanRefresh()}
+          disabled={!canRequestRefresh || isQueueingPlanRefresh}
+          className="rounded-md border border-streak/40 bg-streak/10 px-3 py-1.5 text-xs font-medium text-streak hover:bg-streak/20 disabled:opacity-50"
+        >
+          {isQueueingPlanRefresh ? 'Queueing refresh...' : 'Refresh Game Plan'}
+        </button>
+        <button
+          type="button"
+          onClick={() => void refreshPlanStatus()}
+          disabled={isRefreshingStatus}
+          className="rounded-md border border-border bg-elevated px-3 py-1.5 text-xs text-foreground hover:bg-elevated/70 disabled:opacity-50"
+        >
+          {isRefreshingStatus ? 'Checking...' : 'Check status'}
+        </button>
       </div>
 
       {/* Weekly Rhythm */}

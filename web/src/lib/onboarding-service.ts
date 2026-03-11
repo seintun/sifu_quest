@@ -323,6 +323,26 @@ export async function queueOnboardingPlanJob(
   }
 }
 
+export async function markOnboardingPlanQueued(userId: string): Promise<void> {
+  const supabaseAdmin = createAdminClient()
+  const now = new Date().toISOString()
+
+  const { error } = await supabaseAdmin
+    .from('user_profiles')
+    .update({
+      onboarding_plan_status: 'queued',
+      onboarding_plan_error_code: null,
+      onboarding_plan_retries: 0,
+      onboarding_plan_last_attempt_at: null,
+      last_active_at: now,
+    })
+    .eq('id', userId)
+
+  if (error) {
+    throw new Error(`Failed to mark onboarding plan queued: ${error.message}`)
+  }
+}
+
 export async function updateOnboardingDraft(
   userId: string,
   draft: OnboardingDraftPayload,
@@ -402,7 +422,7 @@ export async function markEnrichmentUpdated(
       onboarding_completion_percent: completionPercent,
       onboarding_next_prompt_key: nextPromptKey,
       onboarding_enriched_completed_at: status === 'enriched_complete' ? now : null,
-      onboarding_plan_status: 'queued',
+      onboarding_plan_status: 'not_queued',
       onboarding_plan_error_code: null,
       onboarding_plan_retries: 0,
       onboarding_plan_last_attempt_at: null,

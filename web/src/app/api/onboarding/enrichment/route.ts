@@ -3,7 +3,6 @@ import {
   loadOnboardingState,
   markEnrichmentUpdated,
   persistProfileOnboardingFile,
-  queueOnboardingPlanJob,
 } from '@/lib/onboarding-service'
 import {
   ONBOARDING_SCHEMA_VERSION,
@@ -48,26 +47,20 @@ export async function POST(request: NextRequest) {
 
     const persistProfilePromise = persistProfileOnboardingFile(userId, draft.core, draft.enrichment)
     const onboardingPromise = markEnrichmentUpdated(userId, draft)
-    const queuePlanPromise = queueOnboardingPlanJob(userId, draft.core, draft.enrichment)
-
     const [onboarding] = await Promise.all([
       onboardingPromise,
       persistProfilePromise,
-      queuePlanPromise,
     ])
 
     const { logProgressEvent } = await import('@/lib/progress')
-    await Promise.all([
-      logProgressEvent(userId, 'enrichment_updated', 'onboarding', {
-        nextPromptKey: onboarding.nextPromptKey,
-      }),
-      logProgressEvent(userId, 'plan_queued', 'onboarding'),
-    ])
+    await logProgressEvent(userId, 'enrichment_updated', 'onboarding', {
+      nextPromptKey: onboarding.nextPromptKey,
+    })
 
     return NextResponse.json({
       success: true,
       onboarding,
-      plan: { status: 'queued' },
+      plan: { status: 'not_queued' },
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
