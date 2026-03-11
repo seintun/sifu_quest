@@ -84,18 +84,27 @@ function PlanHeader({
   showPlanUpToDate: boolean
 }) {
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <h1 className="font-display hidden text-2xl font-bold leading-tight sm:block">{title}</h1>
-        <h1 className="font-display text-[1.7rem] font-bold leading-tight sm:hidden">{mobileTitle.heading}</h1>
-        {mobileTitle.subtitle && <p className="mt-1 text-xs text-muted-foreground sm:hidden">{mobileTitle.subtitle}</p>}
-        <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-      </div>
-      {showPlanUpToDate && (
-        <div className="shrink-0 pt-0.5">
-          <PlanUpToDateBadge />
+    <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display hidden text-2xl font-bold leading-tight sm:block">{title}</h1>
+          <h1 className="font-display text-[1.7rem] font-bold leading-tight sm:hidden">{mobileTitle.heading}</h1>
+          {mobileTitle.subtitle && <p className="mt-1 text-xs text-muted-foreground sm:hidden">{mobileTitle.subtitle}</p>}
         </div>
-      )}
+        {showPlanUpToDate && (
+          <div className="hidden shrink-0 pt-0.5 sm:block">
+            <PlanUpToDateBadge />
+          </div>
+        )}
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
+        {showPlanUpToDate && (
+          <div className="shrink-0 sm:hidden">
+            <PlanUpToDateBadge />
+          </div>
+        )}
+      </div>
     </div>
   )
 }
