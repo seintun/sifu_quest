@@ -2,3 +2,4 @@
 # Only memory/README.md (schema docs) stays in this repo
 memory/*.md
 !memory/README.md
+.vercel
