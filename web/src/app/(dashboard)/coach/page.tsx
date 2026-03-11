@@ -210,13 +210,13 @@ export default function CoachPage() {
   const isAnthropicLocked = Boolean(anthropicProvider && anthropicProvider.availability !== 'available')
 
   return (
-    <div data-testid="coach-shell" className="flex flex-col h-[calc(100dvh-6.5rem)] md:h-[calc(100dvh-3rem)] overflow-hidden">
-      <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
+    <div data-testid="coach-shell" className="flex flex-col h-[calc(100dvh-5.75rem)] md:h-[calc(100dvh-3rem)] overflow-hidden">
+      <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <MessageCircle className="h-5 w-5 text-coach shrink-0" />
+          <MessageCircle className="h-[18px] w-[18px] text-coach shrink-0" />
           <div className="min-w-0">
-            <h1 className="font-display text-xl md:text-2xl font-bold truncate">Coach Chat</h1>
-            <p className="text-xs text-muted-foreground truncate">{selectedModeLabel}</p>
+            <h1 className="font-display text-xl md:text-2xl leading-tight font-bold truncate">Coach Chat</h1>
+            <p className="hidden sm:block text-xs text-muted-foreground truncate mt-0.5">{selectedModeLabel}</p>
           </div>
         </div>
 
@@ -249,7 +249,7 @@ export default function CoachPage() {
       </div>
 
       {isAnthropicLocked && anthropicProvider?.reason && (
-        <div className="mb-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] text-warning flex items-center justify-between gap-2 shrink-0">
+        <div className="mb-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] text-warning flex items-center justify-between gap-2 shrink-0">
           <span className="inline-flex items-center gap-1.5 flex-1 min-w-0 whitespace-nowrap">
             <KeyRound className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">BYOK in Settings for unlimited chat.</span>

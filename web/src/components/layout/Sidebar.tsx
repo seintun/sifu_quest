@@ -111,16 +111,16 @@ export function MobileSidebar() {
   const [open, setOpen] = useState(false)
 
   return (
-    <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-surface border-b border-border">
-      <div className="flex items-center justify-between p-3">
-        <h1 className="font-display text-lg font-bold text-foreground">
+    <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-surface border-b border-border h-12">
+      <div className="flex h-full items-center justify-between px-3">
+        <h1 className="font-display text-base font-bold text-foreground">
           Sifu Quest
         </h1>
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger
-            render={<button className="p-2 text-muted-foreground hover:text-foreground" />}
+            render={<button className="p-1.5 text-muted-foreground hover:text-foreground" />}
           >
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {open ? <X className="h-[18px] w-[18px]" /> : <Menu className="h-[18px] w-[18px]" />}
           </SheetTrigger>
           <SheetContent side="left" className="w-56 bg-surface border-r border-border p-0">
             <SheetTitle className="sr-only">Navigation</SheetTitle>

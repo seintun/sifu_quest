@@ -205,9 +205,9 @@ export function ResponsiveChatControls(props: SharedControlProps) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
-        render={<button className="inline-flex lg:hidden items-center gap-1.5 rounded-lg border border-border px-3 h-9 text-sm text-muted-foreground hover:text-foreground hover:bg-elevated" />}
+        render={<button className="inline-flex lg:hidden items-center gap-1.5 rounded-lg border border-border px-2.5 h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-elevated" />}
       >
-        <Settings2 className="h-4 w-4" />
+        <Settings2 className="h-3.5 w-3.5" />
         Controls
       </SheetTrigger>
       <SheetContent
