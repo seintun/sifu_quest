@@ -24,13 +24,23 @@ const modeFileCache = new Map<string, string>()
 export class MemoryWriteError extends Error {
   filename: string
   dbCode?: string
+  dbMessage?: string
 
-  constructor(filename: string, dbCode?: string) {
-    super(`Failed to save ${filename}`)
+  constructor(filename: string, dbCode?: string, dbMessage?: string) {
+    const suffix = [dbCode ? `code=${dbCode}` : null, dbMessage ? `message=${dbMessage}` : null]
+      .filter(Boolean)
+      .join(' ')
+    super(suffix ? `Failed to save ${filename} (${suffix})` : `Failed to save ${filename}`)
     this.name = 'MemoryWriteError'
     this.filename = filename
     this.dbCode = dbCode
+    this.dbMessage = dbMessage
   }
+}
+
+export interface MemoryBatchEntry {
+  filename: string
+  content: string
 }
 
 function validateMemoryFile(filename: string): void {
@@ -156,7 +166,7 @@ export async function writeMemoryFile(
 
   if (error) {
     console.error(`Error writing memory file ${filename}:`, error)
-    throw new MemoryWriteError(filename, error.code)
+    throw new MemoryWriteError(filename, error.code, error.message)
   }
 
   // The database trigger 'snapshot_memory_version' will automatically record 
@@ -173,6 +183,50 @@ export async function writeMemoryFile(
       version: nextVersion,
       change_source: changeSource
     })
+}
+
+export async function writeMemoryFilesBatch(
+  userId: string,
+  entries: MemoryBatchEntry[],
+  changeSource: string = 'manual',
+): Promise<void> {
+  if (entries.length === 0) {
+    return
+  }
+
+  for (const entry of entries) {
+    validateMemoryFile(entry.filename)
+  }
+
+  const supabase = createAdminClient()
+  const payload = entries.map((entry) => ({
+    filename: entry.filename,
+    content: entry.content,
+  }))
+
+  const { error } = await supabase.rpc('bulk_upsert_memory_files', {
+    user_id_param: userId,
+    entries_param: payload,
+    change_source_param: changeSource,
+  })
+
+  if (!error) {
+    return
+  }
+
+  const missingRpc =
+    error.code === '42883' ||
+    error.code === 'PGRST202' ||
+    (error.message ?? '').includes('bulk_upsert_memory_files')
+
+  if (missingRpc) {
+    await Promise.all(
+      entries.map((entry) => writeMemoryFile(userId, entry.filename, entry.content, changeSource)),
+    )
+    return
+  }
+
+  throw new MemoryWriteError('batch', error.code, error.message)
 }
 
 export function getAllowedMemoryFiles(): string[] {

@@ -1,7 +1,6 @@
 'use client'
 
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { getPlanTimelineMeta, parseProfileSnapshot } from '@/lib/profile-timeline'
 import { cn } from '@/lib/utils'
 import {
     BookOpen,
@@ -18,11 +17,11 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 const NAV_ITEMS = [
   { href: '/',              label: 'Dashboard',      icon: LayoutDashboard, color: 'streak' },
-  { href: '/plan',          label: 'Plan',           icon: ClipboardList,   color: 'plan' },
+  { href: '/plan',          label: 'Game Plan',      icon: ClipboardList,   color: 'plan' },
   { href: '/calendar',      label: 'Calendar',       icon: Calendar,        color: 'streak' },
   { href: '/dsa',           label: 'DSA Tracker',    icon: Code2,           color: 'dsa' },
   { href: '/system-design', label: 'System Design',  icon: Network,         color: 'design' },
@@ -43,29 +42,10 @@ const COLOR_CLASSES: Record<string, { active: string; border: string }> = {
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
-  const [planLabel, setPlanLabel] = useState('Plan')
-
-  useEffect(() => {
-    let active = true
-
-    fetch('/api/memory?file=profile.md')
-      .then(res => res.json())
-      .then(data => {
-        if (!active) return
-        const profile = parseProfileSnapshot(typeof data.content === 'string' ? data.content : '')
-        setPlanLabel(getPlanTimelineMeta(profile.timeline).planLabel)
-      })
-      .catch(() => {})
-
-    return () => {
-      active = false
-    }
-  }, [])
 
   return (
     <nav className="flex flex-col gap-1">
       {NAV_ITEMS.map((item) => {
-        const label = item.href === '/plan' ? planLabel : item.label
         const isActive = pathname === item.href
         const colors = COLOR_CLASSES[item.color]
         const Icon = item.icon
@@ -83,7 +63,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             )}
           >
             <Icon className="h-4 w-4" />
-            {label}
+            {item.label}
           </Link>
         )
       })}

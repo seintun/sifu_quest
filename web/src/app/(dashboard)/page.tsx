@@ -1,8 +1,17 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { DOMAIN_COLORS } from '@/lib/theme'
+import {
+  type OnboardingEnrichmentAnswers,
+  LEARNING_STYLE_OPTIONS,
+  STRENGTH_OPTIONS,
+  TARGET_COMPANY_OPTIONS,
+  TECH_STACK_OPTIONS,
+  createEmptyEnrichmentAnswers,
+} from '@/lib/onboarding-v2'
 import {
   ArrowRight,
   BookOpen,
@@ -36,6 +45,22 @@ interface DashboardMetrics {
   planLabel: string
   currentMonth: number
   currentPlanPeriodLabel: string
+}
+
+type EnrichmentPromptKey = 'techStack' | 'targetCompanies' | 'learningStyle' | 'strengths'
+
+type OnboardingStateResponse = {
+  onboarding: {
+    status: 'not_started' | 'in_progress' | 'core_complete' | 'enriched_complete'
+    nextPromptKey: EnrichmentPromptKey | null
+  }
+  plan: {
+    status: 'not_queued' | 'queued' | 'running' | 'ready' | 'failed'
+    lastErrorCode: string | null
+  }
+  draft: {
+    enrichment?: Partial<OnboardingEnrichmentAnswers>
+  }
 }
 
 function MetricCard({
@@ -142,20 +167,44 @@ function QuickActionCard({
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
+  const [onboardingState, setOnboardingState] = useState<OnboardingStateResponse | null>(null)
+  const [enrichmentDraft, setEnrichmentDraft] = useState<OnboardingEnrichmentAnswers>(createEmptyEnrichmentAnswers())
+  const [savingEnrichment, setSavingEnrichment] = useState(false)
+  const [showAllPromptOptions, setShowAllPromptOptions] = useState(false)
 
   useEffect(() => {
-    fetch('/api/progress')
-      .then(res => res.json())
-      .then(setMetrics)
+    Promise.all([
+      fetch('/api/progress').then((res) => res.json()),
+      fetch('/api/onboarding/status?kick=true')
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null),
+    ])
+      .then(([metricsData, onboardingData]) => {
+        setMetrics(metricsData)
+        if (onboardingData) {
+          const typed = onboardingData as OnboardingStateResponse
+          setOnboardingState(typed)
+          setEnrichmentDraft((prev) => ({
+            ...prev,
+            ...(typed.draft?.enrichment ?? {}),
+          }))
+        }
+      })
       .catch(() => {})
   }, [])
+
+  const nextPromptKey = onboardingState?.onboarding.nextPromptKey ?? null
+
+  useEffect(() => {
+    setShowAllPromptOptions(false)
+  }, [nextPromptKey])
 
   if (!metrics) {
     return <div className="text-muted-foreground">Loading dashboard...</div>
   }
 
   const planHref = '/plan'
-  const planLabel = metrics.planLabel || 'Active Interview Plan'
+  const planLabel = 'Game Plan'
   const overallPlanPct = metrics.planItemsTotal > 0
     ? Math.round((metrics.planItemsCompleted / metrics.planItemsTotal) * 100)
     : 0
@@ -181,6 +230,128 @@ export default function DashboardPage() {
     { href: '/settings', label: 'Account Settings', hint: 'Update your profile and API key', icon: Settings, domain: 'streak' },
   ]
 
+  const planStatus = onboardingState?.plan.status ?? 'ready'
+
+  const enrichmentPromptConfig: Record<
+    EnrichmentPromptKey,
+    {
+      title: string
+      hint: string
+      options: Array<{ value: string; label: string }>
+      customField: keyof OnboardingEnrichmentAnswers
+      valuesField: keyof OnboardingEnrichmentAnswers
+      max: number
+    }
+  > = {
+    techStack: {
+      title: 'Add your primary tech stack',
+      hint: 'Pick up to 8 technologies that reflect your current stack.',
+      options: TECH_STACK_OPTIONS,
+      customField: 'techStackCustom',
+      valuesField: 'techStack',
+      max: 8,
+    },
+    targetCompanies: {
+      title: 'Add target companies or tiers',
+      hint: 'Pick up to 8 targets to personalize company prep.',
+      options: TARGET_COMPANY_OPTIONS,
+      customField: 'targetCompaniesCustom',
+      valuesField: 'targetCompanies',
+      max: 8,
+    },
+    learningStyle: {
+      title: 'How do you learn best?',
+      hint: 'Pick up to 3 preferences so coaching tone matches your style.',
+      options: LEARNING_STYLE_OPTIONS,
+      customField: 'learningStyleCustom',
+      valuesField: 'learningStyle',
+      max: 3,
+    },
+    strengths: {
+      title: 'What are your strongest areas?',
+      hint: 'Pick up to 3 strengths to avoid over-practicing what you already know.',
+      options: STRENGTH_OPTIONS,
+      customField: 'strengthsCustom',
+      valuesField: 'strengths',
+      max: 3,
+    },
+  }
+
+  const activePrompt = nextPromptKey ? enrichmentPromptConfig[nextPromptKey] : null
+  const activePromptOptions = activePrompt?.options ?? []
+  const hasMorePromptOptions = activePromptOptions.length > 5
+
+  function toggleEnrichmentValue(
+    field: keyof OnboardingEnrichmentAnswers,
+    value: string,
+    maxCount: number,
+  ) {
+    setEnrichmentDraft((prev) => {
+      const current = Array.isArray(prev[field]) ? (prev[field] as string[]) : []
+      const next = current.includes(value)
+        ? current.filter((item) => item !== value)
+        : current.length >= maxCount
+          ? current
+          : [...current, value]
+      return {
+        ...prev,
+        [field]: next,
+      }
+    })
+  }
+
+  async function saveEnrichmentPrompt() {
+    if (!activePrompt || !nextPromptKey) {
+      return
+    }
+    setSavingEnrichment(true)
+    try {
+      const response = await fetch('/api/onboarding/enrichment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enrichment: enrichmentDraft }),
+      })
+      if (!response.ok) {
+        return
+      }
+
+      const responseData = await response.json().catch(() => null) as
+        | { onboarding?: OnboardingStateResponse['onboarding']; plan?: { status?: OnboardingStateResponse['plan']['status'] } }
+        | null
+
+      if (responseData?.onboarding) {
+        setOnboardingState((prev) => ({
+          onboarding: responseData.onboarding as OnboardingStateResponse['onboarding'],
+          plan: {
+            status: responseData.plan?.status ?? prev?.plan.status ?? 'queued',
+            lastErrorCode: prev?.plan.lastErrorCode ?? null,
+          },
+          draft: {
+            enrichment: enrichmentDraft,
+          },
+        }))
+      }
+
+      // Refresh latest draft/status without blocking the save interaction.
+      void fetch('/api/onboarding/status')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((refreshed) => {
+          if (!refreshed) {
+            return
+          }
+          const typed = refreshed as OnboardingStateResponse
+          setOnboardingState(typed)
+          setEnrichmentDraft((prev) => ({
+            ...prev,
+            ...(typed.draft?.enrichment ?? {}),
+          }))
+        })
+        .catch(() => {})
+    } finally {
+      setSavingEnrichment(false)
+    }
+  }
+
   return (
     <div className="space-y-6 max-w-6xl">
       <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-surface via-elevated/40 to-surface">
@@ -192,9 +363,6 @@ export default function DashboardPage() {
               <h1 className="font-display text-2xl font-bold">Dashboard</h1>
               <p className="text-muted-foreground text-sm mt-1">Your job search at a glance</p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="rounded-md border border-plan/30 bg-plan/10 px-2.5 py-1 text-xs font-medium text-plan">
-                  {planLabel}
-                </span>
                 <span className="rounded-md border border-border bg-elevated/70 px-2.5 py-1 text-xs text-muted-foreground">
                   {overallPlanPct}% complete
                 </span>
@@ -221,6 +389,101 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+
+      {(planStatus === 'queued' || planStatus === 'running' || planStatus === 'failed') && (
+        <Card className="border border-plan/30 bg-plan/10">
+          <CardContent className="p-4">
+            {planStatus === 'failed' ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-plan">Plan generation needs a retry</p>
+                <p className="text-xs text-muted-foreground">
+                  Any new responses you share help personalize your guidance. Open Game Plan and refresh to regenerate a tailored plan.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-plan">Your personalized plan is being generated</p>
+                <p className="text-xs text-muted-foreground">
+                  Keep sharing updates and questions. They improve personalization, and you can generate a new Game Plan anytime for refreshed recommendations.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {activePrompt && (
+        <Card className="border border-border/70 bg-surface">
+          <CardHeader className="border-b border-border/40 px-4 pt-2.5 pb-1.5">
+            <CardTitle className="text-sm font-medium leading-tight">{activePrompt.title}</CardTitle>
+            <p className="text-xs text-muted-foreground">{activePrompt.hint}</p>
+          </CardHeader>
+          <CardContent className="space-y-2 px-4 pt-1.5 pb-2.5">
+            <div className="flex flex-wrap gap-1.5">
+              {activePromptOptions.map((option, index) => {
+                const values = enrichmentDraft[activePrompt.valuesField] as string[]
+                const active = values.includes(option.value)
+                const hiddenOnMobile = index >= 5 && !showAllPromptOptions
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() =>
+                      toggleEnrichmentValue(activePrompt.valuesField, option.value, activePrompt.max)
+                    }
+                    className={cn(
+                      'inline-flex items-center rounded-full border px-2.5 py-1 text-xs transition-all duration-150 cursor-pointer',
+                      active
+                        ? 'bg-primary text-primary-foreground border-primary font-medium'
+                        : 'bg-surface border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
+                      hiddenOnMobile && 'hidden sm:inline-flex',
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                )
+              })}
+              {hasMorePromptOptions && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllPromptOptions((prev) => !prev)}
+                  className={cn(
+                    'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium transition-all duration-150 cursor-pointer sm:hidden',
+                    showAllPromptOptions
+                      ? 'bg-streak/20 border-streak/60 text-streak shadow-glow-streak'
+                      : 'bg-plan/20 border-plan/60 text-plan shadow-glow-plan hover:bg-plan/30',
+                  )}
+                >
+                  {showAllPromptOptions ? 'View less' : 'View more'}
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                value={String(enrichmentDraft[activePrompt.customField] ?? '')}
+                onChange={(event) =>
+                  setEnrichmentDraft((prev) => ({
+                    ...prev,
+                    [activePrompt.customField]: event.target.value,
+                  }))
+                }
+                placeholder="Optional detail"
+                className="h-8 bg-surface border-border text-sm flex-1"
+              />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => void saveEnrichmentPrompt()}
+                  disabled={savingEnrichment}
+                  className="h-8 rounded-md border border-border bg-elevated px-3 text-xs hover:bg-elevated/70 disabled:opacity-50"
+                >
+                  {savingEnrichment ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Metrics Grid */}
       <div className="max-h-[33vh] overflow-y-auto pr-1 sm:max-h-none sm:overflow-visible sm:pr-0">

@@ -83,7 +83,7 @@ You ←→ Sifu Quest (Next.js on Vercel) ←→ Claude AI (Anthropic)
 ```
 
 1. **Sign in** with Google or try as a Guest (free mode starts without personal key)
-2. **Complete onboarding** — Sifu asks a few questions and builds your personalized coaching profile
+2. **Complete onboarding** — finish a fast 4-6 step core setup; Sifu queues your personalized plan in the background
 3. **Pick a mode** (DSA, System Design, Interview, Job Search, or Business Ideas)
 4. **Start learning** — Sifu reads your Supabase memory files to give context-aware coaching
 5. **Track progress** — your dashboard updates automatically as you log problems, toggle plan items, and chat
@@ -116,8 +116,10 @@ npm run dev
 |----------|--------------|
 | **[docs/technical/](./docs/technical/)** | Architecture diagrams, database schema, API reference, security model |
 | **[docs/technical/provider-pricing-roadmap.md](./docs/technical/provider-pricing-roadmap.md)** | Technical decision roadmap for OpenRouter + Anthropic provider strategy, pricing policy, and chat telemetry |
+| **[docs/technical/onboarding-v2-technical-decisions.md](./docs/technical/onboarding-v2-technical-decisions.md)** | Technical decisions for onboarding v2 queueing, regeneration, migration handling, and UX states |
 | **[docs/setup/](./docs/setup/)** | Step-by-step local development setup and Vercel production deployment |
 | **[docs/project/roadmap.md](./docs/project/roadmap.md)** | The comprehensive product roadmap and design system for Sifu Quest |
+| **[docs/project/onboarding-v2-plan-revision.md](./docs/project/onboarding-v2-plan-revision.md)** | Plan-vs-shipped reconciliation and additional scope added during onboarding v2 delivery |
 
 ---
 

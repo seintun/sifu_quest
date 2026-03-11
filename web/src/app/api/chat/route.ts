@@ -34,6 +34,21 @@ const MODE_TO_FILES: Record<string, { mode: string; memory: string[] }> = {
   'business-ideas': { mode: 'business-ideas.md', memory: ['profile.md', 'ideas.md'] },
 }
 
+function getEnrichmentCoachQuestion(promptKey: string | null): string | null {
+  switch (promptKey) {
+    case 'techStack':
+      return 'Before we start, what is your primary tech stack right now?'
+    case 'targetCompanies':
+      return 'Before we start, what companies or company tiers are you targeting most?'
+    case 'learningStyle':
+      return 'Before we start, how do you prefer to learn during prep sessions?'
+    case 'strengths':
+      return 'Before we start, what are your strongest technical areas today?'
+    default:
+      return null
+  }
+}
+
 type StreamResult = {
   assistantContent: string
   usage: TokenUsage
@@ -337,12 +352,30 @@ async function buildSystemPrompt(
   }
 
   if (isGreeting) {
+    let enrichmentQuestion: string | null = null
+    try {
+      const supabaseAdmin = createAdminClient()
+      const { data } = await supabaseAdmin
+        .from('user_profiles')
+        .select('onboarding_status, onboarding_next_prompt_key')
+        .eq('id', userId)
+        .maybeSingle()
+      if (data?.onboarding_status === 'core_complete') {
+        enrichmentQuestion = getEnrichmentCoachQuestion(data.onboarding_next_prompt_key)
+      }
+    } catch {
+      // No-op: greeting can continue without enrichment prompt.
+    }
+
     const nameMatch = profileContent.match(/\*\*Name:\*\*\s*(.+)/)
     const userName = nameMatch ? nameMatch[1].trim() : null
     const nameInstruction = userName
       ? `Greet the user as "${userName}" — this name comes directly from their memory profile.`
       : 'No name found in memory — use a neutral greeting without fabricating a name.'
-    systemPrompt += `\n\n---\n## Greeting Instruction\n\nThe user just opened this mastery mode. Write a warm, concise welcome (2-4 sentences). ${nameInstruction} Reference their past progress from memory if relevant. End with one open question to kick off the session.`
+    const enrichmentInstruction = enrichmentQuestion
+      ? `After the welcome, ask exactly one onboarding enrichment question: "${enrichmentQuestion}" Do not ask additional questions in the same message.`
+      : 'End with one open question to kick off the session.'
+    systemPrompt += `\n\n---\n## Greeting Instruction\n\nThe user just opened this mastery mode. Write a warm, concise welcome (2-4 sentences). ${nameInstruction} Reference their past progress from memory if relevant. ${enrichmentInstruction}`
   }
 
   return systemPrompt
