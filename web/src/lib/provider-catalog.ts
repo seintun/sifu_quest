@@ -1,4 +1,5 @@
 import 'server-only'
+import { unstable_cache } from 'next/cache'
 
 import {
   ANTHROPIC_MODEL_CATALOG,
@@ -26,6 +27,12 @@ type OpenRouterCache = {
 }
 
 let openRouterCache: OpenRouterCache | null = null
+
+const getCachedOpenRouterFreeModels = unstable_cache(
+  async () => fetchOpenRouterFreeModels(fetch),
+  ['openrouter-free-models'],
+  { revalidate: 300, tags: ['openrouter-model-catalog'] },
+)
 
 function buildFallbackOpenRouterModels(): ChatModelDescriptor[] {
   return OPENROUTER_STATIC_FREE_MODEL_FALLBACKS.map((id) => ({
@@ -82,6 +89,10 @@ async function fetchOpenRouterFreeModels(fetchImpl: typeof fetch = fetch): Promi
 }
 
 export async function getOpenRouterFreeModels(fetchImpl: typeof fetch = fetch): Promise<ChatModelDescriptor[]> {
+  if (fetchImpl === fetch) {
+    return getCachedOpenRouterFreeModels()
+  }
+
   const now = Date.now()
   if (openRouterCache && openRouterCache.expiresAt > now) {
     return openRouterCache.models
