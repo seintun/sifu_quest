@@ -1,5 +1,9 @@
 import { auth } from '@/auth'
 import { ensureUserProfile } from '@/lib/account-state'
+import {
+  isMissingMessageTelemetryColumnError,
+  isMissingSessionTelemetryColumnError,
+} from '@/lib/chat-schema-compat'
 import { resolveProviderSelection } from '@/lib/chat-selection'
 import { computeFreeQuota } from '@/lib/free-quota'
 import { hasEncryptedProviderApiKey } from '@/lib/provider-api-keys'
@@ -9,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 const CHAT_SESSION_UNAVAILABLE_MESSAGE = 'We could not load your chat right now. Please refresh and try again.'
+const CHAT_SCHEMA_REQUIRED_MESSAGE = 'Database schema is out of date. Apply migration 20260310224500_chat_provider_model_telemetry.sql and retry.'
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,6 +46,12 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (sessionError && sessionError.code !== 'PGRST116') {
+      if (isMissingSessionTelemetryColumnError(sessionError)) {
+        return NextResponse.json(
+          { error: 'db_migration_required', message: CHAT_SCHEMA_REQUIRED_MESSAGE },
+          { status: 503 },
+        )
+      }
       console.error(sessionError)
       return NextResponse.json(
         { error: 'chat_session_unavailable', message: CHAT_SESSION_UNAVAILABLE_MESSAGE },
@@ -92,6 +103,12 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: true })
 
     if (messagesError) {
+      if (isMissingMessageTelemetryColumnError(messagesError)) {
+        return NextResponse.json(
+          { error: 'db_migration_required', message: CHAT_SCHEMA_REQUIRED_MESSAGE },
+          { status: 503 },
+        )
+      }
       console.error(messagesError)
       return NextResponse.json(
         { error: 'chat_session_unavailable', message: CHAT_SESSION_UNAVAILABLE_MESSAGE },
@@ -184,6 +201,12 @@ export async function POST(request: NextRequest) {
     const freeQuota = computeFreeQuota(userProfile)
 
     if (error) {
+      if (isMissingSessionTelemetryColumnError(error)) {
+        return NextResponse.json(
+          { error: 'db_migration_required', message: CHAT_SCHEMA_REQUIRED_MESSAGE },
+          { status: 503 },
+        )
+      }
       console.error(error)
       if (error.code === '23503') {
         return NextResponse.json(

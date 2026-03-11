@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import { decryptKey } from '@/lib/apikey'
 import { ensureUserProfile, touchUserLastActiveAt } from '@/lib/account-state'
 import { estimateCostMicrousd, normalizeTokenUsage, type TokenUsage } from '@/lib/chat-usage'
+import { isMissingSessionTelemetryColumnError } from '@/lib/chat-schema-compat'
 import { resolveProviderSelection } from '@/lib/chat-selection'
 import {
   OPENROUTER_FREE_ROUTER_MODEL,
@@ -19,6 +20,7 @@ import { NextRequest } from 'next/server'
 export const runtime = 'nodejs'
 const CHAT_UNAVAILABLE_MESSAGE = 'We hit a temporary issue loading your workspace. Please try again in a moment.'
 const CHAT_STREAM_ERROR_MESSAGE = 'We hit a temporary issue generating a response. Please try again.'
+const CHAT_SCHEMA_REQUIRED_MESSAGE = 'Database schema is out of date. Apply migration 20260310224500_chat_provider_model_telemetry.sql and retry.'
 
 const MODE_TO_FILES: Record<string, { mode: string; memory: string[] }> = {
   dsa: { mode: 'dsa.md', memory: ['profile.md', 'dsa-patterns.md', 'progress.md'] },
@@ -346,12 +348,32 @@ export async function POST(request: NextRequest) {
     let sessionPreferenceModel: string | null = null
 
     if (sessionId) {
-      const { data: ownedSession } = await supabase
+      const { data: ownedSession, error: ownedSessionError } = await supabase
         .from('chat_sessions')
         .select('id, provider, model')
         .eq('id', sessionId)
         .eq('user_id', userId)
         .maybeSingle()
+
+      if (ownedSessionError) {
+        if (isMissingSessionTelemetryColumnError(ownedSessionError)) {
+          return new Response(JSON.stringify({
+            error: 'db_migration_required',
+            message: CHAT_SCHEMA_REQUIRED_MESSAGE,
+          }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        }
+
+        return new Response(JSON.stringify({
+          error: 'chat_unavailable',
+          message: CHAT_UNAVAILABLE_MESSAGE,
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
 
       if (ownedSession) {
         sessionPreferenceProvider = ownedSession.provider

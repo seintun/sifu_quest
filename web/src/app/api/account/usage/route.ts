@@ -1,9 +1,11 @@
 import { auth } from '@/auth'
+import { isMissingMessageTelemetryColumnError } from '@/lib/chat-schema-compat'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
+const CHAT_SCHEMA_REQUIRED_MESSAGE = 'Database schema is out of date. Apply migration 20260310224500_chat_provider_model_telemetry.sql and retry.'
 
 type UsageAccumulator = {
   userTurns: number
@@ -52,6 +54,12 @@ export async function GET() {
       .order('created_at', { ascending: false })
 
     if (messagesError) {
+      if (isMissingMessageTelemetryColumnError(messagesError)) {
+        return NextResponse.json(
+          { error: 'db_migration_required', message: CHAT_SCHEMA_REQUIRED_MESSAGE },
+          { status: 503 },
+        )
+      }
       throw new Error(messagesError.message)
     }
 
