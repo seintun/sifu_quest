@@ -8,6 +8,11 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
     {
+      global: {
+        headers: {
+          'x-app-env': process.env.NEXT_PUBLIC_VERCEL_ENV || 'local',
+        },
+      },
       cookies: {
         getAll() {
           return cookieStore.getAll()

@@ -13,6 +13,11 @@ export function createAdminClient() {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       {
+        global: {
+          headers: {
+            'x-app-env': process.env.NEXT_PUBLIC_VERCEL_ENV || 'local',
+          },
+        },
         auth: {
           autoRefreshToken: false,
           persistSession: false,
