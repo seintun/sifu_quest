@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { signOut } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
@@ -76,6 +77,14 @@ type OnboardingStateResponse = {
 }
 
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-muted-foreground">Loading settings...</div>}>
+      <SettingsPageContent />
+    </Suspense>
+  )
+}
+
+function SettingsPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 

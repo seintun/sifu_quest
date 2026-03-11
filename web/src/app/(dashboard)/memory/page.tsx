@@ -379,14 +379,20 @@ export default function MemoryPage() {
 
       <div className="flex flex-1 min-h-0 gap-4">
         <div className="hidden w-56 shrink-0 overflow-y-auto py-1 md:block">
-          {files.length > 0 ? (
+          {(!files.length && listError) ? (
+            <p className="text-sm text-muted-foreground">No memory files are available yet.</p>
+          ) : !files.length ? (
+            <div className="space-y-2 animate-pulse">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex h-11 w-full items-center gap-2.5 rounded-xl px-3 py-2.5 bg-muted/20" />
+              ))}
+            </div>
+          ) : (
             <FileList
               files={files}
               selectedFile={selectedFile}
               onSelect={handleSelectFile}
             />
-          ) : (
-            <p className="text-sm text-muted-foreground">No memory files are available yet.</p>
           )}
         </div>
 
@@ -412,12 +418,14 @@ export default function MemoryPage() {
 
           <div data-testid="memory-reader" className="memory-prose flex-1 min-h-0 overflow-y-auto">
             <div className="max-w-none px-3 py-3 sm:px-4 sm:py-4 md:max-w-3xl md:px-5 md:py-5">
-              {loading ? (
-                <div className="space-y-3">
-                  <div className="h-4 w-11/12 animate-pulse rounded bg-elevated/50" />
-                  <div className="h-4 w-10/12 animate-pulse rounded bg-elevated/50" />
-                  <div className="h-4 w-8/12 animate-pulse rounded bg-elevated/50" />
-                  <div className="h-4 w-9/12 animate-pulse rounded bg-elevated/50" />
+              {(loading && !content) ? (
+                <div className="space-y-3 animate-pulse">
+                  <div className="h-8 w-1/3 bg-muted rounded-md mb-6" />
+                  <div className="h-4 w-11/12 rounded bg-muted/40" />
+                  <div className="h-4 w-10/12 rounded bg-muted/40" />
+                  <div className="h-4 w-8/12 rounded bg-muted/40" />
+                  <div className="h-4 w-9/12 rounded bg-muted/40" />
+                  <div className="h-10 w-full mt-6 rounded-md bg-muted/20" />
                 </div>
               ) : showError ? (
                 <div className="rounded-xl border border-danger/40 bg-danger/10 p-4 text-sm">

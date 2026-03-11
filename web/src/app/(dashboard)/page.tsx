@@ -63,6 +63,94 @@ type OnboardingStateResponse = {
   }
 }
 
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6 max-w-6xl animate-pulse">
+      {/* Header Skeleton */}
+      <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-surface via-elevated/40 to-surface p-5 sm:p-6">
+        <div className="space-y-4">
+          <div className="h-8 w-48 bg-muted rounded-md" />
+          <div className="h-4 w-64 bg-muted/60 rounded-md" />
+          <div className="mt-3 flex gap-2">
+            <div className="h-6 w-24 bg-muted/80 rounded-md" />
+            <div className="h-6 w-24 bg-muted/80 rounded-md" />
+          </div>
+        </div>
+      </section>
+
+      {/* Metrics Grid Skeleton */}
+      <div>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="h-[104px] border-border bg-surface">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex justify-between items-start">
+                  <div className="space-y-3">
+                    <div className="h-3 w-20 bg-muted rounded" />
+                    <div className="h-8 w-12 bg-muted/80 rounded" />
+                  </div>
+                  <div className="h-7 w-7 sm:h-8 sm:w-8 bg-muted rounded-lg" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Quick Actions Skeleton */}
+      <section className="space-y-3">
+        <div className="h-5 w-32 bg-muted rounded" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="h-[88px] border-border bg-surface">
+              <CardContent className="p-4">
+                <div className="flex gap-4 items-start">
+                  <div className="h-7 w-7 bg-muted rounded-md shrink-0" />
+                  <div className="space-y-2 w-full">
+                    <div className="h-4 w-24 bg-muted rounded" />
+                    <div className="h-3 w-40 bg-muted/60 rounded" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      {/* Bottom Layout Skeleton */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+        <Card className="xl:col-span-2 border-border bg-surface h-[200px]">
+          <CardHeader className="pb-3 border-b border-border/40">
+            <div className="h-5 w-32 bg-muted rounded" />
+          </CardHeader>
+          <CardContent className="space-y-6 pt-4">
+            <div className="space-y-2">
+              <div className="h-3 w-1/4 bg-muted/60 rounded" />
+              <div className="h-2 w-full bg-muted rounded-full" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-3 w-1/4 bg-muted/60 rounded" />
+              <div className="h-2 w-full bg-muted rounded-full" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border bg-surface h-[200px]">
+          <CardHeader className="pb-3 border-b border-border/40">
+            <div className="h-5 w-32 bg-muted rounded" />
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-2 gap-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-14 bg-muted/30 rounded-lg" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
 function MetricCard({
   title,
   value,
@@ -200,7 +288,7 @@ export default function DashboardPage() {
   }, [nextPromptKey])
 
   if (!metrics) {
-    return <div className="text-muted-foreground">Loading dashboard...</div>
+    return <DashboardSkeleton />
   }
 
   const planHref = '/plan'

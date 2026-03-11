@@ -50,9 +50,11 @@ function intensityClass(count: number): string {
   return 'bg-foreground/[0.15]'
 }
 
+
+
 export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [activities, setActivities] = useState<Map<string, DayActivity>>(new Map())
+  const [activities, setActivities] = useState<Map<string, DayActivity> | null>(null)
   const [selectedDay, setSelectedDay] = useState<DayActivity | null>(null)
   const [streak, setStreak] = useState(0)
 
@@ -162,18 +164,28 @@ export default function CalendarPage() {
         </div>
 
         {/* Streak Counter */}
-        <Card className="bg-streak/10 border border-streak/30">
-          <CardContent className="p-3 flex items-center gap-2">
-            <Flame className="h-5 w-5 text-streak" />
-            <span className={cn(
-              "text-3xl font-display font-bold tabular-nums",
-              streak >= 7 ? "text-streak animate-streak-glow" : "text-foreground"
-            )}>
-              {streak}
-            </span>
-            <span className="text-xs text-muted-foreground">day streak</span>
-          </CardContent>
-        </Card>
+        {activities ? (
+          <Card className="bg-streak/10 border border-streak/30">
+            <CardContent className="p-3 flex items-center gap-2">
+              <Flame className="h-5 w-5 text-streak" />
+              <span className={cn(
+                "text-3xl font-display font-bold tabular-nums",
+                streak >= 7 ? "text-streak animate-streak-glow" : "text-foreground"
+              )}>
+                {streak}
+              </span>
+              <span className="text-xs text-muted-foreground">day streak</span>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="bg-muted/10 border-muted/20 animate-pulse">
+            <CardContent className="p-3 flex items-center gap-2">
+              <div className="h-5 w-5 bg-muted rounded-full" />
+              <div className="h-8 w-8 bg-muted rounded" />
+              <div className="h-4 w-16 bg-muted/60 rounded" />
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Month Navigation */}
@@ -219,46 +231,52 @@ export default function CalendarPage() {
               <div key={`empty-${i}`} className="aspect-square" />
             ))}
 
-            {days.map(day => {
-              const dateKey = format(day, 'yyyy-MM-dd')
-              const activity = activities.get(dateKey)
-              const today = isToday(day)
-              const selected = selectedDay && isSameDay(day, selectedDay.date)
-              const count = activity ? totalActivity(activity) : 0
+            {!activities ? (
+              Array.from({ length: days.length }).map((_, i) => (
+                <div key={`skeleton-${i}`} className="aspect-square rounded-md bg-muted/20 animate-pulse" />
+              ))
+            ) : (
+              days.map(day => {
+                const dateKey = format(day, 'yyyy-MM-dd')
+                const activity = activities.get(dateKey)
+                const today = isToday(day)
+                const selected = selectedDay && isSameDay(day, selectedDay.date)
+                const count = activity ? totalActivity(activity) : 0
 
-              return (
-                <button
-                  key={dateKey}
-                  onClick={() => setSelectedDay(activity || emptyActivity(day))}
-                  className={cn(
-                    'aspect-square rounded-md flex flex-col items-center justify-center gap-0.5 text-xs transition-colors relative',
-                    today ? 'ring-1 ring-streak/50' : '',
-                    selected ? 'bg-elevated' : intensityClass(count),
-                    !selected && 'hover:bg-elevated/50',
-                  )}
-                >
-                  <span className={cn(
-                    'tabular-nums',
-                    today ? 'text-streak font-medium' : 'text-muted-foreground'
-                  )}>
-                    {format(day, 'd')}
-                  </span>
-                  {activity && (
-                    <div className="flex gap-0.5">
-                      {activity.dsa > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-dsa inline-block" />
-                      )}
-                      {activity.jobs > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-jobs inline-block" />
-                      )}
-                      {activity.design > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-design inline-block" />
-                      )}
-                    </div>
-                  )}
-                </button>
-              )
-            })}
+                return (
+                  <button
+                    key={dateKey}
+                    onClick={() => setSelectedDay(activity || emptyActivity(day))}
+                    className={cn(
+                      'aspect-square rounded-md flex flex-col items-center justify-center gap-0.5 text-xs transition-colors relative',
+                      today ? 'ring-1 ring-streak/50' : '',
+                      selected ? 'bg-elevated' : intensityClass(count),
+                      !selected && 'hover:bg-elevated/50',
+                    )}
+                  >
+                    <span className={cn(
+                      'tabular-nums',
+                      today ? 'text-streak font-medium' : 'text-muted-foreground'
+                    )}>
+                      {format(day, 'd')}
+                    </span>
+                    {activity && (
+                      <div className="flex gap-0.5">
+                        {activity.dsa > 0 && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-dsa inline-block" />
+                        )}
+                        {activity.jobs > 0 && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-jobs inline-block" />
+                        )}
+                        {activity.design > 0 && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-design inline-block" />
+                        )}
+                      </div>
+                    )}
+                  </button>
+                )
+              })
+            )}
           </div>
 
           {/* Legend */}

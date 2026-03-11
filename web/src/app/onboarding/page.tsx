@@ -125,6 +125,32 @@ function Chip({
   )
 }
 
+function OnboardingSkeleton() {
+  return (
+    <div className="min-h-screen flex items-center justify-center -m-6 animate-pulse">
+      <div className="w-full max-w-2xl p-8">
+        <div className="mb-8 space-y-3">
+          <div className="h-8 w-64 bg-muted rounded" />
+          <div className="h-4 w-32 bg-muted/60 rounded" />
+          <div className="mt-3 h-1.5 w-full bg-muted rounded-full" />
+        </div>
+
+        <div className="space-y-5">
+          <div className="space-y-3">
+            <div className="h-6 w-48 bg-muted rounded" />
+            <div className="h-10 w-full bg-muted/50 rounded-md" />
+          </div>
+        </div>
+
+        <div className="flex justify-between mt-8">
+          <div className="h-10 w-20 bg-muted/40 rounded-md" />
+          <div className="h-10 w-20 bg-muted/80 rounded-md" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function OnboardingPage() {
   const router = useRouter()
   const [booting, setBooting] = useState(true)
@@ -297,11 +323,7 @@ export default function OnboardingPage() {
   }, [core, enrichment, hydrated, stepIndex])
 
   if (booting) {
-    return (
-      <div className="min-h-screen flex items-center justify-center -m-6">
-        <div className="text-muted-foreground">Loading onboarding...</div>
-      </div>
-    )
+    return <OnboardingSkeleton />
   }
 
   if (submitting) {

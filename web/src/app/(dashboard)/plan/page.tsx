@@ -297,6 +297,8 @@ function hasStructuredContent(plan: ParsedPlan): boolean {
   return plan.months.length > 0 || plan.immediateSteps.length > 0 || (plan.weeklyRhythm?.length ?? 0) > 0
 }
 
+
+
 export default function PlanPage() {
   const [plan, setPlan] = useState<ParsedPlan | null>(null)
   const [rawContent, setRawContent] = useState('')
@@ -415,12 +417,55 @@ export default function PlanPage() {
     }
   }
 
-  if (!plan) {
-    return <div className="text-muted-foreground">Loading plan...</div>
-  }
-
   const title = extractTitle(rawContent)
   const mobileTitle = getMobileTitle(title)
+
+  if (!plan) {
+    return (
+      <div className="max-w-4xl space-y-4 sm:space-y-6">
+        <div>
+          <div className="flex items-start justify-between gap-3 animate-pulse">
+            <div className="space-y-2">
+              <div className="h-8 w-64 bg-muted rounded-md" />
+              <div className="h-4 w-48 bg-muted/60 rounded-md" />
+            </div>
+            <div className="h-9 w-40 bg-muted/30 rounded-md hidden sm:block" />
+          </div>
+        </div>
+
+        <Card className="border-border bg-surface animate-pulse">
+          <CardHeader className="pb-3 border-b border-border/40">
+            <div className="h-5 w-32 bg-muted rounded" />
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-16 bg-muted/30 rounded-md" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-2 mt-4 animate-pulse">
+          <div className="h-10 w-full max-w-[400px] bg-muted/30 rounded-lg" />
+          <Card className="border-border bg-surface mt-4 h-64">
+            <CardHeader>
+              <div className="h-6 w-48 bg-muted rounded" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="h-2 w-full bg-muted/50 rounded-full" />
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex gap-3">
+                  <div className="h-4 w-4 bg-muted rounded shrink-0" />
+                  <div className="h-4 w-full bg-muted/40 rounded" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
   const firstMonthValue = plan.months[0] ? `month${plan.months[0].month}` : ''
   const canRequestRefresh = planStatus !== null && planStatus !== 'queued' && planStatus !== 'running'
   const showPlanStatusBanner = shouldShowPlanStatusBanner(planStatus)
