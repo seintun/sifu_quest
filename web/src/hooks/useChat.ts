@@ -1,8 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ChatProvider, ModelAvailability } from '@/lib/chat-provider-config'
+import { consumeChatStream } from '@/lib/chat/stream-parser'
 import { applyQuotaOnChatError } from '@/lib/chat-quota-ui'
+import { buildSystemMeta, getSystemMessage, type ChatMessageMeta } from '@/lib/chat-system-messages'
+import type { ChatProvider, ModelAvailability } from '@/lib/chat-provider-config'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface FreeQuota {
   isFreeTier: boolean
@@ -12,8 +14,11 @@ export interface FreeQuota {
 }
 
 export interface ChatMessage {
+  id?: string
+  createdAt?: string
   role: 'user' | 'assistant'
   content: string
+  meta?: ChatMessageMeta
 }
 
 export interface ChatProviderOption {
@@ -42,20 +47,10 @@ export interface SessionUsageMetrics {
 
 export type StreamPhase = 'idle' | 'thinking' | 'typing'
 
-const FREE_TIER_EXHAUSTED_MESSAGE =
-  'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your key is encrypted with AES-256-CBC before storage, and your past conversation remains accessible here.'
-
-const GUEST_LIMIT_REACHED_MESSAGE =
-  'You have reached the guest limit. Please sign up to continue. After creating your account, add your own Anthropic API key in **Settings** to keep chatting securely.'
-
-const PROVIDER_KEY_REQUIRED_MESSAGE =
-  'Anthropic models require your own Anthropic API key. Add your key in **Settings** and try again.'
-
-const INVALID_PROVIDER_KEY_MESSAGE =
-  'Your saved Anthropic API key could not be used. Re-add your key in **Settings** and try again.'
-
-const CHAT_TEMPORARY_ERROR_MESSAGE =
-  'I hit a temporary issue loading your workspace. Please try again in a moment.'
+type ChatSessionPaging = {
+  hasOlder?: boolean
+  nextBefore?: string | null
+}
 
 type ChatSessionResponse = {
   session?: { id: string } | null
@@ -63,10 +58,37 @@ type ChatSessionResponse = {
   freeQuota?: FreeQuota | null
   selection?: { provider: ChatProvider; model: string }
   metrics?: SessionUsageMetrics
+  paging?: ChatSessionPaging
 }
+
+const PAGE_SIZE = 40
 
 function toMicrousdDisplay(microusd: number): string {
   return `$${(microusd / 1_000_000).toFixed(4)}`
+}
+
+function makeClientMessageId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function getMessageSignature(message: ChatMessage): string {
+  return message.id
+    ? `id:${message.id}`
+    : `${message.role}|${message.createdAt ?? ''}|${message.content}`
+}
+
+function prependOlderMessages(current: ChatMessage[], older: ChatMessage[]): ChatMessage[] {
+  if (older.length === 0) return current
+  const seen = new Set(current.map(getMessageSignature))
+  const nextOlder = older.filter((message) => {
+    const signature = getMessageSignature(message)
+    if (seen.has(signature)) return false
+    seen.add(signature)
+    return true
+  })
+
+  if (nextOlder.length === 0) return current
+  return [...nextOlder, ...current]
 }
 
 export function useChat(mode: string) {
@@ -74,6 +96,7 @@ export function useChat(mode: string) {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null)
   const [upgradeRequired, setUpgradeRequired] = useState<string | null>(null)
   const [freeQuota, setFreeQuota] = useState<FreeQuota | null>(null)
   const [providers, setProviders] = useState<ChatProviderOption[]>([])
@@ -86,20 +109,92 @@ export function useChat(mode: string) {
   const [sessionMetrics, setSessionMetrics] = useState<SessionUsageMetrics | null>(null)
   const [hasAnthropicKey, setHasAnthropicKey] = useState(false)
   const [streamPhase, setStreamPhase] = useState<StreamPhase>('idle')
+  const [hasOlderMessages, setHasOlderMessages] = useState(false)
+  const [nextBefore, setNextBefore] = useState<string | null>(null)
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+  const bootstrapAbortRef = useRef<AbortController | null>(null)
 
   const applySelection = useCallback((provider: ChatProvider, model: string) => {
     setSelectedProvider(provider)
     setSelectedModel(model)
   }, [])
 
-  // Load provider catalog + history for the current mode from DB.
-  useEffect(() => {
+  const applyPaging = useCallback((paging: ChatSessionPaging | null | undefined) => {
+    setHasOlderMessages(Boolean(paging?.hasOlder))
+    setNextBefore(paging?.nextBefore ?? null)
+  }, [])
+
+  const loadBootstrap = useCallback(async () => {
+    bootstrapAbortRef.current?.abort()
     const controller = new AbortController()
-    let cancelled = false
+    bootstrapAbortRef.current = controller
 
     setIsLoaded(false)
+    setBootstrapError(null)
+
+    try {
+      const [providersRes, sessionRes] = await Promise.all([
+        fetch('/api/chat/providers', { signal: controller.signal }),
+        fetch(`/api/chat/session?mode=${mode}&limit=${PAGE_SIZE}`, { signal: controller.signal }),
+      ])
+
+      const providerData = await providersRes.json().catch(() => ({})) as {
+        providers?: ChatProviderOption[]
+        modelsByProvider?: Record<ChatProvider, ChatModelOption[]>
+        defaults?: { provider: ChatProvider; model: string }
+        account?: { hasAnthropicKey?: boolean }
+      }
+      const sessionData = await sessionRes.json().catch(() => ({})) as ChatSessionResponse & { error?: string; message?: string }
+
+      if (!providersRes.ok) {
+        throw new Error('Failed to load providers')
+      }
+
+      if (!sessionRes.ok) {
+        throw new Error(sessionData.message || sessionData.error || 'Failed to load chat session')
+      }
+
+      if (bootstrapAbortRef.current !== controller) return
+
+      setProviders(providerData.providers ?? [])
+      setModelsByProvider(providerData.modelsByProvider ?? { openrouter: [], anthropic: [] })
+      setHasAnthropicKey(Boolean(providerData.account?.hasAnthropicKey))
+
+      if (providerData.defaults) {
+        applySelection(providerData.defaults.provider, providerData.defaults.model)
+      }
+
+      if (sessionData.session) {
+        setSessionId(sessionData.session.id)
+        setMessages(sessionData.messages || [])
+      } else {
+        setSessionId(null)
+        setMessages([])
+      }
+
+      if (sessionData.selection) {
+        applySelection(sessionData.selection.provider, sessionData.selection.model)
+      }
+
+      setSessionMetrics(sessionData.metrics ?? null)
+      setFreeQuota(sessionData.freeQuota ?? null)
+      applyPaging(sessionData.paging)
+    } catch (err) {
+      if (bootstrapAbortRef.current !== controller || (err instanceof Error && err.name === 'AbortError')) return
+      console.error('Failed to load chat bootstrap data', err)
+      setBootstrapError('Unable to load chat right now. Please retry.')
+    } finally {
+      if (bootstrapAbortRef.current === controller) {
+        setIsLoaded(true)
+        bootstrapAbortRef.current = null
+      }
+    }
+  }, [mode, applySelection, applyPaging])
+
+  useEffect(() => {
     abortRef.current?.abort()
+    bootstrapAbortRef.current?.abort()
     setIsStreaming(false)
     setSessionId(null)
     setUpgradeRequired(null)
@@ -108,68 +203,20 @@ export function useChat(mode: string) {
     setSessionMetrics(null)
     setHasAnthropicKey(false)
     setStreamPhase('idle')
+    setHasOlderMessages(false)
+    setNextBefore(null)
 
-    const load = async () => {
-      try {
-        const [providersRes, sessionRes] = await Promise.all([
-          fetch('/api/chat/providers', { signal: controller.signal }),
-          fetch(`/api/chat/session?mode=${mode}`, { signal: controller.signal }),
-        ])
-
-        const providerData = await providersRes.json().catch(() => ({})) as {
-          providers?: ChatProviderOption[]
-          modelsByProvider?: Record<ChatProvider, ChatModelOption[]>
-          defaults?: { provider: ChatProvider; model: string }
-          account?: { hasAnthropicKey?: boolean }
-        }
-        const sessionData = await sessionRes.json().catch(() => ({})) as ChatSessionResponse & { error?: string }
-
-        if (!providersRes.ok) {
-          throw new Error('Failed to load providers')
-        }
-
-        if (!sessionRes.ok) {
-          throw new Error(sessionData.error || 'Failed to load chat session')
-        }
-
-        if (cancelled) return
-
-        setProviders(providerData.providers ?? [])
-        setModelsByProvider(providerData.modelsByProvider ?? { openrouter: [], anthropic: [] })
-        setHasAnthropicKey(Boolean(providerData.account?.hasAnthropicKey))
-
-        if (providerData.defaults) {
-          applySelection(providerData.defaults.provider, providerData.defaults.model)
-        }
-
-        if (sessionData.session) {
-          setSessionId(sessionData.session.id)
-          setMessages(sessionData.messages || [])
-        }
-
-        if (sessionData.selection) {
-          applySelection(sessionData.selection.provider, sessionData.selection.model)
-        }
-
-        setSessionMetrics(sessionData.metrics ?? null)
-        setFreeQuota(sessionData.freeQuota ?? null)
-      } catch (err) {
-        if (cancelled || (err instanceof Error && err.name === 'AbortError')) return
-        console.error('Failed to load chat bootstrap data', err)
-      } finally {
-        if (!cancelled) {
-          setIsLoaded(true)
-        }
-      }
-    }
-
-    void load()
+    void loadBootstrap()
 
     return () => {
-      cancelled = true
-      controller.abort()
+      abortRef.current?.abort()
+      bootstrapAbortRef.current?.abort()
     }
-  }, [mode, applySelection])
+  }, [mode, loadBootstrap])
+
+  const reload = useCallback(() => {
+    void loadBootstrap()
+  }, [loadBootstrap])
 
   const updateProviderSelection = useCallback((provider: ChatProvider) => {
     setUpgradeRequired(null)
@@ -200,7 +247,7 @@ export function useChat(mode: string) {
         model: selectedModel,
       }),
     })
-    const data = await res.json() as ChatSessionResponse & { error?: string }
+    const data = await res.json() as ChatSessionResponse & { error?: string; message?: string }
     if (res.ok && data.session) {
       setSessionId(data.session.id)
       if (data.freeQuota) {
@@ -210,16 +257,148 @@ export function useChat(mode: string) {
         applySelection(data.selection.provider, data.selection.model)
       }
       setSessionMetrics(data.metrics ?? null)
+      applyPaging(data.paging)
       return data.session.id
     }
-    throw new Error(data.error || 'Failed to create session')
-  }, [sessionId, mode, selectedProvider, selectedModel, applySelection])
+    throw new Error(data.message || data.error || 'Failed to create session')
+  }, [sessionId, mode, selectedProvider, selectedModel, applySelection, applyPaging])
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!nextBefore || isLoadingOlder) return
+
+    setIsLoadingOlder(true)
+    try {
+      const res = await fetch(
+        `/api/chat/session?mode=${encodeURIComponent(mode)}&limit=${PAGE_SIZE}&before=${encodeURIComponent(nextBefore)}`,
+      )
+      const data = await res.json().catch(() => ({})) as ChatSessionResponse
+      if (!res.ok) {
+        return
+      }
+
+      const olderMessages = Array.isArray(data.messages) ? data.messages : []
+      setMessages((prev) => prependOlderMessages(prev, olderMessages))
+      applyPaging(data.paging)
+    } finally {
+      setIsLoadingOlder(false)
+    }
+  }, [nextBefore, isLoadingOlder, mode, applyPaging])
+
+  const processStreamResponse = useCallback(async (
+    response: Response,
+    initialMessages: ChatMessage[],
+    onForbidden: (errorCode: string | null) => void,
+  ) => {
+    if (!response.ok) {
+      let errorMessage = 'Unknown error'
+      let errorCode: string | null = null
+      try {
+        const errorData: { message?: string; error?: string } = await response.json()
+        errorMessage = errorData.message || errorData.error || errorMessage
+        errorCode = errorData.error ?? null
+      } catch {
+        // Ignore malformed error payloads.
+      }
+
+      if (response.status === 403) {
+        onForbidden(errorCode)
+        return
+      }
+
+      const safeMessage = response.status >= 500 ? getSystemMessage('chat_temporary_error') : errorMessage
+      setMessages([...initialMessages, { role: 'assistant', content: safeMessage, meta: buildSystemMeta('chat_temporary_error') }])
+      setIsStreaming(false)
+      return
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) {
+      setIsStreaming(false)
+      return
+    }
+
+    let assistantContent = ''
+    let usageApplied = false
+    let flushTimeout: ReturnType<typeof setTimeout> | null = null
+
+    const flushAssistant = () => {
+      setMessages((prev) => {
+        const updated = [...prev]
+        if (updated.length === 0 || updated[updated.length - 1].role !== 'assistant') {
+          updated.push({ id: makeClientMessageId('assistant'), role: 'assistant', content: assistantContent })
+        } else {
+          updated[updated.length - 1] = { ...updated[updated.length - 1], content: assistantContent }
+        }
+        return updated
+      })
+    }
+
+    const scheduleFlush = () => {
+      if (flushTimeout) return
+      flushTimeout = setTimeout(() => {
+        flushTimeout = null
+        flushAssistant()
+      }, 40)
+    }
+
+    await consumeChatStream(reader, (parsed) => {
+      if (parsed.text) {
+        setStreamPhase('typing')
+        assistantContent += parsed.text
+        scheduleFlush()
+      }
+
+      if (parsed.type === 'usage') {
+        usageApplied = true
+        if (parsed.provider && parsed.model) {
+          applySelection(parsed.provider, parsed.model)
+        }
+        setSessionMetrics((prev) => ({
+          userTurns: (prev?.userTurns ?? 0) + 1,
+          inputTokens: (prev?.inputTokens ?? 0) + (parsed.inputTokens ?? 0),
+          outputTokens: (prev?.outputTokens ?? 0) + (parsed.outputTokens ?? 0),
+          totalTokens: (prev?.totalTokens ?? 0) + (parsed.totalTokens ?? 0),
+          estimatedCostMicrousd: (prev?.estimatedCostMicrousd ?? 0) + (parsed.estimatedCostMicrousd ?? 0),
+        }))
+      }
+
+      if (parsed.type === 'status' && parsed.status) {
+        setStreamPhase(parsed.status)
+      }
+
+      if (parsed.error) {
+        assistantContent += `\n\nError: ${parsed.error}`
+        scheduleFlush()
+      }
+    })
+
+    if (flushTimeout) {
+      clearTimeout(flushTimeout)
+      flushTimeout = null
+    }
+
+    flushAssistant()
+
+    if (!usageApplied) {
+      setSessionMetrics((prev) => ({
+        userTurns: (prev?.userTurns ?? 0) + 1,
+        inputTokens: prev?.inputTokens ?? 0,
+        outputTokens: prev?.outputTokens ?? 0,
+        totalTokens: prev?.totalTokens ?? 0,
+        estimatedCostMicrousd: prev?.estimatedCostMicrousd ?? 0,
+      }))
+    }
+  }, [applySelection])
 
   const sendMessage = useCallback(async (userMessage: string) => {
-    const newMessages: ChatMessage[] = [
-      ...messages,
-      { role: 'user', content: userMessage },
-    ]
+    const optimisticUser: ChatMessage = {
+      id: makeClientMessageId('user'),
+      role: 'user',
+      content: userMessage,
+      createdAt: new Date().toISOString(),
+    }
+    const newMessages: ChatMessage[] = [...messages, optimisticUser]
+
     setMessages(newMessages)
     setUpgradeRequired(null)
     setIsStreaming(true)
@@ -231,7 +410,6 @@ export function useChat(mode: string) {
       !(selectedProvider === 'anthropic' && hasAnthropicKey),
     )
 
-    // Optimistically decrement quota only when provider-aware enforcement applies.
     if (shouldEnforceQuota) {
       setFreeQuota((prev) => prev && prev.isFreeTier ? { ...prev, remaining: Math.max(0, prev.remaining - 1) } : prev)
     }
@@ -255,146 +433,47 @@ export function useChat(mode: string) {
         signal: controller.signal,
       })
 
-      if (!res.ok) {
-        let errorMessage = 'Unknown error'
-        let errorCode: string | null = null
-        try {
-          const errorData: { message?: string; error?: string } = await res.json()
-          errorMessage = errorData.message || errorData.error || errorMessage
-          errorCode = errorData.error ?? null
-        } catch {
-          // Ignore malformed error payloads.
-        }
+      await processStreamResponse(res, newMessages, (errorCode) => {
+        setFreeQuota(applyQuotaOnChatError(previousQuota, errorCode))
+        const normalizedUpgradeCode =
+          errorCode === 'invalid_api_key'
+            ? 'provider_key_required'
+            : (errorCode || 'missing_api_key')
+        setUpgradeRequired(normalizedUpgradeCode)
 
-        if (res.status === 403) {
-          setFreeQuota(applyQuotaOnChatError(previousQuota, errorCode))
-          const normalizedUpgradeCode =
-            errorCode === 'invalid_api_key'
-              ? 'provider_key_required'
-              : (errorCode || 'missing_api_key')
-          setUpgradeRequired(normalizedUpgradeCode)
-          const isGuestBlocked = errorCode === 'guest_limit_reached' || errorCode === 'session_expired'
-          const isProviderKeyRequired = errorCode === 'provider_key_required' || errorCode === 'invalid_api_key'
-          setMessages([
-            ...newMessages,
-            {
-              role: 'assistant',
-              content: isProviderKeyRequired
-                ? (errorCode === 'invalid_api_key' ? INVALID_PROVIDER_KEY_MESSAGE : PROVIDER_KEY_REQUIRED_MESSAGE)
-                : isGuestBlocked
-                  ? GUEST_LIMIT_REACHED_MESSAGE
-                  : FREE_TIER_EXHAUSTED_MESSAGE,
-            },
-          ])
-          setIsStreaming(false)
-          return
-        }
+        const isGuestBlocked = errorCode === 'guest_limit_reached' || errorCode === 'session_expired'
+        const isProviderKeyRequired = errorCode === 'provider_key_required' || errorCode === 'invalid_api_key'
 
-        setFreeQuota(previousQuota)
-        const safeMessage = res.status >= 500 ? CHAT_TEMPORARY_ERROR_MESSAGE : errorMessage
-        setMessages([...newMessages, { role: 'assistant', content: safeMessage }])
+        const systemCode = isProviderKeyRequired
+          ? (errorCode === 'invalid_api_key' ? 'invalid_provider_key' : 'provider_key_required')
+          : isGuestBlocked
+            ? 'guest_limit_reached'
+            : 'free_tier_exhausted'
+
+        setMessages([
+          ...newMessages,
+          {
+            role: 'assistant',
+            content: getSystemMessage(systemCode),
+            meta: buildSystemMeta(systemCode),
+          },
+        ])
         setIsStreaming(false)
-        return
-      }
-
-      const reader = res.body?.getReader()
-      if (!reader) {
-        setFreeQuota(previousQuota)
-        setIsStreaming(false)
-        return
-      }
-
-      const decoder = new TextDecoder()
-      let assistantContent = ''
-      let usageApplied = false
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        for (const line of decoder.decode(value, { stream: true }).split('\n')) {
-          if (!line.startsWith('data: ')) continue
-          const data = line.slice(6).trim()
-          if (data === '[DONE]') continue
-          try {
-            const parsed = JSON.parse(data) as {
-              text?: string
-              error?: string
-              type?: string
-              status?: StreamPhase
-              provider?: ChatProvider
-              model?: string
-              inputTokens?: number | null
-              outputTokens?: number | null
-              totalTokens?: number | null
-              estimatedCostMicrousd?: number | null
-            }
-
-            if (parsed.text) {
-              setStreamPhase('typing')
-              assistantContent += parsed.text
-              setMessages((prev) => {
-                const updated = [...prev]
-                if (updated.length === 0 || updated[updated.length - 1].role !== 'assistant') {
-                  updated.push({ role: 'assistant', content: assistantContent })
-                } else {
-                  updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
-                }
-                return updated
-              })
-            }
-
-            if (parsed.type === 'usage') {
-              usageApplied = true
-              if (parsed.provider && parsed.model) {
-                applySelection(parsed.provider, parsed.model)
-              }
-              setSessionMetrics((prev) => ({
-                userTurns: (prev?.userTurns ?? 0) + 1,
-                inputTokens: (prev?.inputTokens ?? 0) + (parsed.inputTokens ?? 0),
-                outputTokens: (prev?.outputTokens ?? 0) + (parsed.outputTokens ?? 0),
-                totalTokens: (prev?.totalTokens ?? 0) + (parsed.totalTokens ?? 0),
-                estimatedCostMicrousd: (prev?.estimatedCostMicrousd ?? 0) + (parsed.estimatedCostMicrousd ?? 0),
-              }))
-            }
-
-            if (parsed.type === 'status' && parsed.status) {
-              setStreamPhase(parsed.status)
-            }
-
-            if (parsed.error) {
-              assistantContent += `\n\nError: ${parsed.error}`
-              setMessages((prev) => {
-                const updated = [...prev]
-                if (updated.length === 0 || updated[updated.length - 1].role !== 'assistant') {
-                  updated.push({ role: 'assistant', content: assistantContent })
-                } else {
-                  updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
-                }
-                return updated
-              })
-            }
-          } catch {
-            // Skip malformed JSON lines.
-          }
-        }
-      }
-
-      if (!usageApplied) {
-        setSessionMetrics((prev) => ({
-          userTurns: (prev?.userTurns ?? 0) + 1,
-          inputTokens: prev?.inputTokens ?? 0,
-          outputTokens: prev?.outputTokens ?? 0,
-          totalTokens: prev?.totalTokens ?? 0,
-          estimatedCostMicrousd: prev?.estimatedCostMicrousd ?? 0,
-        }))
-      }
+      })
     } catch (err) {
       if (err instanceof Error) {
         setFreeQuota(previousQuota)
         if (err.name === 'AbortError') {
           return
         }
-        setMessages([...newMessages, { role: 'assistant', content: CHAT_TEMPORARY_ERROR_MESSAGE }])
+        setMessages([
+          ...newMessages,
+          {
+            role: 'assistant',
+            content: getSystemMessage('chat_temporary_error'),
+            meta: buildSystemMeta('chat_temporary_error'),
+          },
+        ])
       }
     } finally {
       if (abortRef.current === controller) {
@@ -403,7 +482,7 @@ export function useChat(mode: string) {
         abortRef.current = null
       }
     }
-  }, [messages, mode, ensureSession, freeQuota, selectedProvider, selectedModel, hasAnthropicKey, applySelection])
+  }, [messages, mode, ensureSession, freeQuota, selectedProvider, selectedModel, hasAnthropicKey, processStreamResponse])
 
   const greet = useCallback(async () => {
     if (isStreaming) return
@@ -431,109 +510,23 @@ export function useChat(mode: string) {
         signal: controller.signal,
       })
 
-      if (!res.ok) {
-        let errorMessage = 'Unknown error'
-        let errorCode: string | null = null
-        try {
-          const errorData: { message?: string; error?: string } = await res.json()
-          errorMessage = errorData.message || errorData.error || errorMessage
-          errorCode = errorData.error ?? null
-        } catch {
-          // Ignore malformed error payloads.
-        }
-
-        if (res.status === 403) {
-          const normalizedUpgradeCode =
-            errorCode === 'invalid_api_key'
-              ? 'provider_key_required'
-              : (errorCode || 'missing_api_key')
-          setUpgradeRequired(normalizedUpgradeCode)
-          setIsStreaming(false)
-          return
-        }
-
-        const safeMessage = res.status >= 500 ? CHAT_TEMPORARY_ERROR_MESSAGE : errorMessage
-        setMessages([{ role: 'assistant', content: safeMessage }])
+      await processStreamResponse(res, [], (errorCode) => {
+        const normalizedUpgradeCode =
+          errorCode === 'invalid_api_key'
+            ? 'provider_key_required'
+            : (errorCode || 'missing_api_key')
+        setUpgradeRequired(normalizedUpgradeCode)
         setIsStreaming(false)
-        return
-      }
-
-      const reader = res.body?.getReader()
-      if (!reader) {
-        setIsStreaming(false)
-        return
-      }
-
-      const decoder = new TextDecoder()
-      let assistantContent = ''
-      let streamError: string | null = null
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        for (const line of decoder.decode(value, { stream: true }).split('\n')) {
-          if (!line.startsWith('data: ')) continue
-          const data = line.slice(6).trim()
-          if (data === '[DONE]') continue
-          try {
-            const parsed = JSON.parse(data) as {
-              text?: string
-              error?: string
-              type?: string
-              status?: StreamPhase
-              provider?: ChatProvider
-              model?: string
-            }
-            if (parsed.text) {
-              setStreamPhase('typing')
-              assistantContent += parsed.text
-              setMessages((prev) => {
-                const updated = [...prev]
-                if (updated.length === 0 || updated[updated.length - 1].role !== 'assistant') {
-                  updated.push({ role: 'assistant', content: assistantContent })
-                } else {
-                  updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
-                }
-                return updated
-              })
-            }
-            if (parsed.type === 'status' && parsed.status) {
-              setStreamPhase(parsed.status)
-            }
-            if (parsed.type === 'usage') {
-              if (parsed.provider && parsed.model) {
-                applySelection(parsed.provider, parsed.model)
-              }
-              setSessionMetrics((prev) => ({
-                userTurns: (prev?.userTurns ?? 0) + 1,
-                inputTokens: prev?.inputTokens ?? 0,
-                outputTokens: prev?.outputTokens ?? 0,
-                totalTokens: prev?.totalTokens ?? 0,
-                estimatedCostMicrousd: prev?.estimatedCostMicrousd ?? 0,
-              }))
-            }
-            if (parsed.error) {
-              streamError = parsed.error
-              break
-            }
-          } catch {
-            // Ignore malformed JSON payloads.
-          }
-        }
-        if (streamError) {
-          break
-        }
-      }
-
-      if (streamError) {
-        assistantContent += `\n\nError: ${streamError}`
-        setMessages([{ role: 'assistant', content: assistantContent }])
-        setIsStreaming(false)
-        return
-      }
+      })
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
-        setMessages([{ role: 'assistant', content: CHAT_TEMPORARY_ERROR_MESSAGE }])
+        setMessages([
+          {
+            role: 'assistant',
+            content: getSystemMessage('chat_temporary_error'),
+            meta: buildSystemMeta('chat_temporary_error'),
+          },
+        ])
       }
     } finally {
       if (abortRef.current === controller) {
@@ -542,12 +535,14 @@ export function useChat(mode: string) {
         abortRef.current = null
       }
     }
-  }, [isStreaming, mode, ensureSession, selectedProvider, selectedModel, applySelection])
+  }, [isStreaming, mode, ensureSession, selectedProvider, selectedModel, processStreamResponse])
 
   const clearHistory = useCallback(async () => {
     setMessages([])
     setSessionId(null)
     setSessionMetrics(null)
+    setHasOlderMessages(false)
+    setNextBefore(null)
     try {
       const res = await fetch('/api/chat/session', {
         method: 'POST',
@@ -568,11 +563,12 @@ export function useChat(mode: string) {
           applySelection(data.selection.provider, data.selection.model)
         }
         setSessionMetrics(data.metrics ?? null)
+        applyPaging(data.paging)
       }
     } catch (err) {
       console.error('Failed to clear history', err)
     }
-  }, [mode, selectedProvider, selectedModel, applySelection])
+  }, [mode, selectedProvider, selectedModel, applySelection, applyPaging])
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort()
@@ -586,6 +582,8 @@ export function useChat(mode: string) {
     setMessages,
     isStreaming,
     isLoaded,
+    bootstrapError,
+    reload,
     upgradeRequired,
     freeQuota,
     sendMessage,
@@ -601,6 +599,9 @@ export function useChat(mode: string) {
     sessionMetrics,
     hasAnthropicKey,
     streamPhase,
+    hasOlderMessages,
+    isLoadingOlder,
+    loadOlderMessages,
     updateProviderSelection,
     updateModelSelection,
     formatMicrousd: toMicrousdDisplay,
