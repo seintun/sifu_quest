@@ -81,3 +81,15 @@ export function isMissingSessionUsageRpcError(error: DbErrorLike | null | undefi
     Boolean(error.message?.includes('increment_chat_session_usage'))
   )
 }
+
+export function isMissingAccountUsageRpcError(error: DbErrorLike | null | undefined): boolean {
+  if (!error) {
+    return false
+  }
+
+  return (
+    error.code === 'PGRST202' ||
+    error.code === '42883' ||
+    Boolean(error.message?.includes('get_account_usage_aggregates'))
+  )
+}
