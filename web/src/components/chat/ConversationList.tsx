@@ -50,7 +50,7 @@ function CodeBlock({ className, children, node: _node, ...props }: CodeBlockProp
   }
 
   return (
-    <div className="relative my-3 w-full rounded-lg overflow-hidden border border-border/60 bg-[#0d1117]">
+    <div className="relative my-3 w-full rounded-lg overflow-hidden border border-border/60 bg-elevated">
       {lang && (
         <div className="flex items-center justify-between px-4 py-1.5 bg-elevated/50 border-b border-border/40">
           <span className="text-[11px] uppercase tracking-wider text-dim font-mono">{lang}</span>

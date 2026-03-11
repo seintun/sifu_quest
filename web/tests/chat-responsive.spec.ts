@@ -17,7 +17,10 @@ for (const scenario of scenarios) {
     await page.setViewportSize({ width: scenario.width, height: scenario.height })
     await page.goto('/coach')
     const shell = page.getByTestId('coach-shell')
-    if (await shell.count() === 0) {
+
+    try {
+      await shell.waitFor({ state: 'attached', timeout: 3000 })
+    } catch {
       test.skip(true, 'Authenticated coach route required for chat shell assertions.')
     }
 

@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const mode = searchParams.get('mode')
     const before = searchParams.get('before')
+    const beforeId = searchParams.get('beforeId')
     const limitParam = searchParams.get('limit')
     const parsedLimit = limitParam ? Number.parseInt(limitParam, 10) : null
     const pageSize = Number.isFinite(parsedLimit) && parsedLimit && parsedLimit > 0
@@ -169,11 +170,19 @@ export async function GET(request: NextRequest) {
       .eq('session_id', chatSession.id)
       .eq('user_id', userId)
 
-    if (before && pageSize) {
+    if (beforeId && pageSize) {
+      modernMessagesBuilder = modernMessagesBuilder.lt('id', beforeId)
+    } else if (before && pageSize) {
       modernMessagesBuilder = modernMessagesBuilder.lt('created_at', before)
     }
 
-    modernMessagesBuilder = modernMessagesBuilder.order('created_at', { ascending: pageSize === null })
+    if (pageSize) {
+      modernMessagesBuilder = modernMessagesBuilder.order('id', { ascending: false })
+    } else {
+      modernMessagesBuilder = modernMessagesBuilder
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+    }
 
     if (pageSize) {
       modernMessagesBuilder = modernMessagesBuilder.limit(pageSize + 1)
@@ -191,11 +200,19 @@ export async function GET(request: NextRequest) {
         .eq('session_id', chatSession.id)
         .eq('user_id', userId)
 
-      if (before && pageSize) {
+      if (beforeId && pageSize) {
+        legacyMessagesBuilder = legacyMessagesBuilder.lt('id', beforeId)
+      } else if (before && pageSize) {
         legacyMessagesBuilder = legacyMessagesBuilder.lt('created_at', before)
       }
 
-      legacyMessagesBuilder = legacyMessagesBuilder.order('created_at', { ascending: pageSize === null })
+      if (pageSize) {
+        legacyMessagesBuilder = legacyMessagesBuilder.order('id', { ascending: false })
+      } else {
+        legacyMessagesBuilder = legacyMessagesBuilder
+          .order('created_at', { ascending: true })
+          .order('id', { ascending: true })
+      }
 
       if (pageSize) {
         legacyMessagesBuilder = legacyMessagesBuilder.limit(pageSize + 1)
@@ -230,6 +247,11 @@ export async function GET(request: NextRequest) {
     const nextBefore = hasOlder
       ? (pagedMessagesDesc[pagedMessagesDesc.length - 1]?.created_at ?? null)
       : null
+    const nextBeforeId = hasOlder
+      ? (pagedMessagesDesc[pagedMessagesDesc.length - 1]?.id != null
+          ? String(pagedMessagesDesc[pagedMessagesDesc.length - 1]?.id)
+          : null)
+      : null
 
     const legacyTotalTokens = messageTelemetryAvailable
       ? 0
@@ -254,6 +276,7 @@ export async function GET(request: NextRequest) {
       paging: {
         hasOlder,
         nextBefore,
+        nextBeforeId,
       },
       freeQuota,
       selection: effectiveSelection,
