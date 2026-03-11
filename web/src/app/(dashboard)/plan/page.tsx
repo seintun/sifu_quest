@@ -441,8 +441,8 @@ export default function PlanPage() {
           onQueuePlanRefresh={() => void queuePlanRefresh()}
         />
         {fallbackMarkdownContent ? (
-          <Card className="border-border bg-surface pt-0">
-            <CardContent className="px-4 pt-1 pb-4 sm:px-6 sm:pt-1 sm:pb-5 [&>*:first-child]:!mt-0">
+          <Card className="border-border bg-surface mt-8 sm:mt-10 p-6 py-8 sm:p-10 sm:py-12">
+            <CardContent className="p-0 [&>*:first-child]:!mt-0">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
                 {fallbackMarkdownContent}
               </ReactMarkdown>
