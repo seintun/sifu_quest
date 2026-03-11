@@ -280,7 +280,6 @@ export default function DashboardPage() {
   const activePrompt = nextPromptKey ? enrichmentPromptConfig[nextPromptKey] : null
   const activePromptOptions = activePrompt?.options ?? []
   const hasMorePromptOptions = activePromptOptions.length > 5
-  const visiblePromptOptions = showAllPromptOptions ? activePromptOptions : activePromptOptions.slice(0, 5)
 
   function toggleEnrichmentValue(
     field: keyof OnboardingEnrichmentAnswers,
@@ -396,9 +395,10 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-2.5 px-4 py-3">
             <div className="flex flex-wrap gap-1.5">
-              {visiblePromptOptions.map((option) => {
+              {activePromptOptions.map((option, index) => {
                 const values = enrichmentDraft[activePrompt.valuesField] as string[]
                 const active = values.includes(option.value)
+                const hiddenOnMobile = index >= 5 && !showAllPromptOptions
                 return (
                   <button
                     key={option.value}
@@ -407,29 +407,33 @@ export default function DashboardPage() {
                       toggleEnrichmentValue(activePrompt.valuesField, option.value, activePrompt.max)
                     }
                     className={cn(
-                      'rounded-full border px-2.5 py-1 text-xs transition-all duration-150 cursor-pointer',
+                      'inline-flex items-center rounded-full border px-2.5 py-1 text-xs transition-all duration-150 cursor-pointer',
                       active
                         ? 'bg-primary text-primary-foreground border-primary font-medium'
                         : 'bg-surface border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
+                      hiddenOnMobile && 'hidden sm:inline-flex',
                     )}
                   >
                     {option.label}
                   </button>
                 )
               })}
+              {hasMorePromptOptions && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllPromptOptions((prev) => !prev)}
+                  className={cn(
+                    'inline-flex items-center rounded-full border px-2.5 py-1 text-xs transition-all duration-150 cursor-pointer sm:hidden',
+                    showAllPromptOptions
+                      ? 'bg-plan/15 border-plan/50 text-plan'
+                      : 'bg-surface border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
+                  )}
+                >
+                  {showAllPromptOptions ? 'View less' : 'View more'}
+                </button>
+              )}
             </div>
-            {hasMorePromptOptions && (
-              <button
-                type="button"
-                onClick={() => setShowAllPromptOptions((prev) => !prev)}
-                className="text-xs text-plan hover:text-plan/80 underline-offset-2 hover:underline"
-              >
-                {showAllPromptOptions
-                  ? 'Show fewer options'
-                  : `More options (${activePromptOptions.length - 5} more)`}
-              </button>
-            )}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-2">
               <Input
                 value={String(enrichmentDraft[activePrompt.customField] ?? '')}
                 onChange={(event) =>
@@ -439,9 +443,9 @@ export default function DashboardPage() {
                   }))
                 }
                 placeholder="Optional detail"
-                className="h-8 bg-surface border-border text-sm sm:flex-1"
+                className="h-8 bg-surface border-border text-sm flex-1"
               />
-              <div className="flex justify-end sm:justify-start">
+              <div className="flex justify-end">
                 <button
                   type="button"
                   onClick={() => void saveEnrichmentPrompt()}
