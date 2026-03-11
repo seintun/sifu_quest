@@ -15,7 +15,7 @@ export function createAdminClient() {
       {
         global: {
           headers: {
-            'x-app-env': process.env.NEXT_PUBLIC_VERCEL_ENV || 'local',
+            'x-app-env': process.env.VERCEL_ENV || 'local',
           },
         },
         auth: {
