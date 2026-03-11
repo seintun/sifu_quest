@@ -3,45 +3,57 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
-async function hasSession(): Promise<boolean> {
-  const res = await fetch('/api/auth/session')
-  const session = await res.json()
-  return !!session?.user?.id
+type AccountStatusResponse = {
+  onboarding?: {
+    status?: 'not_started' | 'in_progress' | 'core_complete' | 'enriched_complete'
+  }
 }
 
 export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [checked, setChecked] = useState(false)
+  const isBypassPath =
+    pathname === '/login' ||
+    pathname === '/onboarding' ||
+    pathname.startsWith('/api')
 
   useEffect(() => {
-    if (pathname === '/login' || pathname === '/onboarding' || pathname.startsWith('/api')) {
-      setChecked(true)
+    if (isBypassPath) {
       return
     }
 
-    // Check for session first
-    hasSession()
-      .then((isValidSession) => {
-        if (!isValidSession) throw new Error('No session')
-        return fetch('/api/memory?file=profile.md').then(r => r.json())
-      })
-      .then((profile) => {
-        const ready =
-          profile.content &&
-          profile.content.includes('**Name:**')
-        if (!ready) {
-          router.replace('/onboarding')
-        } else {
-          setChecked(true)
+    fetch('/api/account/status')
+      .then(async (response) => {
+        if (response.status === 401) {
+          throw new Error('unauthorized')
         }
-      }).catch(() => {
-        // If session check fails or API fails, redirect to login
+        if (!response.ok) {
+          throw new Error('status_failed')
+        }
+        return (await response.json()) as AccountStatusResponse
+      })
+      .then((data) => {
+        const onboardingStatus = data.onboarding?.status
+        const complete =
+          onboardingStatus === 'core_complete' ||
+          onboardingStatus === 'enriched_complete'
+        if (!complete) {
+          router.replace('/onboarding')
+          return
+        }
+        setChecked(true)
+      })
+      .catch(() => {
         router.replace('/login')
       })
-  }, [pathname, router])
+  }, [isBypassPath, router])
 
-  if (!checked && pathname !== '/onboarding' && pathname !== '/login') {
+  if (isBypassPath) {
+    return <>{children}</>
+  }
+
+  if (!checked) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-muted-foreground">Loading...</div>
