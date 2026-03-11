@@ -5,6 +5,8 @@ export type QuotaProfile = {
   free_user_messages_used: number
 }
 
+export type QuotaProvider = 'openrouter' | 'anthropic'
+
 export type FreeQuotaView = {
   isFreeTier: boolean
   remaining: number
@@ -14,6 +16,22 @@ export type FreeQuotaView = {
 
 export function isUsingFreeTier(profile: QuotaProfile): boolean {
   return profile.is_guest || !profile.api_key_enc
+}
+
+export function shouldEnforceProviderQuota(
+  profile: QuotaProfile,
+  provider: QuotaProvider,
+  hasAnthropicKey: boolean,
+): boolean {
+  if (!isUsingFreeTier(profile)) {
+    return false
+  }
+
+  if (provider === 'anthropic' && hasAnthropicKey) {
+    return false
+  }
+
+  return true
 }
 
 export function computeFreeQuotaForLimit(profile: QuotaProfile, maxUserMessages: number): FreeQuotaView {

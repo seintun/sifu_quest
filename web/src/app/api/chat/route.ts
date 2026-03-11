@@ -9,7 +9,7 @@ import {
   isOpenRouterFreeModel,
   type ChatProvider,
 } from '@/lib/chat-provider-config'
-import { getQuotaError, incrementFreeUserMessagesUsed, isUsingFreeTier } from '@/lib/free-quota'
+import { getQuotaError, incrementFreeUserMessagesUsed, shouldEnforceProviderQuota } from '@/lib/free-quota'
 import { readMemoryFiles, readModeFile } from '@/lib/memory'
 import { getEncryptedProviderApiKey, hasEncryptedProviderApiKey } from '@/lib/provider-api-keys'
 import { createAdminClient } from '@/lib/supabase-admin'
@@ -452,16 +452,16 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const usingFreeTier = isUsingFreeTier(userProfile)
-    if (usingFreeTier) {
+    const resolvedProvider = selection.selection.provider
+    const resolvedModel = selection.selection.model
+    const enforceQuota = shouldEnforceProviderQuota(userProfile, resolvedProvider, hasAnthropicKey)
+
+    if (enforceQuota) {
       const quotaError = getQuotaError(userProfile)
       if (quotaError) {
         return new Response(JSON.stringify(quotaError), { status: 403 })
       }
     }
-
-    const resolvedProvider = selection.selection.provider
-    const resolvedModel = selection.selection.model
 
     if (resolvedProvider === 'openrouter' && !isOpenRouterFreeModel(resolvedModel)) {
       return new Response(
@@ -622,7 +622,7 @@ export async function POST(request: NextRequest) {
               })
               .eq('id', userId)
 
-            if (usingFreeTier) {
+            if (enforceQuota) {
               try {
                 await incrementFreeUserMessagesUsed(userId, 1)
               } catch (quotaError) {

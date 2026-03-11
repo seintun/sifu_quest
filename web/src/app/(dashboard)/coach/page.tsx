@@ -167,6 +167,7 @@ export default function CoachPage() {
     selectedProviderInfo,
     availableModelsForSelectedProvider,
     sessionMetrics,
+    hasAnthropicKey,
     streamPhase,
     updateProviderSelection,
     updateModelSelection,
@@ -180,6 +181,11 @@ export default function CoachPage() {
   const [input, setInput] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const isQuotaBlocked = Boolean(
+    freeQuota?.isFreeTier &&
+    freeQuota.remaining <= 0 &&
+    !(selectedProvider === 'anthropic' && hasAnthropicKey),
+  )
 
   useEffect(() => {
     setDismissedPrompt(false)
@@ -218,7 +224,7 @@ export default function CoachPage() {
   useEffect(() => {
     if (!isLoaded) return
     if (messages.length === 0 && hasGreetedRef.current !== mode && !upgradeRequired) {
-      if (freeQuota?.isFreeTier && freeQuota.remaining <= 0) {
+      if (isQuotaBlocked) {
         hasGreetedRef.current = mode
         setMessages([{
           role: 'assistant',
@@ -229,7 +235,7 @@ export default function CoachPage() {
       hasGreetedRef.current = mode
       greet()
     }
-  }, [mode, messages.length, greet, isLoaded, upgradeRequired, freeQuota, setMessages, isGuest])
+  }, [mode, messages.length, greet, isLoaded, upgradeRequired, isQuotaBlocked, setMessages, isGuest])
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
@@ -244,14 +250,14 @@ export default function CoachPage() {
 
   // Auto-focus input when assistant finishes streaming
   useEffect(() => {
-    if (!isStreaming && textareaRef.current && !(freeQuota?.isFreeTier && freeQuota.remaining <= 0)) {
+    if (!isStreaming && textareaRef.current && !isQuotaBlocked) {
       textareaRef.current.focus()
     }
-  }, [isStreaming, freeQuota])
+  }, [isStreaming, isQuotaBlocked])
 
   // Automatically trigger the end-of-quota experience once the free-tier limit is reached.
   useEffect(() => {
-    if (!isStreaming && freeQuota?.isFreeTier && freeQuota.remaining <= 0 && messages.length > 0) {
+    if (!isStreaming && isQuotaBlocked && messages.length > 0) {
       const lastMessage = messages[messages.length - 1]
       // Only append if we haven't already appended it
       const hasLimitMessage =
@@ -272,7 +278,7 @@ export default function CoachPage() {
         queueMicrotask(() => setDismissedPrompt(false))
       }
     }
-  }, [isStreaming, freeQuota, messages, setMessages, isGuest])
+  }, [isStreaming, isQuotaBlocked, messages, setMessages, isGuest])
 
   const handleClearHistory = () => {
     hasGreetedRef.current = null
@@ -408,7 +414,7 @@ export default function CoachPage() {
              </div>
           ) : (
             <>
-              {freeQuota?.isFreeTier && freeQuota.remaining <= 0 && !isStreaming && !dismissedPrompt && (
+              {isQuotaBlocked && !isStreaming && !dismissedPrompt && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
                   {isGuest ? <UpgradePrompt onClose={() => setDismissedPrompt(true)} /> : <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />}
                 </div>
@@ -496,7 +502,7 @@ export default function CoachPage() {
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={
-                  freeQuota?.isFreeTier && freeQuota.remaining <= 0
+                  isQuotaBlocked
                     ? (isGuest ? 'Guest limit reached' : 'Free limit reached')
                     : 'Type a message...'
                 }
@@ -504,7 +510,7 @@ export default function CoachPage() {
                 rows={1}
                 disabled={
                   isStreaming ||
-                  (freeQuota?.isFreeTier && freeQuota.remaining <= 0) ||
+                  isQuotaBlocked ||
                   selectedProviderInfo?.availability !== 'available'
                 }
               />
@@ -523,7 +529,7 @@ export default function CoachPage() {
                   onClick={handleSend}
                   disabled={
                     !input.trim() ||
-                    (freeQuota?.isFreeTier && freeQuota.remaining <= 0) ||
+                    isQuotaBlocked ||
                     selectedProviderInfo?.availability !== 'available'
                   }
                   className="h-10 w-10 shrink-0"

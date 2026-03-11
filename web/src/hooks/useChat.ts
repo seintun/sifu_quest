@@ -80,6 +80,7 @@ export function useChat(mode: string) {
   const [selectedProvider, setSelectedProvider] = useState<ChatProvider>('openrouter')
   const [selectedModel, setSelectedModel] = useState('')
   const [sessionMetrics, setSessionMetrics] = useState<SessionUsageMetrics | null>(null)
+  const [hasAnthropicKey, setHasAnthropicKey] = useState(false)
   const [streamPhase, setStreamPhase] = useState<StreamPhase>('idle')
   const abortRef = useRef<AbortController | null>(null)
 
@@ -101,6 +102,7 @@ export function useChat(mode: string) {
     setMessages([])
     setFreeQuota(null)
     setSessionMetrics(null)
+    setHasAnthropicKey(false)
     setStreamPhase('idle')
 
     const load = async () => {
@@ -114,6 +116,7 @@ export function useChat(mode: string) {
           providers?: ChatProviderOption[]
           modelsByProvider?: Record<ChatProvider, ChatModelOption[]>
           defaults?: { provider: ChatProvider; model: string }
+          account?: { hasAnthropicKey?: boolean }
         }
         const sessionData = await sessionRes.json().catch(() => ({})) as ChatSessionResponse & { error?: string }
 
@@ -129,6 +132,7 @@ export function useChat(mode: string) {
 
         setProviders(providerData.providers ?? [])
         setModelsByProvider(providerData.modelsByProvider ?? { openrouter: [], anthropic: [] })
+        setHasAnthropicKey(Boolean(providerData.account?.hasAnthropicKey))
 
         if (providerData.defaults) {
           applySelection(providerData.defaults.provider, providerData.defaults.model)
@@ -215,9 +219,15 @@ export function useChat(mode: string) {
     setStreamPhase('thinking')
 
     const previousQuota = freeQuota
+    const shouldEnforceQuota = Boolean(
+      freeQuota?.isFreeTier &&
+      !(selectedProvider === 'anthropic' && hasAnthropicKey),
+    )
 
-    // Optimistically decrement quota.
-    setFreeQuota((prev) => prev && prev.isFreeTier ? { ...prev, remaining: Math.max(0, prev.remaining - 1) } : prev)
+    // Optimistically decrement quota only when provider-aware enforcement applies.
+    if (shouldEnforceQuota) {
+      setFreeQuota((prev) => prev && prev.isFreeTier ? { ...prev, remaining: Math.max(0, prev.remaining - 1) } : prev)
+    }
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -381,7 +391,7 @@ export function useChat(mode: string) {
         abortRef.current = null
       }
     }
-  }, [messages, mode, ensureSession, freeQuota, selectedProvider, selectedModel, applySelection])
+  }, [messages, mode, ensureSession, freeQuota, selectedProvider, selectedModel, hasAnthropicKey, applySelection])
 
   const greet = useCallback(async () => {
     if (isStreaming) return
@@ -556,6 +566,7 @@ export function useChat(mode: string) {
     selectedProviderInfo,
     availableModelsForSelectedProvider,
     sessionMetrics,
+    hasAnthropicKey,
     streamPhase,
     updateProviderSelection,
     updateModelSelection,
