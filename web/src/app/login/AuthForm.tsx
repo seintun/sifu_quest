@@ -32,6 +32,7 @@ export function AuthForm() {
   return (
     <div className="space-y-3 sm:space-y-4">
       <Button 
+        data-testid="auth-google-button"
         variant="outline" 
         className="w-full h-11 sm:h-12 text-sm relative group overflow-hidden border-border bg-transparent hover:bg-surface transition-all"
         onClick={handleGoogleSignIn}
@@ -75,6 +76,7 @@ export function AuthForm() {
       </div>
 
       <Button 
+        data-testid="auth-guest-button"
         variant="secondary" 
         className="w-full h-11 sm:h-12 text-sm group hover:bg-elevated text-foreground"
         onClick={handleGuestSignIn}

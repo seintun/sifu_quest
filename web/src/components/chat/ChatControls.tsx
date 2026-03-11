@@ -81,7 +81,7 @@ function ControlsBody({
       <label className="grid gap-1 text-xs text-muted-foreground">
         Provider
         <Select value={selectedProvider} onValueChange={(value) => onProviderChange(value as 'openrouter' | 'anthropic')}>
-          <SelectTrigger className="w-full bg-surface border-border h-10">
+          <SelectTrigger data-testid="mobile-provider-select" className="w-full bg-surface border-border h-10">
             <SelectValue placeholder="Provider" />
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false}>
@@ -89,6 +89,7 @@ function ControlsBody({
               <SelectItem
                 key={provider.id}
                 value={provider.id}
+                data-testid={`provider-option-${provider.id}`}
                 disabled={provider.availability !== 'available'}
               >
                 {provider.availability === 'available' ? provider.label : `${provider.label} (key required)`}
@@ -141,7 +142,7 @@ function ControlsBody({
         </Select>
       </label>
 
-      <Button type="button" variant="outline" className="justify-start" onClick={onClear}>
+      <Button data-testid="mobile-clear-chat-button" type="button" variant="outline" className="justify-start" onClick={onClear}>
         <Trash2 className="h-4 w-4" />
         Clear chat history
       </Button>
@@ -153,12 +154,12 @@ export function DesktopChatControls(props: SharedControlProps) {
   return (
     <div className="hidden lg:flex items-center gap-2">
       <Select value={props.selectedProvider} onValueChange={(value) => props.onProviderChange(value as 'openrouter' | 'anthropic')}>
-        <SelectTrigger className="w-36 bg-surface border-border h-9">
+        <SelectTrigger data-testid="desktop-provider-select" className="w-36 bg-surface border-border h-9">
           <SelectValue />
         </SelectTrigger>
         <SelectContent alignItemWithTrigger={false}>
           {props.providers.map((provider) => (
-            <SelectItem key={provider.id} value={provider.id} disabled={provider.availability !== 'available'}>
+            <SelectItem key={provider.id} value={provider.id} disabled={provider.availability !== 'available'} data-testid={`provider-option-${provider.id}`}>
               {provider.availability === 'available' ? provider.label : `${provider.label} (key required)`}
             </SelectItem>
           ))}
@@ -195,7 +196,7 @@ export function DesktopChatControls(props: SharedControlProps) {
         </SelectContent>
       </Select>
 
-      <Button variant="ghost" size="sm" onClick={props.onClear} className="text-muted-foreground hover:text-danger">
+      <Button data-testid="desktop-clear-chat-button" variant="ghost" size="sm" onClick={props.onClear} className="text-muted-foreground hover:text-danger" aria-label="Clear chat history">
         <Trash2 className="h-4 w-4" />
       </Button>
     </div>
@@ -217,7 +218,7 @@ export function ResponsiveChatControls(props: SharedControlProps) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
-        render={<button className="inline-flex lg:hidden items-center gap-1.5 rounded-lg border border-border px-2.5 h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-elevated" />}
+        render={<button className="inline-flex lg:hidden items-center gap-1.5 rounded-lg border border-border px-2.5 h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-elevated" aria-label="Open chat controls" />}
       >
         <Settings2 className="h-3.5 w-3.5" />
         Controls

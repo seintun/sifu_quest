@@ -61,6 +61,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             key={item.href}
             href={item.href}
             onClick={onNavigate}
+            data-testid={`nav-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
             className={cn(
               'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
               isActive
@@ -130,6 +131,7 @@ function LogoutFooter({ deferred, onDeferredLogout }: LogoutFooterProps) {
       <button
         type="button"
         onClick={handleSignOutClick}
+        data-testid="sidebar-signout-button"
         className="flex w-full items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-danger hover:bg-danger/5 transition-colors"
         aria-label="Sign out of your account"
       >
@@ -165,7 +167,7 @@ function LogoutFooter({ deferred, onDeferredLogout }: LogoutFooterProps) {
 
 export function Sidebar() {
   return (
-    <aside className="hidden md:flex w-56 flex-col fixed inset-y-0 left-0 bg-surface border-r border-border z-30">
+    <aside data-testid="desktop-sidebar" className="hidden md:flex w-56 flex-col fixed inset-y-0 left-0 bg-surface border-r border-border z-30">
       <div className="p-4 border-b border-border">
         <h1 className="font-display text-lg font-bold text-foreground">
           Sifu Quest
@@ -223,18 +225,19 @@ export function MobileSidebar() {
   }
 
   return (
-    <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-surface border-b border-border h-12">
+    <div data-testid="mobile-sidebar-header" className="md:hidden fixed top-0 left-0 right-0 z-40 bg-surface border-b border-border h-12">
       <div className="flex h-full items-center justify-between px-3">
         <h1 className="font-display text-base font-bold text-foreground">
           Sifu Quest
         </h1>
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger
+            data-testid="mobile-sidebar-trigger"
             render={<button className="p-1.5 text-muted-foreground hover:text-foreground" aria-label="Open navigation menu" />}
           >
             {open ? <X className="h-[18px] w-[18px]" /> : <Menu className="h-[18px] w-[18px]" />}
           </SheetTrigger>
-          <SheetContent side="left" className="w-56 bg-surface border-r border-border p-0 flex flex-col">
+          <SheetContent data-testid="mobile-sidebar-content" side="left" className="w-56 bg-surface border-r border-border p-0 flex flex-col">
             <SheetTitle className="sr-only">Navigation</SheetTitle>
             <div className="p-4 border-b border-border">
               <h2 className="font-display text-lg font-bold">Sifu Quest</h2>

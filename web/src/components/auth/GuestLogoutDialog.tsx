@@ -39,6 +39,7 @@ export function GuestLogoutDialog({
         max-h-[84svh] + overflow-y-auto prevents content from ever being cut off.
       */}
       <DialogContent
+        data-testid="guest-logout-dialog"
         className="
           left-1/2 -translate-x-1/2
           top-[8vh] translate-y-0
@@ -75,6 +76,7 @@ export function GuestLogoutDialog({
         */}
         <div className="-mx-4 -mb-4 flex flex-col gap-2 rounded-b-xl border-t border-border/60 bg-muted/50 px-4 py-4">
           <Button
+            data-testid="guest-logout-upgrade-button"
             className="w-full"
             onClick={onUpgrade}
             disabled={isBusy}
@@ -91,6 +93,7 @@ export function GuestLogoutDialog({
           </Button>
 
           <button
+            data-testid="guest-logout-confirm-button"
             type="button"
             onClick={onSignOut}
             disabled={isBusy}

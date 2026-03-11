@@ -101,8 +101,9 @@ function LogProblemForm({
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label>Problem Name</Label>
+            <Label htmlFor="dsa-problem">Problem Name</Label>
             <Input
+              id="dsa-problem"
               value={form.problem}
               onChange={e => setForm({ ...form, problem: e.target.value })}
               placeholder="e.g., Two Sum"
@@ -152,8 +153,9 @@ function LogProblemForm({
             </Select>
           </div>
           <div>
-            <Label>Notes (optional)</Label>
+            <Label htmlFor="dsa-notes">Notes (optional)</Label>
             <Input
+              id="dsa-notes"
               value={form.notes}
               onChange={e => setForm({ ...form, notes: e.target.value })}
               placeholder="Key takeaway..."

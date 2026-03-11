@@ -168,7 +168,7 @@ function MetricCard({
 }) {
   const colors = DOMAIN_COLORS[domain]
   return (
-    <Card className={`h-full ${colors.bg} border ${colors.border} ${colors.glow} transition-all duration-200 hover:-translate-y-0.5`}>
+    <Card data-testid={`metric-card-${domain}`} className={`h-full ${colors.bg} border ${colors.border} ${colors.glow} transition-all duration-200 hover:-translate-y-0.5`}>
       <CardContent className="p-3 sm:p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -234,7 +234,7 @@ function QuickActionCard({
   const colors = DOMAIN_COLORS[domain]
 
   return (
-    <Link href={href} className="group">
+    <Link href={href} className="group" data-testid={`quick-action-${domain}`}>
       <Card className={`h-full border ${colors.border} ${colors.bg} ${colors.glow} transition-all duration-200 hover:-translate-y-0.5`}>
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-4">
@@ -551,6 +551,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center gap-2">
               <Input
+                aria-label="Optional detail for prompt"
                 value={String(enrichmentDraft[activePrompt.customField] ?? '')}
                 onChange={(event) =>
                   setEnrichmentDraft((prev) => ({

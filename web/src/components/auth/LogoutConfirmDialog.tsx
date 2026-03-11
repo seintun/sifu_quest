@@ -29,7 +29,7 @@ export function LogoutConfirmDialog({
 }: LogoutConfirmDialogProps) {
   return (
     <Dialog open={open} onOpenChange={isSigningOut ? undefined : onOpenChange}>
-      <DialogContent className="max-w-sm w-full mx-4 sm:mx-auto">
+      <DialogContent data-testid="logout-confirm-dialog" className="max-w-sm w-full mx-4 sm:mx-auto">
         <DialogHeader className="space-y-2">
           <DialogTitle className="flex items-center gap-2 text-base">
             <LogOut className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
@@ -50,6 +50,7 @@ export function LogoutConfirmDialog({
 
         <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button
+            data-testid="logout-cancel-button"
             variant="outline"
             className="w-full sm:w-auto"
             onClick={() => onOpenChange(false)}
@@ -58,6 +59,7 @@ export function LogoutConfirmDialog({
             Cancel
           </Button>
           <Button
+            data-testid="logout-confirm-button"
             variant="destructive"
             className="w-full sm:w-auto"
             onClick={onSignOut}
