@@ -32,8 +32,13 @@ function isMissingProfileColumnError(error: { code?: string; message?: string } 
     return false
   }
   const message = error.message ?? ''
+  const missingColumnLikeMessage =
+    message.includes('column') &&
+    (message.includes('does not exist') || message.includes('Could not find'))
   return (
     error.code === '42703' ||
+    error.code === 'PGRST204' ||
+    (missingColumnLikeMessage && message.includes('onboarding_')) ||
     message.includes('free_user_messages_used') ||
     message.includes('default_provider') ||
     message.includes('default_model') ||
@@ -197,6 +202,39 @@ export async function ensureUserProfile(userId: string, sessionEmail?: string | 
         .maybeSingle()
 
       if (refetchError) {
+        if (isMissingProfileColumnError(refetchError)) {
+          const { data: existingLegacyProfile, error: legacyRefetchError } = await supabaseAdmin
+            .from('user_profiles')
+            .select(selectProfileFieldsLegacy)
+            .eq('id', userId)
+            .maybeSingle()
+
+          if (legacyRefetchError) {
+            throw new Error(`Failed to load user profile after duplicate insert: ${legacyRefetchError.message}`)
+          }
+
+          if (existingLegacyProfile) {
+            return {
+              ...existingLegacyProfile,
+              free_user_messages_used: 0,
+              free_quota_exhausted: Boolean(existingLegacyProfile.free_quota_exhausted),
+              default_provider: 'openrouter',
+              default_model: null,
+              onboarding_status: 'not_started',
+              onboarding_version: 2,
+              onboarding_completion_percent: 0,
+              onboarding_next_prompt_key: null,
+              onboarding_core_completed_at: null,
+              onboarding_enriched_completed_at: null,
+              onboarding_draft: null,
+              onboarding_last_step: 0,
+              onboarding_plan_status: 'not_queued',
+              onboarding_plan_error_code: null,
+              onboarding_plan_retries: 0,
+              onboarding_plan_last_attempt_at: null,
+            }
+          }
+        }
         throw new Error(`Failed to load user profile after duplicate insert: ${refetchError.message}`)
       }
 
