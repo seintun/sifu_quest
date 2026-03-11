@@ -66,7 +66,7 @@ function shouldShowPlanStatusBanner(status: OnboardingPlanStatus | null): boolea
 
 function PlanUpToDateBadge() {
   return (
-    <Badge variant="outline" className="h-8 cursor-default pointer-events-none border-border/60 bg-elevated/70 px-3 text-xs font-medium text-muted-foreground">
+    <Badge variant="outline" className="h-8 cursor-default pointer-events-none border-success/40 bg-success/10 px-3 text-xs font-medium text-success">
       Plan up to date
     </Badge>
   )
@@ -84,13 +84,15 @@ function PlanHeader({
   showPlanUpToDate: boolean
 }) {
   return (
-    <div>
-      <h1 className="font-display hidden text-2xl font-bold leading-tight sm:block">{title}</h1>
-      <h1 className="font-display text-[1.7rem] font-bold leading-tight sm:hidden">{mobileTitle.heading}</h1>
-      {mobileTitle.subtitle && <p className="mt-1 text-xs text-muted-foreground sm:hidden">{mobileTitle.subtitle}</p>}
-      <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="font-display hidden text-2xl font-bold leading-tight sm:block">{title}</h1>
+        <h1 className="font-display text-[1.7rem] font-bold leading-tight sm:hidden">{mobileTitle.heading}</h1>
+        {mobileTitle.subtitle && <p className="mt-1 text-xs text-muted-foreground sm:hidden">{mobileTitle.subtitle}</p>}
+        <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+      </div>
       {showPlanUpToDate && (
-        <div className="mt-2 flex justify-end">
+        <div className="shrink-0 pt-0.5">
           <PlanUpToDateBadge />
         </div>
       )}
