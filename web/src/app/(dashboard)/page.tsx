@@ -170,6 +170,7 @@ export default function DashboardPage() {
   const [onboardingState, setOnboardingState] = useState<OnboardingStateResponse | null>(null)
   const [enrichmentDraft, setEnrichmentDraft] = useState<OnboardingEnrichmentAnswers>(createEmptyEnrichmentAnswers())
   const [savingEnrichment, setSavingEnrichment] = useState(false)
+  const [showAllPromptOptions, setShowAllPromptOptions] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -191,6 +192,12 @@ export default function DashboardPage() {
       })
       .catch(() => {})
   }, [])
+
+  const nextPromptKey = onboardingState?.onboarding.nextPromptKey ?? null
+
+  useEffect(() => {
+    setShowAllPromptOptions(false)
+  }, [nextPromptKey])
 
   if (!metrics) {
     return <div className="text-muted-foreground">Loading dashboard...</div>
@@ -223,7 +230,6 @@ export default function DashboardPage() {
     { href: '/settings', label: 'Account Settings', hint: 'Update your profile and API key', icon: Settings, domain: 'streak' },
   ]
 
-  const nextPromptKey = onboardingState?.onboarding.nextPromptKey ?? null
   const planStatus = onboardingState?.plan.status ?? 'ready'
 
   const enrichmentPromptConfig: Record<
@@ -272,6 +278,12 @@ export default function DashboardPage() {
   }
 
   const activePrompt = nextPromptKey ? enrichmentPromptConfig[nextPromptKey] : null
+  const activePromptSelectedCount = activePrompt
+    ? (enrichmentDraft[activePrompt.valuesField] as string[]).length
+    : 0
+  const activePromptOptions = activePrompt?.options ?? []
+  const hasMorePromptOptions = activePromptOptions.length > 5
+  const visiblePromptOptions = showAllPromptOptions ? activePromptOptions : activePromptOptions.slice(0, 5)
 
   function toggleEnrichmentValue(
     field: keyof OnboardingEnrichmentAnswers,
@@ -380,20 +392,17 @@ export default function DashboardPage() {
       )}
 
       {activePrompt && (
-        <Card className="border border-border bg-surface">
-          <CardHeader className="pb-2 border-b border-border/40">
-            <CardTitle className="text-sm font-medium">{activePrompt.title}</CardTitle>
+        <Card className="border border-border/70 bg-surface">
+          <CardHeader className="border-b border-border/40 px-4 py-3">
+            <CardTitle className="text-sm font-medium leading-tight">{activePrompt.title}</CardTitle>
             <p className="text-xs text-muted-foreground">{activePrompt.hint}</p>
-            <div className="mt-2 inline-flex items-center rounded-md border border-plan/30 bg-plan/10 px-2 py-1 text-[11px] font-medium text-plan">
-              Personalization question
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              This helps tailor your plan and coaching experience to you.
+            <p className="text-[11px] text-muted-foreground">
+              {activePromptSelectedCount}/{activePrompt.max} selected
             </p>
           </CardHeader>
-          <CardContent className="pt-4 space-y-3">
-            <div className="flex flex-wrap gap-2">
-              {activePrompt.options.map((option) => {
+          <CardContent className="space-y-2.5 px-4 py-3">
+            <div className="flex flex-wrap gap-1.5">
+              {visiblePromptOptions.map((option) => {
                 const values = enrichmentDraft[activePrompt.valuesField] as string[]
                 const active = values.includes(option.value)
                 return (
@@ -404,7 +413,7 @@ export default function DashboardPage() {
                       toggleEnrichmentValue(activePrompt.valuesField, option.value, activePrompt.max)
                     }
                     className={cn(
-                      'px-3.5 py-1.5 rounded-full text-sm border transition-all duration-150 cursor-pointer',
+                      'rounded-full border px-2.5 py-1 text-xs transition-all duration-150 cursor-pointer',
                       active
                         ? 'bg-primary text-primary-foreground border-primary font-medium'
                         : 'bg-surface border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
@@ -415,26 +424,39 @@ export default function DashboardPage() {
                 )
               })}
             </div>
-            <Input
-              value={String(enrichmentDraft[activePrompt.customField] ?? '')}
-              onChange={(event) =>
-                setEnrichmentDraft((prev) => ({
-                  ...prev,
-                  [activePrompt.customField]: event.target.value,
-                }))
-              }
-              placeholder="Optional custom detail"
-              className="bg-surface border-border text-sm"
-            />
-            <div className="flex justify-end">
+            {hasMorePromptOptions && (
               <button
                 type="button"
-                onClick={() => void saveEnrichmentPrompt()}
-                disabled={savingEnrichment}
-                className="px-3 py-1.5 text-xs rounded-md border border-border bg-elevated hover:bg-elevated/70 disabled:opacity-50"
+                onClick={() => setShowAllPromptOptions((prev) => !prev)}
+                className="text-xs text-plan hover:text-plan/80 underline-offset-2 hover:underline"
               >
-                {savingEnrichment ? 'Saving...' : 'Save and Continue'}
+                {showAllPromptOptions
+                  ? 'Show fewer options'
+                  : `More options (${activePromptOptions.length - 5} more)`}
               </button>
+            )}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                value={String(enrichmentDraft[activePrompt.customField] ?? '')}
+                onChange={(event) =>
+                  setEnrichmentDraft((prev) => ({
+                    ...prev,
+                    [activePrompt.customField]: event.target.value,
+                  }))
+                }
+                placeholder="Optional detail"
+                className="h-8 bg-surface border-border text-sm sm:flex-1"
+              />
+              <div className="flex justify-end sm:justify-start">
+                <button
+                  type="button"
+                  onClick={() => void saveEnrichmentPrompt()}
+                  disabled={savingEnrichment}
+                  className="h-8 rounded-md border border-border bg-elevated px-3 text-xs hover:bg-elevated/70 disabled:opacity-50"
+                >
+                  {savingEnrichment ? 'Saving...' : 'Save'}
+                </button>
+              </div>
             </div>
           </CardContent>
         </Card>

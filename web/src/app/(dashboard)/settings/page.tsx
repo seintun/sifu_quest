@@ -98,6 +98,7 @@ export default function SettingsPage() {
   const [onboardingState, setOnboardingState] = useState<OnboardingStateResponse | null>(null)
   const [enrichmentDraft, setEnrichmentDraft] = useState<OnboardingEnrichmentAnswers>(createEmptyEnrichmentAnswers())
   const [isSavingEnrichment, setIsSavingEnrichment] = useState(false)
+  const [showAllPromptOptions, setShowAllPromptOptions] = useState(false)
 
   const [message, setMessage] = useState<FlashMessage>(null)
 
@@ -341,6 +342,16 @@ export default function SettingsPage() {
 
   const nextPromptKey = onboardingState?.onboarding.nextPromptKey ?? null
   const activePrompt = nextPromptKey ? enrichmentPromptConfig[nextPromptKey] : null
+  const activePromptSelectedCount = activePrompt
+    ? (enrichmentDraft[activePrompt.valuesField] as string[]).length
+    : 0
+  const activePromptOptions = activePrompt?.options ?? []
+  const hasMorePromptOptions = activePromptOptions.length > 5
+  const visiblePromptOptions = showAllPromptOptions ? activePromptOptions : activePromptOptions.slice(0, 5)
+
+  useEffect(() => {
+    setShowAllPromptOptions(false)
+  }, [nextPromptKey])
 
   const toggleEnrichmentValue = useCallback(
     (field: keyof OnboardingEnrichmentAnswers, value: string, maxCount: number) => {
@@ -440,20 +451,15 @@ export default function SettingsPage() {
       )}
 
       {onboardingState?.onboarding.status === 'core_complete' && activePrompt && (
-        <Card className="border-plan/30 bg-plan/10">
-          <CardHeader>
-            <CardTitle>{activePrompt.title}</CardTitle>
-            <CardDescription>{activePrompt.hint}</CardDescription>
-            <div className="mt-2 inline-flex items-center rounded-md border border-plan/30 bg-plan/10 px-2 py-1 text-[11px] font-medium text-plan">
-              Personalization question
-            </div>
-            <CardDescription className="mt-1 text-[11px]">
-              This helps tailor your plan and coaching experience to you.
-            </CardDescription>
+        <Card className="border border-border/70 bg-surface">
+          <CardHeader className="border-b border-border/40 px-4 py-3">
+            <CardTitle className="text-sm font-medium leading-tight">{activePrompt.title}</CardTitle>
+            <CardDescription className="text-xs">{activePrompt.hint}</CardDescription>
+            <CardDescription className="text-[11px]">{activePromptSelectedCount}/{activePrompt.max} selected</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2.5 px-4 py-3">
             <div className="flex flex-wrap gap-2">
-              {activePrompt.options.map((option) => {
+              {visiblePromptOptions.map((option) => {
                 const values = enrichmentDraft[activePrompt.valuesField] as string[]
                 const selected = values.includes(option.value)
                 return (
@@ -463,7 +469,7 @@ export default function SettingsPage() {
                     onClick={() =>
                       toggleEnrichmentValue(activePrompt.valuesField, option.value, activePrompt.max)
                     }
-                    className={`px-3.5 py-1.5 rounded-full text-sm border transition-all duration-150 cursor-pointer ${
+                    className={`rounded-full border px-2.5 py-1 text-xs transition-all duration-150 cursor-pointer ${
                       selected
                         ? 'bg-primary text-primary-foreground border-primary font-medium'
                         : 'bg-surface border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
@@ -474,21 +480,34 @@ export default function SettingsPage() {
                 )
               })}
             </div>
-            <Input
-              value={String(enrichmentDraft[activePrompt.customField] ?? '')}
-              onChange={(event) =>
-                setEnrichmentDraft((prev) => ({
-                  ...prev,
-                  [activePrompt.customField]: event.target.value,
-                }))
-              }
-              placeholder="Optional custom detail"
-              className="bg-elevated/50"
-            />
-            <div className="flex justify-end">
-              <Button onClick={() => void saveEnrichment()} disabled={isSavingEnrichment}>
-                {isSavingEnrichment ? 'Saving...' : 'Save Enrichment'}
-              </Button>
+            {hasMorePromptOptions && (
+              <button
+                type="button"
+                onClick={() => setShowAllPromptOptions((prev) => !prev)}
+                className="text-xs text-plan hover:text-plan/80 underline-offset-2 hover:underline"
+              >
+                {showAllPromptOptions
+                  ? 'Show fewer options'
+                  : `More options (${activePromptOptions.length - 5} more)`}
+              </button>
+            )}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                value={String(enrichmentDraft[activePrompt.customField] ?? '')}
+                onChange={(event) =>
+                  setEnrichmentDraft((prev) => ({
+                    ...prev,
+                    [activePrompt.customField]: event.target.value,
+                  }))
+                }
+                placeholder="Optional detail"
+                className="h-8 bg-elevated/50 sm:flex-1"
+              />
+              <div className="flex justify-end sm:justify-start">
+                <Button size="sm" onClick={() => void saveEnrichment()} disabled={isSavingEnrichment}>
+                  {isSavingEnrichment ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
