@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import { getPersistableOnboardingDisplayName } from '@/lib/onboarding-name'
 import {
   markCoreOnboardingComplete,
+  OnboardingMigrationRequiredError,
   persistCoreOnboardingFiles,
   queueOnboardingPlanJob,
 } from '@/lib/onboarding-service'
@@ -69,6 +70,9 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
+    if (error instanceof OnboardingMigrationRequiredError) {
+      return NextResponse.json({ error: error.message }, { status: 503 })
+    }
     const message = error instanceof Error ? error.message : 'Unknown error'
     if (error instanceof Error && error.name === 'OnboardingValidationError') {
       return NextResponse.json({ error: message }, { status: 400 })

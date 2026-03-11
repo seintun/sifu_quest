@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import {
   loadOnboardingState,
   markEnrichmentUpdated,
+  OnboardingMigrationRequiredError,
   persistProfileOnboardingFile,
 } from '@/lib/onboarding-service'
 import {
@@ -63,6 +64,9 @@ export async function POST(request: NextRequest) {
       plan: { status: 'not_queued' },
     })
   } catch (error) {
+    if (error instanceof OnboardingMigrationRequiredError) {
+      return NextResponse.json({ error: error.message }, { status: 503 })
+    }
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
   }

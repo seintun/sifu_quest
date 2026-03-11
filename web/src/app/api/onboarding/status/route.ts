@@ -1,6 +1,7 @@
 import { auth } from '@/auth'
 import {
   loadOnboardingState,
+  OnboardingMigrationRequiredError,
   runOnboardingPlanJobForUser,
 } from '@/lib/onboarding-service'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
@@ -27,6 +28,9 @@ export async function GET(request: NextRequest) {
     const refreshed = await loadOnboardingState(userId)
     return NextResponse.json(refreshed)
   } catch (error) {
+    if (error instanceof OnboardingMigrationRequiredError) {
+      return NextResponse.json({ error: error.message }, { status: 503 })
+    }
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
   }

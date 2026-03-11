@@ -5,7 +5,7 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 function getWorkerSecret(): string | null {
-  const secret = process.env.ONBOARDING_WORKER_SECRET || process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET
+  const secret = process.env.ONBOARDING_WORKER_SECRET
   if (!secret || secret.trim().length === 0) {
     return null
   }

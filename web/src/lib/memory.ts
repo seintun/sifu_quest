@@ -209,7 +209,12 @@ export async function writeMemoryFilesBatch(
     return
   }
 
-  if (error.code === '42883') {
+  const missingRpc =
+    error.code === '42883' ||
+    error.code === 'PGRST202' ||
+    (error.message ?? '').includes('bulk_upsert_memory_files')
+
+  if (missingRpc) {
     await Promise.all(
       entries.map((entry) => writeMemoryFile(userId, entry.filename, entry.content, changeSource)),
     )

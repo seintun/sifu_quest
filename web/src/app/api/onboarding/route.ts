@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import { getPersistableOnboardingDisplayName } from '@/lib/onboarding-name'
 import {
   markCoreOnboardingComplete,
+  OnboardingMigrationRequiredError,
   persistCoreOnboardingFiles,
   queueOnboardingPlanJob,
 } from '@/lib/onboarding-service'
@@ -63,6 +64,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, planStatus: 'queued' })
   } catch (error) {
+    if (error instanceof OnboardingMigrationRequiredError) {
+      return NextResponse.json({ error: error.message }, { status: 503 })
+    }
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
       { error: message || 'We could not process onboarding right now. Please try again.' },

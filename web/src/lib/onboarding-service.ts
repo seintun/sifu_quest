@@ -56,6 +56,42 @@ function getBackoffDelayMs(attemptCount: number): number {
 
 const PLAN_JOB_STALE_MS = 10 * 60 * 1000
 
+type DbErrorLike = {
+  code?: string | null
+  message?: string | null
+}
+
+export class OnboardingMigrationRequiredError extends Error {
+  constructor(action: string) {
+    super(`Onboarding v2 schema is not available for ${action}. Run the latest database migrations and retry.`)
+    this.name = 'OnboardingMigrationRequiredError'
+  }
+}
+
+function isMissingOnboardingSchemaError(error: DbErrorLike | null | undefined): boolean {
+  if (!error) {
+    return false
+  }
+  const message = (error.message ?? '').toLowerCase()
+  const mentionsMissingColumn =
+    (message.includes('column') && (message.includes('does not exist') || message.includes('could not find'))) ||
+    message.includes('schema cache')
+
+  return (
+    error.code === '42703' ||
+    error.code === 'PGRST204' ||
+    (mentionsMissingColumn && message.includes('onboarding_'))
+  )
+}
+
+function toOnboardingStateWriteError(action: string, error: DbErrorLike | null | undefined): Error {
+  if (isMissingOnboardingSchemaError(error)) {
+    return new OnboardingMigrationRequiredError(action)
+  }
+  const detail = error?.message ?? 'Unknown database error'
+  return new Error(`Failed to ${action}: ${detail}`)
+}
+
 function toErrorCode(error: unknown): string {
   if (error instanceof MemoryWriteError && error.dbCode === '23503') {
     return 'identity_mismatch'
@@ -339,7 +375,7 @@ export async function markOnboardingPlanQueued(userId: string): Promise<void> {
     .eq('id', userId)
 
   if (error) {
-    throw new Error(`Failed to mark onboarding plan queued: ${error.message}`)
+    throw toOnboardingStateWriteError('mark onboarding plan queued', error)
   }
 }
 
@@ -367,7 +403,7 @@ export async function updateOnboardingDraft(
     .eq('id', userId)
 
   if (error) {
-    throw new Error(`Failed to update onboarding draft: ${error.message}`)
+    throw toOnboardingStateWriteError('update onboarding draft', error)
   }
 }
 
@@ -399,7 +435,7 @@ export async function markCoreOnboardingComplete(
     .eq('id', userId)
 
   if (error) {
-    throw new Error(`Failed to mark onboarding core complete: ${error.message}`)
+    throw toOnboardingStateWriteError('mark onboarding core complete', error)
   }
 }
 
@@ -431,7 +467,7 @@ export async function markEnrichmentUpdated(
     .eq('id', userId)
 
   if (error) {
-    throw new Error(`Failed to update onboarding enrichment: ${error.message}`)
+    throw toOnboardingStateWriteError('update onboarding enrichment', error)
   }
 
   return {
@@ -456,7 +492,7 @@ export async function loadOnboardingState(userId: string): Promise<{
     .maybeSingle()
 
   if (error) {
-    throw new Error(`Failed to read onboarding state: ${error.message}`)
+    throw toOnboardingStateWriteError('load onboarding state', error)
   }
 
   const fallbackDraft = createEmptyOnboardingDraftPayload()
@@ -520,7 +556,7 @@ async function markPlanJobSuccess(userId: string, attemptCount: number): Promise
     .eq('id', userId)
 
   if (profileError) {
-    throw new Error(`Failed to update user profile after plan success: ${profileError.message}`)
+    throw toOnboardingStateWriteError('update user profile after plan success', profileError)
   }
 
   const { logProgressEvent } = await import('./progress')
@@ -542,7 +578,7 @@ async function markPlanJobRunning(userId: string): Promise<void> {
     .eq('id', userId)
 
   if (profileError) {
-    throw new Error(`Failed to update user profile while plan is running: ${profileError.message}`)
+    throw toOnboardingStateWriteError('update user profile while plan is running', profileError)
   }
 }
 
@@ -593,7 +629,7 @@ async function markPlanJobFailure(
     .eq('id', userId)
 
   if (profileError) {
-    throw new Error(`Failed to update user profile after plan failure: ${profileError.message}`)
+    throw toOnboardingStateWriteError('update user profile after plan failure', profileError)
   }
 
   const { logProgressEvent } = await import('./progress')
@@ -661,7 +697,7 @@ async function runPlanJobForUser(userId: string): Promise<boolean> {
       .eq('id', userId)
 
     if (profileError) {
-      throw new Error(`Failed to sync profile after stale plan job requeue: ${profileError.message}`)
+      throw toOnboardingStateWriteError('sync profile after stale plan job requeue', profileError)
     }
 
     job = requeuedJob

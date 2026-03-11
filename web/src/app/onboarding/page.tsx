@@ -156,6 +156,8 @@ export default function OnboardingPage() {
   async function handleSubmitCore(): Promise<void> {
     setSubmitting(true)
     try {
+      await ensureSession()
+
       const response = await fetch('/api/onboarding/core/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -167,6 +169,15 @@ export default function OnboardingPage() {
       })
 
       if (!response.ok) {
+        if (response.status === 401) {
+          toast.error('Session Expired', {
+            description: 'Your session expired. Reloading so you can continue onboarding.',
+          })
+          if (typeof window !== 'undefined') {
+            window.location.reload()
+          }
+          return
+        }
         const data = await response.json().catch(() => ({ error: 'Unable to complete onboarding.' }))
         toast.error('Onboarding Failed', { description: data.error || 'Please review your answers and try again.' })
         return

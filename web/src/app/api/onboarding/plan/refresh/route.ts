@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import {
   loadOnboardingState,
   markOnboardingPlanQueued,
+  OnboardingMigrationRequiredError,
   queueOnboardingPlanJob,
 } from '@/lib/onboarding-service'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
@@ -26,6 +27,12 @@ export async function POST() {
         { status: 409 },
       )
     }
+    if (state.plan.status === 'queued' || state.plan.status === 'running') {
+      return NextResponse.json(
+        { error: 'A game plan refresh is already in progress.' },
+        { status: 409 },
+      )
+    }
 
     await queueOnboardingPlanJob(userId, state.draft.core, state.draft.enrichment)
     await markOnboardingPlanQueued(userId)
@@ -38,6 +45,9 @@ export async function POST() {
       plan: { status: 'queued' as const },
     })
   } catch (error) {
+    if (error instanceof OnboardingMigrationRequiredError) {
+      return NextResponse.json({ error: error.message }, { status: 503 })
+    }
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
   }
