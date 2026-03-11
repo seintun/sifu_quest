@@ -81,19 +81,21 @@ function PlanStatusControls({
   isQueueingPlanRefresh: boolean
   onQueuePlanRefresh: () => void
 }) {
+  const baseBadgeClass = 'h-9 cursor-default pointer-events-none px-3 text-xs font-medium'
+
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-surface/60 p-2.5 sm:flex-row sm:items-center sm:justify-between sm:border-0 sm:bg-transparent sm:p-0">
+    <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-surface/60 p-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-wrap items-center gap-2">
         {planStatus === 'not_queued' && (
-          <Badge variant="outline" className="cursor-default pointer-events-none border-info/40 bg-info/10 text-info">
+          <Badge variant="outline" className={`${baseBadgeClass} border-info/40 bg-info/10 text-info`}>
             New profile updates available
           </Badge>
         )}
-        <Badge variant="outline" className="cursor-default pointer-events-none border-border/60 bg-elevated/70 text-muted-foreground">
+        <Badge variant="outline" className={`${baseBadgeClass} border-border/60 bg-elevated/70 text-muted-foreground`}>
           Status: {formatPlanStatus(planStatus)}
         </Badge>
         {planErrorCode && (
-          <Badge variant="outline" className="cursor-default pointer-events-none border-danger/40 bg-danger/10 text-danger">
+          <Badge variant="outline" className={`${baseBadgeClass} border-danger/40 bg-danger/10 text-danger`}>
             Error: {planErrorCode}
           </Badge>
         )}
@@ -102,7 +104,7 @@ function PlanStatusControls({
         type="button"
         onClick={onQueuePlanRefresh}
         disabled={!canRequestRefresh || isQueueingPlanRefresh}
-        className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 py-2 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 sm:w-auto sm:justify-start sm:py-1.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+        className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 sm:w-auto sm:justify-start disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
       >
         <RefreshCw className={`h-3.5 w-3.5 ${isQueueingPlanRefresh ? 'animate-spin' : ''}`} />
         {isQueueingPlanRefresh ? 'Queueing update...' : 'Generate Updated Plan'}
