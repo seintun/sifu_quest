@@ -37,18 +37,34 @@ export async function POST() {
         { status: 409 },
       )
     }
+
     if (state.plan.status === 'queued' || state.plan.status === 'running') {
       return NextResponse.json(
         {
-          error: 'A game plan refresh is already in progress.',
+          success: true,
+          message: 'A game plan refresh is already in progress.',
           code: 'plan_refresh_in_progress',
+          plan: { status: state.plan.status },
           requestId,
         },
-        { status: 409 },
+        { status: 202 },
       )
     }
 
-    await queueOnboardingPlanJob(userId, state.draft.core, state.draft.enrichment)
+    const queueResult = await queueOnboardingPlanJob(userId, state.draft.core, state.draft.enrichment)
+    if (queueResult === 'already_running' || queueResult === 'already_queued') {
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'A game plan refresh is already in progress.',
+          code: 'plan_refresh_in_progress',
+          plan: { status: queueResult === 'already_running' ? 'running' : 'queued' },
+          requestId,
+        },
+        { status: 202 },
+      )
+    }
+
     await markOnboardingPlanQueued(userId)
 
     const { logProgressEvent } = await import('@/lib/progress')

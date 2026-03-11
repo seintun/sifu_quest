@@ -3,6 +3,10 @@ import Anthropic from '@anthropic-ai/sdk'
 import { assertRequiredEnv } from './env'
 import { MemoryWriteError, writeMemoryFilesBatch } from './memory'
 import {
+  getPlanRetryState,
+  isPlanJobRunningStale,
+} from './onboarding-plan-job-state'
+import {
   type LegacyOnboardingPayload,
   type OnboardingCoreAnswers,
   type OnboardingDraftPayload,
@@ -37,6 +41,8 @@ type PlanJobPayload = {
   queuedAt: string
 }
 
+export type QueueOnboardingPlanJobResult = 'queued' | 'already_queued' | 'already_running'
+
 const PLAN_PLACEHOLDER = `# Personalized Plan
 
 Your personalized plan is being generated in the background.
@@ -48,13 +54,7 @@ function todayIsoDate(): string {
   return new Date().toISOString().split('T')[0]
 }
 
-function getBackoffDelayMs(attemptCount: number): number {
-  // 2m, 4m, 8m
-  const minutes = 2 ** Math.max(1, attemptCount)
-  return minutes * 60 * 1000
-}
-
-const PLAN_JOB_STALE_MS = 10 * 60 * 1000
+export { getBackoffDelayMs, getPlanRetryState, isPlanJobRunningStale } from './onboarding-plan-job-state'
 
 type DbErrorLike = {
   code?: string | null
@@ -339,12 +339,76 @@ export async function queueOnboardingPlanJob(
   userId: string,
   core: OnboardingCoreAnswers,
   enrichment: OnboardingEnrichmentAnswers,
-): Promise<void> {
+): Promise<QueueOnboardingPlanJobResult> {
   const supabaseAdmin = createAdminClient()
   const now = new Date().toISOString()
   const payload = createPlanJobPayload(core, enrichment)
 
-  const { error: queueError } = await supabaseAdmin
+  // Reuse terminal jobs without clobbering in-flight work.
+  const { data: reclaimedJob, error: reclaimError } = await supabaseAdmin
+    .from('onboarding_plan_jobs')
+    .update({
+      status: 'queued',
+      payload,
+      attempt_count: 0,
+      available_at: now,
+      last_error_code: null,
+      updated_at: now,
+      completed_at: null,
+    })
+    .eq('user_id', userId)
+    .in('status', ['completed', 'failed'])
+    .select('status')
+    .maybeSingle()
+
+  if (reclaimError) {
+    throw toDatabaseOperationError('queue onboarding plan job', reclaimError)
+  }
+
+  if (reclaimedJob) {
+    return 'queued'
+  }
+
+  const { error: insertError } = await supabaseAdmin
+    .from('onboarding_plan_jobs')
+    .insert({
+      user_id: userId,
+      status: 'queued',
+      payload,
+      attempt_count: 0,
+      available_at: now,
+      last_error_code: null,
+      updated_at: now,
+      completed_at: null,
+    })
+
+  if (!insertError) {
+    return 'queued'
+  }
+
+  if (insertError.code !== '23505') {
+    throw toDatabaseOperationError('queue onboarding plan job', insertError)
+  }
+
+  // Handle concurrent queue requests safely.
+  const { data: existingJob, error: existingJobError } = await supabaseAdmin
+    .from('onboarding_plan_jobs')
+    .select('status')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (existingJobError) {
+    throw toDatabaseOperationError('queue onboarding plan job', existingJobError)
+  }
+
+  if (existingJob?.status === 'running') {
+    return 'already_running'
+  }
+  if (existingJob?.status === 'queued') {
+    return 'already_queued'
+  }
+
+  const { error: fallbackUpsertError } = await supabaseAdmin
     .from('onboarding_plan_jobs')
     .upsert(
       {
@@ -360,9 +424,11 @@ export async function queueOnboardingPlanJob(
       { onConflict: 'user_id' },
     )
 
-  if (queueError) {
-    throw toDatabaseOperationError('queue onboarding plan job', queueError)
+  if (fallbackUpsertError) {
+    throw toDatabaseOperationError('queue onboarding plan job', fallbackUpsertError)
   }
+
+  return 'queued'
 }
 
 export async function markOnboardingPlanQueued(userId: string): Promise<void> {
@@ -595,17 +661,16 @@ async function markPlanJobFailure(
 ): Promise<void> {
   const supabaseAdmin = createAdminClient()
   const now = new Date().toISOString()
-  const exhausted = attemptCount >= 3
+  const retryState = getPlanRetryState(attemptCount)
+  const exhausted = retryState.exhausted
 
   const { data: updatedJob, error: jobError } = await supabaseAdmin
     .from('onboarding_plan_jobs')
     .update({
-      status: exhausted ? 'failed' : 'queued',
+      status: retryState.nextStatus,
       attempt_count: attemptCount,
       last_error_code: errorCode,
-      available_at: exhausted
-        ? now
-        : new Date(Date.now() + getBackoffDelayMs(attemptCount)).toISOString(),
+      available_at: retryState.availableAtIso,
       updated_at: now,
     })
     .eq('user_id', userId)
@@ -665,9 +730,7 @@ async function runPlanJobForUser(userId: string): Promise<boolean> {
 
   // If a worker died mid-run, recover stale running jobs so a kick can resume processing.
   if (job.status === 'running') {
-    const updatedAtMs = job.updated_at ? new Date(job.updated_at).getTime() : NaN
-    const isStale = Number.isNaN(updatedAtMs) || Date.now() - updatedAtMs > PLAN_JOB_STALE_MS
-    if (!isStale) {
+    if (!isPlanJobRunningStale(job.updated_at)) {
       return false
     }
 

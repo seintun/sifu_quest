@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { normalizeApiError } from './api-error-normalization'
 
 type ApiErrorResponseContext = {
   route: string
@@ -11,13 +12,6 @@ type ApiErrorResponseContext = {
   details?: Record<string, unknown>
 }
 
-type NormalizedError = {
-  status: number
-  code: string
-  message: string
-  exposeMessage: boolean
-}
-
 export function createRequestId(): string {
   try {
     return crypto.randomUUID()
@@ -26,48 +20,11 @@ export function createRequestId(): string {
   }
 }
 
-function normalizeError(error: unknown): NormalizedError {
-  if (error instanceof Error && error.name === 'OnboardingMigrationRequiredError') {
-    return {
-      status: 503,
-      code: 'onboarding_schema_unavailable',
-      message: error.message,
-      exposeMessage: true,
-    }
-  }
-
-  if (error instanceof Error && error.name === 'OnboardingValidationError') {
-    return {
-      status: 400,
-      code: 'onboarding_validation_error',
-      message: error.message,
-      exposeMessage: true,
-    }
-  }
-
-  if (error instanceof Error && error.message.toLowerCase().includes('unauthorized')) {
-    return {
-      status: 401,
-      code: 'unauthorized',
-      message: 'Unauthorized',
-      exposeMessage: true,
-    }
-  }
-
-  const fallback = error instanceof Error ? error.message : 'Unknown error'
-  return {
-    status: 500,
-    code: 'internal_error',
-    message: fallback,
-    exposeMessage: false,
-  }
-}
-
 export function createApiErrorResponse(
   error: unknown,
   context: ApiErrorResponseContext,
 ) {
-  const normalized = normalizeError(error)
+  const normalized = normalizeApiError(error)
   const status = context.status ?? normalized.status
   const code = context.code ?? normalized.code
   const safeMessage =

@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import { createApiErrorResponse, createRequestId } from '@/lib/api-error-response'
 import { getPersistableOnboardingDisplayName } from '@/lib/onboarding-name'
 import {
+  loadOnboardingState,
   markCoreOnboardingComplete,
   persistCoreOnboardingFiles,
   queueOnboardingPlanJob,
@@ -32,6 +33,25 @@ export async function POST(request: NextRequest) {
     }
 
     userId = await resolveCanonicalUserId(session.user.id, session.user.email)
+    const existingState = await loadOnboardingState(userId)
+    if (
+      existingState.onboarding.status === 'core_complete' ||
+      existingState.onboarding.status === 'enriched_complete'
+    ) {
+      return NextResponse.json({
+        success: true,
+        idempotent: true,
+        onboarding: {
+          version: existingState.onboarding.version,
+          status: existingState.onboarding.status,
+        },
+        plan: {
+          status: existingState.plan.status,
+          lastErrorCode: existingState.plan.lastErrorCode,
+        },
+      })
+    }
+
     const body = await request.json()
     const core = validateCoreAnswers(body?.core)
     const enrichment = normalizeEnrichmentAnswers(body?.enrichment)
@@ -49,7 +69,7 @@ export async function POST(request: NextRequest) {
       currentStep,
     }
     await markCoreOnboardingComplete(userId, draft)
-    await queueOnboardingPlanJob(userId, core, enrichment)
+    const queueResult = await queueOnboardingPlanJob(userId, core, enrichment)
 
     const displayName = getPersistableOnboardingDisplayName(core.name)
     if (displayName) {
@@ -66,7 +86,9 @@ export async function POST(request: NextRequest) {
 
     const { logProgressEvent, logAuditEvent } = await import('@/lib/progress')
     await logProgressEvent(userId, 'core_completed', 'onboarding')
-    await logProgressEvent(userId, 'plan_queued', 'onboarding')
+    if (queueResult === 'queued') {
+      await logProgressEvent(userId, 'plan_queued', 'onboarding')
+    }
     await logAuditEvent(userId, 'account', 'profile', { action: 'onboarding_core_completed' })
 
     return NextResponse.json({
@@ -76,7 +98,7 @@ export async function POST(request: NextRequest) {
         status: 'core_complete',
       },
       plan: {
-        status: 'queued',
+        status: queueResult === 'already_running' ? 'running' : 'queued',
       },
     })
   } catch (error) {
