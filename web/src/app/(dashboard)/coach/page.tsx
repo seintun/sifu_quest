@@ -138,7 +138,27 @@ function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreamin
 export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
   const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
-  const { messages, setMessages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
+  const {
+    messages,
+    setMessages,
+    isStreaming,
+    isLoaded,
+    upgradeRequired,
+    freeQuota,
+    sendMessage,
+    greet,
+    clearHistory,
+    stopStreaming,
+    providers,
+    selectedProvider,
+    selectedModel,
+    selectedProviderInfo,
+    availableModelsForSelectedProvider,
+    sessionMetrics,
+    updateProviderSelection,
+    updateModelSelection,
+    formatMicrousd,
+  } = useChat(mode)
   const [accountIsGuest, setAccountIsGuest] = useState<boolean | null>(null)
   const [isAnonymousSession, setIsAnonymousSession] = useState<boolean | null>(null)
   const isGuest = isAnonymousSession === null ? (accountIsGuest ?? Boolean(freeQuota?.isGuest)) : isAnonymousSession
@@ -216,7 +236,7 @@ export default function CoachPage() {
     }
   }, [isStreaming, freeQuota])
 
-  // Automatically trigger the end-of-quota experience once the 5th message finishes streaming
+  // Automatically trigger the end-of-quota experience once the free-tier limit is reached.
   useEffect(() => {
     if (!isStreaming && freeQuota?.isFreeTier && freeQuota.remaining <= 0 && messages.length > 0) {
       const lastMessage = messages[messages.length - 1]
@@ -269,6 +289,38 @@ export default function CoachPage() {
           <h1 className="font-display text-2xl font-bold">Coach Chat</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Select value={selectedProvider} onValueChange={v => updateProviderSelection(v as 'openrouter' | 'anthropic')}>
+            <SelectTrigger className="w-40 bg-surface border-border">
+              <SelectValue>{selectedProviderInfo?.label ?? 'Provider'}</SelectValue>
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false}>
+              {providers.map((provider) => (
+                <SelectItem
+                  key={provider.id}
+                  value={provider.id}
+                  disabled={provider.availability !== 'available'}
+                >
+                  {provider.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedModel} onValueChange={v => v && updateModelSelection(v)}>
+            <SelectTrigger className="w-64 bg-surface border-border">
+              <SelectValue>{availableModelsForSelectedProvider.find((model) => model.id === selectedModel)?.label ?? 'Model'}</SelectValue>
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false}>
+              {availableModelsForSelectedProvider.map((model) => (
+                <SelectItem
+                  key={model.id}
+                  value={model.id}
+                  disabled={model.availability !== 'available'}
+                >
+                  {model.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={mode} onValueChange={v => v && setMode(v)}>
             <SelectTrigger className="w-44 bg-surface border-border">
               <SelectValue>{selectedModeLabel}</SelectValue>
@@ -295,7 +347,7 @@ export default function CoachPage() {
         <CardContent className="p-0 flex-1 flex flex-col min-h-0">
           {upgradeRequired && !dismissedPrompt ? (
              <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-center min-h-0">
-                 {upgradeRequired === 'missing_api_key' || (!isGuest && upgradeRequired === 'guest_limit_reached') ? (
+                 {upgradeRequired === 'missing_api_key' || upgradeRequired === 'provider_key_required' || (!isGuest && upgradeRequired === 'guest_limit_reached') ? (
                    <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />
                  ) : (
                    <UpgradePrompt onClose={() => setDismissedPrompt(true)} />
@@ -356,6 +408,22 @@ export default function CoachPage() {
                 </div>
               </div>
             )}
+            {selectedProviderInfo?.availability !== 'available' && selectedProviderInfo?.reason && (
+              <div className="mb-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                {selectedProviderInfo.reason}
+              </div>
+            )}
+            {sessionMetrics && (
+              <div className="mb-2 rounded-md border border-border/60 bg-elevated/30 px-3 py-2 text-xs text-foreground/80">
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <span>Turns: {sessionMetrics.userTurns}</span>
+                  <span>Input tokens: {sessionMetrics.inputTokens}</span>
+                  <span>Output tokens: {sessionMetrics.outputTokens}</span>
+                  <span>Total tokens: {sessionMetrics.totalTokens}</span>
+                  <span>Est. cost: {formatMicrousd(sessionMetrics.estimatedCostMicrousd)}</span>
+                </div>
+              </div>
+            )}
             <div className="flex gap-2">
               <Textarea
                 ref={textareaRef}
@@ -369,7 +437,11 @@ export default function CoachPage() {
                 }
                 className="bg-elevated border-border resize-none min-h-[2.5rem] max-h-32"
                 rows={1}
-                disabled={isStreaming || (freeQuota?.isFreeTier && freeQuota.remaining <= 0)}
+                disabled={
+                  isStreaming ||
+                  (freeQuota?.isFreeTier && freeQuota.remaining <= 0) ||
+                  selectedProviderInfo?.availability !== 'available'
+                }
               />
               {isStreaming ? (
                 <Button
@@ -384,7 +456,11 @@ export default function CoachPage() {
                 <Button
                   size="sm"
                   onClick={handleSend}
-                  disabled={!input.trim() || (freeQuota?.isFreeTier && freeQuota.remaining <= 0)}
+                  disabled={
+                    !input.trim() ||
+                    (freeQuota?.isFreeTier && freeQuota.remaining <= 0) ||
+                    selectedProviderInfo?.availability !== 'available'
+                  }
                   className="shrink-0 self-end"
                 >
                   <Send className="h-4 w-4" />

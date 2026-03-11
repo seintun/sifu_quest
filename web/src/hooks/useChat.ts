@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ChatProvider, ModelAvailability } from '@/lib/chat-provider-config'
 
 export interface FreeQuota {
   isFreeTier: boolean
@@ -14,14 +15,53 @@ export interface ChatMessage {
   content: string
 }
 
+export interface ChatProviderOption {
+  id: ChatProvider
+  label: string
+  availability: ModelAvailability
+  reason?: string
+}
+
+export interface ChatModelOption {
+  id: string
+  label: string
+  provider: ChatProvider
+  isFree: boolean
+  availability: ModelAvailability
+  reason?: string
+}
+
+export interface SessionUsageMetrics {
+  userTurns: number
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  estimatedCostMicrousd: number
+}
+
 const FREE_TIER_EXHAUSTED_MESSAGE =
   'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your key is encrypted with AES-256-CBC before storage, and your past conversation remains accessible here.'
 
 const GUEST_LIMIT_REACHED_MESSAGE =
   'You have reached the guest limit. Please sign up to continue. After creating your account, add your own Anthropic API key in **Settings** to keep chatting securely.'
 
+const PROVIDER_KEY_REQUIRED_MESSAGE =
+  'Anthropic models require your own Anthropic API key. Add your key in **Settings** and try again.'
+
 const CHAT_TEMPORARY_ERROR_MESSAGE =
   'I hit a temporary issue loading your workspace. Please try again in a moment.'
+
+type ChatSessionResponse = {
+  session?: { id: string } | null
+  messages?: ChatMessage[]
+  freeQuota?: FreeQuota | null
+  selection?: { provider: ChatProvider; model: string }
+  metrics?: SessionUsageMetrics
+}
+
+function toMicrousdDisplay(microusd: number): string {
+  return `$${(microusd / 1_000_000).toFixed(4)}`
+}
 
 export function useChat(mode: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -30,9 +70,22 @@ export function useChat(mode: string) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [upgradeRequired, setUpgradeRequired] = useState<string | null>(null)
   const [freeQuota, setFreeQuota] = useState<FreeQuota | null>(null)
+  const [providers, setProviders] = useState<ChatProviderOption[]>([])
+  const [modelsByProvider, setModelsByProvider] = useState<Record<ChatProvider, ChatModelOption[]>>({
+    openrouter: [],
+    anthropic: [],
+  })
+  const [selectedProvider, setSelectedProvider] = useState<ChatProvider>('openrouter')
+  const [selectedModel, setSelectedModel] = useState('')
+  const [sessionMetrics, setSessionMetrics] = useState<SessionUsageMetrics | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
-  // Load history for the current mode from DB
+  const applySelection = useCallback((provider: ChatProvider, model: string) => {
+    setSelectedProvider(provider)
+    setSelectedModel(model)
+  }, [])
+
+  // Load provider catalog + history for the current mode from DB.
   useEffect(() => {
     const controller = new AbortController()
     let cancelled = false
@@ -44,54 +97,109 @@ export function useChat(mode: string) {
     setUpgradeRequired(null)
     setMessages([])
     setFreeQuota(null)
-    
-    fetch(`/api/chat/session?mode=${mode}`, { signal: controller.signal })
-      .then(async res => {
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) {
-          throw new Error((data as { error?: string }).error || 'Failed to load chat session')
+    setSessionMetrics(null)
+
+    const load = async () => {
+      try {
+        const providersRes = await fetch('/api/chat/providers', { signal: controller.signal })
+        const providerData = await providersRes.json().catch(() => ({})) as {
+          providers?: ChatProviderOption[]
+          modelsByProvider?: Record<ChatProvider, ChatModelOption[]>
+          defaults?: { provider: ChatProvider; model: string }
         }
-        return data
-      })
-      .then(data => {
+
+        if (!providersRes.ok) {
+          throw new Error('Failed to load providers')
+        }
+
         if (cancelled) return
-        if (data.session) {
-           setSessionId(data.session.id)
-           setMessages(data.messages || [])
+
+        setProviders(providerData.providers ?? [])
+        setModelsByProvider(providerData.modelsByProvider ?? { openrouter: [], anthropic: [] })
+
+        if (providerData.defaults) {
+          applySelection(providerData.defaults.provider, providerData.defaults.model)
         }
-        setFreeQuota(data.freeQuota ?? null)
-        setIsLoaded(true)
-      })
-      .catch(err => {
+
+        const sessionRes = await fetch(`/api/chat/session?mode=${mode}`, { signal: controller.signal })
+        const sessionData = await sessionRes.json().catch(() => ({})) as ChatSessionResponse & { error?: string }
+
+        if (!sessionRes.ok) {
+          throw new Error(sessionData.error || 'Failed to load chat session')
+        }
+
+        if (cancelled) return
+
+        if (sessionData.session) {
+          setSessionId(sessionData.session.id)
+          setMessages(sessionData.messages || [])
+        }
+
+        if (sessionData.selection) {
+          applySelection(sessionData.selection.provider, sessionData.selection.model)
+        }
+
+        setSessionMetrics(sessionData.metrics ?? null)
+        setFreeQuota(sessionData.freeQuota ?? null)
+      } catch (err) {
         if (cancelled || (err instanceof Error && err.name === 'AbortError')) return
-        console.error("Failed to load chat session", err)
-        setIsLoaded(true)
-      })
+        console.error('Failed to load chat bootstrap data', err)
+      } finally {
+        if (!cancelled) {
+          setIsLoaded(true)
+        }
+      }
+    }
+
+    void load()
 
     return () => {
       cancelled = true
       controller.abort()
     }
-  }, [mode])
+  }, [mode, applySelection])
 
-  // Helper to ensure we have an active DB session before sending a message
-  const ensureSession = useCallback(async (): Promise<string> => {
-     if (sessionId) return sessionId
-     const res = await fetch('/api/chat/session', {
-       method: 'POST',
-       headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({ mode })
-     })
-      const data = await res.json()
-      if (res.ok && data.session) {
-        setSessionId(data.session.id)
-        if (data.freeQuota) {
-          setFreeQuota(data.freeQuota)
-        }
-        return data.session.id
+  const updateProviderSelection = useCallback((provider: ChatProvider) => {
+    setSelectedProvider(provider)
+    setSelectedModel((prev) => {
+      const models = modelsByProvider[provider] ?? []
+      if (models.some((model) => model.id === prev && model.availability === 'available')) {
+        return prev
       }
-     throw new Error(data.error || 'Failed to create session')
-  }, [sessionId, mode])
+      const firstAvailable = models.find((model) => model.availability === 'available')
+      return firstAvailable?.id ?? models[0]?.id ?? ''
+    })
+  }, [modelsByProvider])
+
+  const updateModelSelection = useCallback((modelId: string) => {
+    setSelectedModel(modelId)
+  }, [])
+
+  const ensureSession = useCallback(async (): Promise<string> => {
+    if (sessionId) return sessionId
+    const res = await fetch('/api/chat/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode,
+        provider: selectedProvider,
+        model: selectedModel,
+      }),
+    })
+    const data = await res.json() as ChatSessionResponse & { error?: string }
+    if (res.ok && data.session) {
+      setSessionId(data.session.id)
+      if (data.freeQuota) {
+        setFreeQuota(data.freeQuota)
+      }
+      if (data.selection) {
+        applySelection(data.selection.provider, data.selection.model)
+      }
+      setSessionMetrics(data.metrics ?? null)
+      return data.session.id
+    }
+    throw new Error(data.error || 'Failed to create session')
+  }, [sessionId, mode, selectedProvider, selectedModel, applySelection])
 
   const sendMessage = useCallback(async (userMessage: string) => {
     const newMessages: ChatMessage[] = [
@@ -103,59 +211,59 @@ export function useChat(mode: string) {
 
     const previousQuota = freeQuota
 
-    // Optimistically decrement quota
-    setFreeQuota(prev => prev && prev.isFreeTier ? { ...prev, remaining: Math.max(0, prev.remaining - 1) } : prev)
+    // Optimistically decrement quota.
+    setFreeQuota((prev) => prev && prev.isFreeTier ? { ...prev, remaining: Math.max(0, prev.remaining - 1) } : prev)
 
     const controller = new AbortController()
     abortRef.current = controller
 
     try {
       const activeSessionId = await ensureSession()
-      
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          messages: newMessages, 
+        body: JSON.stringify({
+          messages: newMessages,
           mode,
-          sessionId: activeSessionId
+          sessionId: activeSessionId,
+          provider: selectedProvider,
+          model: selectedModel,
         }),
         signal: controller.signal,
       })
 
       if (!res.ok) {
+        setFreeQuota(previousQuota)
         let errorMessage = 'Unknown error'
         let errorCode: string | null = null
         try {
-           const errorData: { message?: string; error?: string } = await res.json()
-           errorMessage = errorData.message || errorData.error || errorMessage
-           errorCode = errorData.error ?? null
-        } catch { /* ignore */ }
-        
+          const errorData: { message?: string; error?: string } = await res.json()
+          errorMessage = errorData.message || errorData.error || errorMessage
+          errorCode = errorData.error ?? null
+        } catch {
+          // Ignore malformed error payloads.
+        }
+
         if (res.status === 403) {
-          if (errorCode === 'guest_limit_reached' || errorCode === 'missing_api_key' || errorCode === 'session_expired') {
-            setFreeQuota((prev) =>
-              prev && prev.isFreeTier
-                ? { ...prev, remaining: 0 }
-                : prev,
-            )
-          } else {
-            setFreeQuota(previousQuota)
-          }
           setUpgradeRequired(errorCode || 'missing_api_key')
           const isGuestBlocked = errorCode === 'guest_limit_reached' || errorCode === 'session_expired'
+          const isProviderKeyRequired = errorCode === 'provider_key_required'
           setMessages([
             ...newMessages,
             {
               role: 'assistant',
-              content: isGuestBlocked ? GUEST_LIMIT_REACHED_MESSAGE : FREE_TIER_EXHAUSTED_MESSAGE,
+              content: isProviderKeyRequired
+                ? PROVIDER_KEY_REQUIRED_MESSAGE
+                : isGuestBlocked
+                  ? GUEST_LIMIT_REACHED_MESSAGE
+                  : FREE_TIER_EXHAUSTED_MESSAGE,
             },
           ])
           setIsStreaming(false)
           return
         }
 
-        setFreeQuota(previousQuota)
         const safeMessage = res.status >= 500 ? CHAT_TEMPORARY_ERROR_MESSAGE : errorMessage
         setMessages([...newMessages, { role: 'assistant', content: safeMessage }])
         setIsStreaming(false)
@@ -171,6 +279,7 @@ export function useChat(mode: string) {
 
       const decoder = new TextDecoder()
       let assistantContent = ''
+      let usageApplied = false
       setMessages([...newMessages, { role: 'assistant', content: '' }])
 
       while (true) {
@@ -181,25 +290,63 @@ export function useChat(mode: string) {
           const data = line.slice(6).trim()
           if (data === '[DONE]') continue
           try {
-            const parsed = JSON.parse(data)
+            const parsed = JSON.parse(data) as {
+              text?: string
+              error?: string
+              type?: string
+              provider?: ChatProvider
+              model?: string
+              inputTokens?: number | null
+              outputTokens?: number | null
+              totalTokens?: number | null
+              estimatedCostMicrousd?: number | null
+            }
+
             if (parsed.text) {
               assistantContent += parsed.text
-              setMessages(prev => {
+              setMessages((prev) => {
                 const updated = [...prev]
                 updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
                 return updated
               })
             }
+
+            if (parsed.type === 'usage') {
+              usageApplied = true
+              if (parsed.provider && parsed.model) {
+                applySelection(parsed.provider, parsed.model)
+              }
+              setSessionMetrics((prev) => ({
+                userTurns: (prev?.userTurns ?? 0) + 1,
+                inputTokens: (prev?.inputTokens ?? 0) + (parsed.inputTokens ?? 0),
+                outputTokens: (prev?.outputTokens ?? 0) + (parsed.outputTokens ?? 0),
+                totalTokens: (prev?.totalTokens ?? 0) + (parsed.totalTokens ?? 0),
+                estimatedCostMicrousd: (prev?.estimatedCostMicrousd ?? 0) + (parsed.estimatedCostMicrousd ?? 0),
+              }))
+            }
+
             if (parsed.error) {
               assistantContent += `\n\nError: ${parsed.error}`
-              setMessages(prev => {
+              setMessages((prev) => {
                 const updated = [...prev]
                 updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
                 return updated
               })
             }
-          } catch { /* skip malformed JSON */ }
+          } catch {
+            // Skip malformed JSON lines.
+          }
         }
+      }
+
+      if (!usageApplied) {
+        setSessionMetrics((prev) => ({
+          userTurns: (prev?.userTurns ?? 0) + 1,
+          inputTokens: prev?.inputTokens ?? 0,
+          outputTokens: prev?.outputTokens ?? 0,
+          totalTokens: prev?.totalTokens ?? 0,
+          estimatedCostMicrousd: prev?.estimatedCostMicrousd ?? 0,
+        }))
       }
     } catch (err) {
       if (err instanceof Error) {
@@ -215,7 +362,7 @@ export function useChat(mode: string) {
         abortRef.current = null
       }
     }
-  }, [messages, mode, ensureSession, freeQuota])
+  }, [messages, mode, ensureSession, freeQuota, selectedProvider, selectedModel, applySelection])
 
   const greet = useCallback(async () => {
     if (isStreaming) return
@@ -226,15 +373,17 @@ export function useChat(mode: string) {
 
     try {
       const activeSessionId = await ensureSession()
-      
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          messages: [{ role: 'user', content: 'Start the session.' }], 
-          mode, 
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'Start the session.' }],
+          mode,
           isGreeting: true,
-          sessionId: activeSessionId
+          sessionId: activeSessionId,
+          provider: selectedProvider,
+          model: selectedModel,
         }),
         signal: controller.signal,
       })
@@ -243,11 +392,13 @@ export function useChat(mode: string) {
         let errorMessage = 'Unknown error'
         let errorCode: string | null = null
         try {
-           const errorData: { message?: string; error?: string } = await res.json()
-           errorMessage = errorData.message || errorData.error || errorMessage
-           errorCode = errorData.error ?? null
-        } catch { /* ignore */ }
-        
+          const errorData: { message?: string; error?: string } = await res.json()
+          errorMessage = errorData.message || errorData.error || errorMessage
+          errorCode = errorData.error ?? null
+        } catch {
+          // Ignore malformed error payloads.
+        }
+
         if (res.status === 403) {
           setUpgradeRequired(errorCode || 'missing_api_key')
           setIsStreaming(false)
@@ -261,7 +412,10 @@ export function useChat(mode: string) {
       }
 
       const reader = res.body?.getReader()
-      if (!reader) { setIsStreaming(false); return }
+      if (!reader) {
+        setIsStreaming(false)
+        return
+      }
 
       const decoder = new TextDecoder()
       let assistantContent = ''
@@ -275,16 +429,26 @@ export function useChat(mode: string) {
           const data = line.slice(6).trim()
           if (data === '[DONE]') continue
           try {
-            const parsed = JSON.parse(data)
+            const parsed = JSON.parse(data) as { text?: string; type?: string; provider?: ChatProvider; model?: string }
             if (parsed.text) {
               assistantContent += parsed.text
               setMessages([{ role: 'assistant', content: assistantContent }])
             }
-            if (parsed.error) {
-              assistantContent += `\n\nError: ${parsed.error}`
-              setMessages([{ role: 'assistant', content: assistantContent }])
+            if (parsed.type === 'usage') {
+              if (parsed.provider && parsed.model) {
+                applySelection(parsed.provider, parsed.model)
+              }
+              setSessionMetrics((prev) => ({
+                userTurns: (prev?.userTurns ?? 0) + 1,
+                inputTokens: prev?.inputTokens ?? 0,
+                outputTokens: prev?.outputTokens ?? 0,
+                totalTokens: prev?.totalTokens ?? 0,
+                estimatedCostMicrousd: prev?.estimatedCostMicrousd ?? 0,
+              }))
             }
-          } catch { /* skip malformed JSON */ }
+          } catch {
+            // Ignore malformed JSON payloads.
+          }
         }
       }
     } catch (err) {
@@ -297,33 +461,65 @@ export function useChat(mode: string) {
         abortRef.current = null
       }
     }
-  }, [isStreaming, mode, ensureSession])
+  }, [isStreaming, mode, ensureSession, selectedProvider, selectedModel, applySelection])
 
   const clearHistory = useCallback(async () => {
     setMessages([])
     setSessionId(null)
-    // Archive the active session by creating a new one (creating a new one automatically archives old ones for that mode)
+    setSessionMetrics(null)
     try {
       const res = await fetch('/api/chat/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode })
+        body: JSON.stringify({
+          mode,
+          provider: selectedProvider,
+          model: selectedModel,
+        }),
       })
-      const data = await res.json()
+      const data = await res.json() as ChatSessionResponse
       if (res.ok && data.session) {
         setSessionId(data.session.id)
         if (data.freeQuota) {
           setFreeQuota(data.freeQuota)
         }
+        if (data.selection) {
+          applySelection(data.selection.provider, data.selection.model)
+        }
+        setSessionMetrics(data.metrics ?? null)
       }
     } catch (err) {
-      console.error("Failed to clear history", err)
+      console.error('Failed to clear history', err)
     }
-  }, [mode])
+  }, [mode, selectedProvider, selectedModel, applySelection])
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort()
   }, [])
 
-  return { messages, setMessages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming }
+  const selectedProviderInfo = providers.find((provider) => provider.id === selectedProvider) ?? null
+  const availableModelsForSelectedProvider = modelsByProvider[selectedProvider] ?? []
+
+  return {
+    messages,
+    setMessages,
+    isStreaming,
+    isLoaded,
+    upgradeRequired,
+    freeQuota,
+    sendMessage,
+    greet,
+    clearHistory,
+    stopStreaming,
+    providers,
+    modelsByProvider,
+    selectedProvider,
+    selectedModel,
+    selectedProviderInfo,
+    availableModelsForSelectedProvider,
+    sessionMetrics,
+    updateProviderSelection,
+    updateModelSelection,
+    formatMicrousd: toMicrousdDisplay,
+  }
 }

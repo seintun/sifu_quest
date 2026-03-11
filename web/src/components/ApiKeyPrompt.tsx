@@ -26,7 +26,7 @@ export function ApiKeyPrompt({ onClose }: ApiKeyPromptProps = {}) {
           </div>
           <CardTitle className="text-xl">Free Messages Exhausted</CardTitle>
           <CardDescription className="text-foreground/80">
-            You&apos;ve reached the free-tier limit on the shared platform key. 
+            You&apos;ve reached the free-tier limit on shared OpenRouter free models.
             To continue chatting, please provide your own Anthropic API key.
           </CardDescription>
         </CardHeader>

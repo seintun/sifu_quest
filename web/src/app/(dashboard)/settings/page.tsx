@@ -26,8 +26,27 @@ type AccountStatus = {
   isLinked: boolean
   displayName: string | null
   hasApiKey: boolean
+  hasAnthropicApiKey?: boolean
+  defaultProvider?: 'openrouter' | 'anthropic'
+  defaultModel?: string | null
   prefillName: string | null
   avatarUrl: string | null
+}
+
+type UsageTotals = {
+  userTurns: number
+  assistantTurns: number
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  estimatedCostMicrousd: number
+}
+
+type AccountUsage = {
+  lifetime: UsageTotals
+  trailing30Days: UsageTotals
+  providerBreakdown: Array<UsageTotals & { provider: string }>
+  modelBreakdown: Array<UsageTotals & { provider: string; model: string }>
 }
 
 type FlashMessage = { text: string; type: 'success' | 'error' } | null
@@ -49,6 +68,9 @@ export default function SettingsPage() {
   const [isAccountStatusLoading, setIsAccountStatusLoading] = useState(false)
   const [isAccountStatusInitialized, setIsAccountStatusInitialized] = useState(false)
   const [accountStatusError, setAccountStatusError] = useState('')
+  const [usage, setUsage] = useState<AccountUsage | null>(null)
+  const [isUsageLoading, setIsUsageLoading] = useState(false)
+  const [usageError, setUsageError] = useState('')
 
   const [message, setMessage] = useState<FlashMessage>(null)
 
@@ -80,9 +102,28 @@ export default function SettingsPage() {
     }
   }, [router])
 
+  const loadUsage = useCallback(async () => {
+    setIsUsageLoading(true)
+    setUsageError('')
+    try {
+      const res = await fetch('/api/account/usage')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setUsageError(data.message || data.error || 'Unable to load usage metrics right now.')
+        return
+      }
+      setUsage(data as AccountUsage)
+    } catch {
+      setUsageError('Unable to load usage metrics right now.')
+    } finally {
+      setIsUsageLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     void loadAccountStatus()
-  }, [loadAccountStatus])
+    void loadUsage()
+  }, [loadAccountStatus, loadUsage])
 
   useEffect(() => {
     if (searchParams.get('success') === 'linked') {
@@ -214,6 +255,9 @@ export default function SettingsPage() {
   const normalizedInputName = useMemo(() => fullName.trim().replace(/\s+/g, ' '), [fullName])
   const canSaveApiKey = useMemo(() => canSaveAnthropicApiKey(apiKey), [apiKey])
   const isNameDirty = normalizedInputName !== normalizedCurrentName
+  const hasAnthropicApiKey = Boolean(accountStatus?.hasAnthropicApiKey ?? accountStatus?.hasApiKey)
+
+  const formatMicrousd = useCallback((microusd: number) => `$${(microusd / 1_000_000).toFixed(4)}`, [])
 
   if (!isAccountStatusInitialized) return <div className="p-8 text-muted-foreground">Loading settings...</div>
 
@@ -336,13 +380,69 @@ export default function SettingsPage() {
               <Button type="submit" disabled={!canSaveApiKey || isSavingKey || isRemovingKey}>
                 {isSavingKey ? 'Saving...' : 'Save API Key'}
               </Button>
-              {shouldShowRemoveApiKey(accountStatus?.hasApiKey) && (
+              {shouldShowRemoveApiKey(hasAnthropicApiKey) && (
                 <Button type="button" variant="outline" onClick={handleRemoveKey} disabled={isSavingKey || isRemovingKey}>
                   {isRemovingKey ? 'Removing...' : 'Remove Key'}
                 </Button>
               )}
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border bg-surface/80 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle>Chat Usage Metrics</CardTitle>
+          <CardDescription>
+            Session and account usage telemetry aggregated from your chat history.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          {isUsageLoading ? (
+            <p className="text-muted-foreground">Loading usage metrics...</p>
+          ) : usageError ? (
+            <p className="text-danger">{usageError}</p>
+          ) : usage ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="rounded-lg border border-border/60 bg-elevated/40 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Last 30 days</p>
+                  <p className="mt-1">User turns: {usage.trailing30Days.userTurns}</p>
+                  <p>Assistant turns: {usage.trailing30Days.assistantTurns}</p>
+                  <p>Total tokens: {usage.trailing30Days.totalTokens}</p>
+                  <p>Estimated cost: {formatMicrousd(usage.trailing30Days.estimatedCostMicrousd)}</p>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-elevated/40 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Lifetime</p>
+                  <p className="mt-1">User turns: {usage.lifetime.userTurns}</p>
+                  <p>Assistant turns: {usage.lifetime.assistantTurns}</p>
+                  <p>Total tokens: {usage.lifetime.totalTokens}</p>
+                  <p>Estimated cost: {formatMicrousd(usage.lifetime.estimatedCostMicrousd)}</p>
+                </div>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-elevated/30 p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Provider breakdown</p>
+                {usage.providerBreakdown.length === 0 ? (
+                  <p className="text-muted-foreground">No provider usage yet.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {usage.providerBreakdown.map((provider) => (
+                      <p key={provider.provider}>
+                        {provider.provider}: {provider.assistantTurns} responses, {provider.totalTokens} tokens, {formatMicrousd(provider.estimatedCostMicrousd)}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="text-muted-foreground">No usage metrics yet.</p>
+          )}
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => void loadUsage()} disabled={isUsageLoading}>
+              {isUsageLoading ? 'Refreshing...' : 'Refresh Usage'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
