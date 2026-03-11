@@ -330,9 +330,6 @@ export default function DashboardPage() {
               <h1 className="font-display text-2xl font-bold">Dashboard</h1>
               <p className="text-muted-foreground text-sm mt-1">Your job search at a glance</p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="rounded-md border border-plan/30 bg-plan/10 px-2.5 py-1 text-xs font-medium text-plan">
-                  {planLabel}
-                </span>
                 <span className="rounded-md border border-border bg-elevated/70 px-2.5 py-1 text-xs text-muted-foreground">
                   {overallPlanPct}% complete
                 </span>
