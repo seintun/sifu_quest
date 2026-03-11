@@ -1,4 +1,5 @@
 import { MobileSidebar, Sidebar } from "@/components/layout/Sidebar";
+import { AuthStatusProvider } from "@/context/AuthStatusContext";
 
 export default function DashboardLayout({
   children,
@@ -6,7 +7,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <>
+    <AuthStatusProvider>
       <Sidebar />
       <MobileSidebar />
       <main className="md:ml-56 min-h-screen pt-12 md:pt-0">
@@ -14,6 +15,6 @@ export default function DashboardLayout({
           {children}
         </div>
       </main>
-    </>
+    </AuthStatusProvider>
   );
 }
