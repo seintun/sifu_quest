@@ -14,7 +14,8 @@ import { ApiKeyPrompt } from '@/components/ApiKeyPrompt'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { useChat, type ChatMessage } from '@/hooks/useChat'
 import 'highlight.js/styles/github-dark.css'
-import { MessageCircle, Send, Square, Trash2, Sparkles } from 'lucide-react'
+import { KeyRound, MessageCircle, Send, Square, Trash2, Sparkles } from 'lucide-react'
+import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, type ComponentType, type HTMLAttributes } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
@@ -285,6 +286,8 @@ export default function CoachPage() {
   const showThinkingIndicator =
     isStreaming &&
     (streamPhase === 'thinking' || (streamPhase === 'typing' && (!lastMessage || lastMessage.role === 'user')))
+  const anthropicProvider = providers.find((provider) => provider.id === 'anthropic') ?? null
+  const isAnthropicLocked = Boolean(anthropicProvider && anthropicProvider.availability !== 'available')
 
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 3rem)' }}>
@@ -306,7 +309,9 @@ export default function CoachPage() {
                   value={provider.id}
                   disabled={provider.availability !== 'available'}
                 >
-                  {provider.label}
+                  {provider.availability === 'available'
+                    ? provider.label
+                    : `${provider.label} (requires key in Settings)`}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -347,6 +352,17 @@ export default function CoachPage() {
           </Button>
         </div>
       </div>
+      {isAnthropicLocked && anthropicProvider?.reason && (
+        <div className="mb-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning flex items-center justify-between gap-3">
+          <span className="inline-flex items-center gap-1.5">
+            <KeyRound className="h-3.5 w-3.5" />
+            {anthropicProvider.reason}
+          </span>
+          <Link href="/settings" className="underline underline-offset-2 whitespace-nowrap hover:text-warning/90">
+            Open Settings
+          </Link>
+        </div>
+      )}
 
       {/* Chat Area */}
       <Card className="flex-1 border-border bg-background overflow-hidden flex flex-col min-h-0">
