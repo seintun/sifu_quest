@@ -423,10 +423,10 @@ export default function DashboardPage() {
                   type="button"
                   onClick={() => setShowAllPromptOptions((prev) => !prev)}
                   className={cn(
-                    'inline-flex items-center rounded-full border px-2.5 py-1 text-xs transition-all duration-150 cursor-pointer sm:hidden',
+                    'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium transition-all duration-150 cursor-pointer sm:hidden',
                     showAllPromptOptions
-                      ? 'bg-plan/15 border-plan/50 text-plan'
-                      : 'bg-surface border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
+                      ? 'bg-streak/20 border-streak/60 text-streak shadow-glow-streak'
+                      : 'bg-plan/20 border-plan/60 text-plan shadow-glow-plan hover:bg-plan/30',
                   )}
                 >
                   {showAllPromptOptions ? 'View less' : 'View more'}
