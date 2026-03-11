@@ -23,7 +23,16 @@ export class MissingEnvironmentVariableError extends Error {
 }
 
 export function getMissingRequiredEnv(keys: readonly string[]): string[] {
-  return keys.filter((key) => !process.env[key] || process.env[key]?.trim().length === 0)
+  return keys.filter((key) => {
+    // Vercel sets `VERCEL=1` automatically.
+    // If we're on Vercel, NextAuth strictly infers the callback base URL from VERCEL_URL, 
+    // so we don't *need* NEXTAUTH_URL defined in the Vercel dashboard for Preview environments.
+    if (key === 'NEXTAUTH_URL' && process.env.VERCEL === '1') {
+      return false
+    }
+    
+    return !process.env[key] || process.env[key]?.trim().length === 0
+  })
 }
 
 export function assertRequiredEnv(keys: readonly string[]): void {
