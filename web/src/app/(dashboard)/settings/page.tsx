@@ -148,9 +148,10 @@ export default function SettingsPage() {
     }
   }, [])
 
-  const loadOnboardingStatus = useCallback(async () => {
+  const loadOnboardingStatus = useCallback(async (options?: { kick?: boolean }) => {
+    const kick = options?.kick ?? true
     try {
-      const res = await fetch('/api/onboarding/status?kick=true')
+      const res = await fetch(kick ? '/api/onboarding/status?kick=true' : '/api/onboarding/status')
       if (!res.ok) {
         return
       }
@@ -381,7 +382,23 @@ export default function SettingsPage() {
         return
       }
       setMessage({ text: 'Onboarding profile enrichment saved.', type: 'success' })
-      await loadOnboardingStatus()
+      const data = await res.json().catch(() => ({})) as {
+        onboarding?: OnboardingStateResponse['onboarding']
+        plan?: { status?: OnboardingStateResponse['plan']['status'] }
+      }
+      if (data.onboarding) {
+        setOnboardingState((prev) => ({
+          onboarding: data.onboarding as OnboardingStateResponse['onboarding'],
+          plan: {
+            status: data.plan?.status ?? prev?.plan.status ?? 'queued',
+            lastErrorCode: prev?.plan.lastErrorCode ?? null,
+          },
+          draft: {
+            enrichment: enrichmentDraft,
+          },
+        }))
+      }
+      void loadOnboardingStatus({ kick: false })
     } catch {
       setMessage({ text: 'Failed to save onboarding enrichment.', type: 'error' })
     } finally {

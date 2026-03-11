@@ -46,15 +46,23 @@ export async function POST(request: NextRequest) {
       currentStep,
     }
 
-    await persistProfileOnboardingFile(userId, draft.core, draft.enrichment)
-    const onboarding = await markEnrichmentUpdated(userId, draft)
-    await queueOnboardingPlanJob(userId, draft.core, draft.enrichment)
+    const persistProfilePromise = persistProfileOnboardingFile(userId, draft.core, draft.enrichment)
+    const onboardingPromise = markEnrichmentUpdated(userId, draft)
+    const queuePlanPromise = queueOnboardingPlanJob(userId, draft.core, draft.enrichment)
+
+    const [onboarding] = await Promise.all([
+      onboardingPromise,
+      persistProfilePromise,
+      queuePlanPromise,
+    ])
 
     const { logProgressEvent } = await import('@/lib/progress')
-    await logProgressEvent(userId, 'enrichment_updated', 'onboarding', {
-      nextPromptKey: onboarding.nextPromptKey,
-    })
-    await logProgressEvent(userId, 'plan_queued', 'onboarding')
+    await Promise.all([
+      logProgressEvent(userId, 'enrichment_updated', 'onboarding', {
+        nextPromptKey: onboarding.nextPromptKey,
+      }),
+      logProgressEvent(userId, 'plan_queued', 'onboarding'),
+    ])
 
     return NextResponse.json({
       success: true,

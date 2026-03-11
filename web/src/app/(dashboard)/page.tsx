@@ -315,13 +315,38 @@ export default function DashboardPage() {
         return
       }
 
-      const refreshed = await fetch('/api/onboarding/status?kick=true').then((res) => res.json())
-      const typed = refreshed as OnboardingStateResponse
-      setOnboardingState(typed)
-      setEnrichmentDraft((prev) => ({
-        ...prev,
-        ...(typed.draft?.enrichment ?? {}),
-      }))
+      const responseData = await response.json().catch(() => null) as
+        | { onboarding?: OnboardingStateResponse['onboarding']; plan?: { status?: OnboardingStateResponse['plan']['status'] } }
+        | null
+
+      if (responseData?.onboarding) {
+        setOnboardingState((prev) => ({
+          onboarding: responseData.onboarding as OnboardingStateResponse['onboarding'],
+          plan: {
+            status: responseData.plan?.status ?? prev?.plan.status ?? 'queued',
+            lastErrorCode: prev?.plan.lastErrorCode ?? null,
+          },
+          draft: {
+            enrichment: enrichmentDraft,
+          },
+        }))
+      }
+
+      // Refresh latest draft/status without blocking the save interaction.
+      void fetch('/api/onboarding/status')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((refreshed) => {
+          if (!refreshed) {
+            return
+          }
+          const typed = refreshed as OnboardingStateResponse
+          setOnboardingState(typed)
+          setEnrichmentDraft((prev) => ({
+            ...prev,
+            ...(typed.draft?.enrichment ?? {}),
+          }))
+        })
+        .catch(() => {})
     } finally {
       setSavingEnrichment(false)
     }
