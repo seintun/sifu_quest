@@ -37,7 +37,7 @@ test('anthropic defaults to haiku and uses ascending cost labels', () => {
     [1, 2, 3],
   )
   assert.equal(getAnthropicModelCostTier('claude-3-5-haiku-latest'), 1)
-  assert.equal(getAnthropicModelCostTier('claude-opus-4-1'), 3)
+  assert.equal(getAnthropicModelCostTier('claude-opus-4-6'), 3)
 })
 
 test('sanitizeModelLabel formats provider/model id for UI display', () => {
