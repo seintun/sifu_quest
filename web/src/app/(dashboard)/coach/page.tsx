@@ -458,7 +458,7 @@ export default function CoachPage() {
                 </div>
               </div>
             )}
-            <div className="flex gap-2">
+            <div className="flex items-end gap-2">
               <Textarea
                 ref={textareaRef}
                 value={input}
@@ -479,23 +479,23 @@ export default function CoachPage() {
               />
               {isStreaming ? (
                 <Button
-                  size="sm"
+                  size="icon"
                   variant="outline"
                   onClick={stopStreaming}
-                  className="shrink-0 self-end"
+                  className="h-10 w-10 shrink-0"
                 >
                   <Square className="h-4 w-4" />
                 </Button>
               ) : (
                 <Button
-                  size="sm"
+                  size="icon"
                   onClick={handleSend}
                   disabled={
                     !input.trim() ||
                     (freeQuota?.isFreeTier && freeQuota.remaining <= 0) ||
                     selectedProviderInfo?.availability !== 'available'
                   }
-                  className="shrink-0 self-end"
+                  className="h-10 w-10 shrink-0"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
