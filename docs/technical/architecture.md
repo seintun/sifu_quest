@@ -87,9 +87,77 @@ All routes live under `src/app/api/` and require authentication via `auth()` fro
 | `/api/progress/events`           | GET    | Raw progress events for calendar heatmap       |
 | `/api/system-design/log`         | POST   | Log system design concept to memory            |
 
+| `/api/guest-upgrade/token`       | POST   | Issue short-lived JWT for guest—>Google upgrade |
+| `/api/guest-upgrade/complete`    | GET    | Merge guest data after Google OAuth; redirects to `/settings?success=linked` |
+| `/api/account/status`            | GET    | Unified account + onboarding status (used by AuthStatusContext) |
+
 ---
 
-## Core Library Modules
+## Authentication & Session Management
+
+Sifu Quest operates a **dual-session model**: a Supabase session (cookie-based, used by server-side data operations) and a NextAuth JWT session (used for page routing and client-side identity).
+
+### User Types
+
+| Type | How signed in | `is_guest` flag | Session expires |
+|---|---|---|---|
+| **Guest** | Anonymous Supabase sign-in via NextAuth CredentialsProvider | `true` | 30 minutes |
+| **Google** | Google OAuth via NextAuth + Supabase | `false` | NextAuth JWT expiry |
+
+### Route Protection
+
+All dashboard routes (`/coach`, `/plan`, `/settings`, `/memory`, etc.) are protected by a **Next.js Edge Middleware** at `src/middleware.ts`:
+
+```
+unauthenticated request → middleware → redirect /login
+authenticated request   → middleware → passes through to dashboard
+```
+
+Excluded paths: `/login`, `/api/auth/**`, `/_next/**`, `/favicon.ico`
+
+### Logout Flow
+
+Sign-out tears down both sessions in order:
+
+1. `supabase.auth.signOut()` — destroys the Supabase cookie first
+2. `next-auth signOut({ callbackUrl: '/login' })` — clears the NextAuth JWT and redirects
+
+> ⚠️ Order matters: reversing it leaves a dangling Supabase session that would still be readable server-side until it expires naturally.
+
+Different dialog is shown depending on user type:
+- **Guest users** → `GuestLogoutDialog` with prominent "Create Account & Link Google" upgrade CTA
+- **Google users** → `LogoutConfirmDialog` with simple confirmation
+
+### Guest → Google Conversion Flow
+
+When a guest user clicks "Create Account & Link Google":
+
+```mermaid
+flowchart TD
+  CTA["Create Account & Link Google"] --> TOKEN["POST /api/guest-upgrade/token\n(creates short-lived JWT with guestUserId)"]
+  TOKEN --> OAUTH["next-auth signIn('google')\ncallbackUrl = /api/guest-upgrade/complete?token=..."]
+  OAUTH --> GOOGLE["Google OAuth consent screen"]
+  GOOGLE --> NEXTAUTH_CB["next-auth /api/auth/callback/google\n(new Google session created)"]
+  NEXTAUTH_CB --> COMPLETE["GET /api/guest-upgrade/complete?token=..."]
+  COMPLETE --> VERIFY["verifyGuestUpgradeToken(token)\n→ extract guestUserId"]
+  VERIFY --> MERGE["mergeGuestDataIntoUser(guestId, googleId)"]
+  MERGE --> SETTINGS["/settings?success=linked"]
+
+  MERGE --> M1["Copy memory_files"]
+  MERGE --> M2["Copy onboarding_* columns\n(status, draft, completion %)"]
+  MERGE --> M3["Prefer guest display_name\n(real onboarding name)"]
+  MERGE --> M4["Transfer chat_sessions,\nchat_messages, progress_events"]
+  MERGE --> M5["Delete guest profile\n+ Supabase auth user"]
+```
+
+After merge the user lands on `/settings?success=linked` with:
+- All memories intact
+- Onboarding status preserved (no re-onboarding)
+- Display name from onboarding retained
+
+---
+
+
 
 Located in `src/lib/`:
 

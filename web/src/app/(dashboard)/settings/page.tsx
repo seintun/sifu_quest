@@ -1,7 +1,6 @@
 'use client'
 
 import { Suspense } from 'react'
-import { signOut } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
@@ -10,6 +9,7 @@ import { canSaveAnthropicApiKey, shouldShowRemoveApiKey } from '@/lib/account-se
 import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
 import { getOnboardingPrefillName } from '@/lib/onboarding-name'
 import { validateFullName } from '@/lib/profile-name'
+import { performSignOut } from '@/lib/auth-signout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -21,7 +21,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { KeyRound, Loader2, ShieldAlert, UserRound } from 'lucide-react'
+import { GuestLogoutDialog } from '@/components/auth/GuestLogoutDialog'
+import { LogoutConfirmDialog } from '@/components/auth/LogoutConfirmDialog'
+import { KeyRound, Loader2, ShieldAlert, UserRound, LogOut } from 'lucide-react'
 
 type AccountStatus = {
   userId: string
@@ -121,6 +123,11 @@ function SettingsPageContent() {
   const [isSavingKey, setIsSavingKey] = useState(false)
   const [isRemovingKey, setIsRemovingKey] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isUpgrading, setIsUpgrading] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  const [guestLogoutOpen, setGuestLogoutOpen] = useState(false)
+  const [googleLogoutOpen, setGoogleLogoutOpen] = useState(false)
 
   const [message, setMessage] = useState<FlashMessage>(null)
 
@@ -253,7 +260,7 @@ function SettingsPageContent() {
     try {
       const res = await fetch('/api/account', { method: 'DELETE' })
       if (res.ok) {
-        await signOut({ callbackUrl: '/' })
+        await performSignOut()
       } else {
         const data = await res.json().catch(() => ({}))
         setMessage({ text: data.error || 'Failed to delete account.', type: 'error' })
@@ -274,8 +281,31 @@ function SettingsPageContent() {
     }
   }
 
+  const handleGuestUpgradeFromDialog = async () => {
+    setIsUpgrading(true)
+    const result = await startGuestGoogleUpgrade(window.location.origin)
+    if (!result.ok) {
+      setMessage({ text: `Failed to link account: ${result.error}`, type: 'error' })
+      setIsUpgrading(false)
+      setGuestLogoutOpen(false)
+    }
+    // On success the page redirects via OAuth
+  }
+
+  const handleSignOut = async () => {
+    setIsLoggingOut(true)
+    await performSignOut()
+  }
+
+  const handleSignOutClick = () => {
+    if (isGuest) {
+      setGuestLogoutOpen(true)
+    } else {
+      setGoogleLogoutOpen(true)
+    }
+  }
+
   const isGuest = Boolean(accountStatus?.isGuest)
-  const showGuestUpgradeSection = isGuest || Boolean(accountStatusError)
 
   const normalizedCurrentName = useMemo(() => (accountStatus?.displayName ?? '').trim(), [accountStatus?.displayName])
   const normalizedInputName = useMemo(() => fullName.trim().replace(/\s+/g, ' '), [fullName])
@@ -308,27 +338,44 @@ function SettingsPageContent() {
             </div>
           )}
 
-      {showGuestUpgradeSection && (
-        <Card className="border-streak/30 bg-streak/5 shadow-glow-streak">
+      {/* ── Session card ── */}
+      {isAccountStatusInitialized && (
+        <Card
+          className={
+            isGuest
+              ? 'border-streak/30 bg-streak/5 shadow-glow-streak'
+              : 'border-border bg-surface/80 backdrop-blur-sm'
+          }
+        >
           <CardHeader>
-            <CardTitle>Upgrade to Full Account</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <UserRound className="h-4 w-4 text-streak" />
+              {isGuest ? 'Guest Session' : 'Your Account'}
+            </CardTitle>
             <CardDescription>
-              {accountStatusError
-                ? accountStatusError
-                : 'You are currently in a guest session. Link Google to permanently keep your memory and progress.'}
+              {isGuest
+                ? 'You\'re browsing as a guest. Your progress is saved temporarily — it will be lost if you sign out without linking Google.'
+                : accountStatus?.displayName
+                  ? `Signed in as ${accountStatus.displayName}.`
+                  : 'Signed in with Google.'}
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Button onClick={handleLinkGoogle} disabled={isAccountStatusLoading}>
-              Link Google Account
-            </Button>
+          <CardContent className="flex flex-col sm:flex-row flex-wrap gap-2">
+            {isGuest && (
+              <Button onClick={handleLinkGoogle} disabled={isAccountStatusLoading}>
+                Link Google Account
+              </Button>
+            )}
             <Button
               variant="outline"
-              onClick={() => mutateAccountStatus()}
-              disabled={isAccountStatusLoading}
+              className="flex items-center gap-2 text-danger border-danger/30 hover:bg-danger/5 hover:text-danger"
+              onClick={handleSignOutClick}
             >
-              {isAccountStatusLoading ? 'Refreshing...' : 'Retry Status'}
+              <LogOut className="h-4 w-4" />
+              Sign Out
             </Button>
+
+
           </CardContent>
         </Card>
       )}
@@ -492,6 +539,21 @@ function SettingsPageContent() {
         </CardContent>
       </Card>
 
+      <GuestLogoutDialog
+        open={guestLogoutOpen}
+        onOpenChange={setGuestLogoutOpen}
+        onUpgrade={handleGuestUpgradeFromDialog}
+        onSignOut={handleSignOut}
+        isUpgrading={isUpgrading}
+        isSigningOut={isLoggingOut}
+      />
+      <LogoutConfirmDialog
+        open={googleLogoutOpen}
+        onOpenChange={setGoogleLogoutOpen}
+        onSignOut={handleSignOut}
+        isSigningOut={isLoggingOut}
+        displayName={accountStatus?.displayName ?? undefined}
+      />
       <Dialog open={deleteDialogOpen} onOpenChange={(open) => {
         setDeleteDialogOpen(open)
         if (!open) setDeleteConfirmText('')
