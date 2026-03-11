@@ -456,7 +456,8 @@ After core completion, the app unlocks immediately. Plan generation runs asynchr
 ### Step 1 — Scaffold
 
 ```bash
-cd /Users/seintun/code/sifu_quest
+cd sifu_quest
+
 npx create-next-app@latest web --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"
 cd web
 npx shadcn-ui@latest init   # select: zinc base color, CSS variables: yes

@@ -93,7 +93,7 @@ flowchart TD
 
 ### Sidebar
 
-#### [MODIFY] [Sidebar.tsx](file:///Users/seintun/code/sifu_quest/web/src/components/layout/Sidebar.tsx)
+#### [MODIFY] [Sidebar.tsx](web/src/components/layout/Sidebar.tsx)
 
 - Fetch account status (via SWR `/api/account/status`) to know if user is guest or Google
 - Add a `LogoutFooter` sub-component at the bottom of the sidebar panel
@@ -136,7 +136,7 @@ flowchart TD
 
 ### Settings Page
 
-#### [MODIFY] [settings/page.tsx](file:///Users/seintun/code/sifu_quest/web/src/app/(dashboard)/settings/page.tsx)
+#### [MODIFY] [settings/page.tsx](web/src/app/(dashboard)/settings/page.tsx)
 
 - Add a **Session card** as the first card in the page; **consolidate the existing guest upgrade card into this** (no duplicate sections)
 - For **guests**: `streak/30` border + `streak/5` bg (same as existing guest upgrade card) — keeps visual language consistent
