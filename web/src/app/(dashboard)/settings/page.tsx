@@ -448,11 +448,11 @@ export default function SettingsPage() {
 
       {onboardingState?.onboarding.status === 'core_complete' && activePrompt && (
         <Card className="border border-border/70 bg-surface">
-          <CardHeader className="border-b border-border/40 px-4 py-3">
+          <CardHeader className="border-b border-border/40 px-4 pt-2.5 pb-1.5">
             <CardTitle className="text-sm font-medium leading-tight">{activePrompt.title}</CardTitle>
             <CardDescription className="text-xs">{activePrompt.hint}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2.5 px-4 py-3">
+          <CardContent className="space-y-2 px-4 pt-1.5 pb-2.5">
             <div className="flex flex-wrap gap-2">
               {activePromptOptions.map((option, index) => {
                 const values = enrichmentDraft[activePrompt.valuesField] as string[]
