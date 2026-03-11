@@ -347,6 +347,7 @@ export default function SettingsPage() {
           </CardTitle>
           <CardDescription>
             You only provide your Anthropic key (`sk-ant-...`). We encrypt it with AES-256-CBC before storage, never store or log plaintext, and use it only to call Claude on your behalf.
+            OpenRouter free models use an app-managed server key (`OPENROUTER_API_KEY`), not this field.
           </CardDescription>
         </CardHeader>
         <CardContent>

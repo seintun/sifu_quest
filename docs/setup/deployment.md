@@ -40,6 +40,7 @@ Go to **Settings → Environment Variables** and add each variable:
 | `NEXT_PUBLIC_SUPABASE_URL`             | Supabase dashboard → Settings → API  | Production, Preview |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase dashboard → Settings → API  | Production, Preview |
 | `SUPABASE_SERVICE_ROLE_KEY`            | Supabase dashboard → Settings → API  | Production, Preview |
+| `OPENROUTER_API_KEY`                   | OpenRouter Keys                      | Production, Preview |
 | `ANTHROPIC_API_KEY`                    | Anthropic Console → API Keys         | Production, Preview |
 | `API_KEY_ENCRYPTION_SECRET`            | `openssl rand -hex 32`               | Production, Preview |
 | `NEXTAUTH_SECRET`                      | `openssl rand -base64 32`            | Production, Preview |
@@ -72,7 +73,7 @@ After adding all environment variables, trigger a redeploy:
 
 - [ ] Visit `https://your-app.vercel.app` — landing page loads
 - [ ] Click **Login with Google** — redirects to Google, returns authenticated
-- [ ] Start without a personal key — trial is limited to 5 messages / 30 minutes
+- [ ] Start without a personal key — shared OpenRouter free path is available and free quota is enforced (current rollout: 10 messages)
 - [ ] Save an API key in Settings — verify it encrypts and round-trips
 - [ ] Delete your account — confirm all data is wiped (GDPR)
 - [ ] Check Sentry dashboard — errors and traces appear
@@ -85,9 +86,9 @@ After adding all environment variables, trigger a redeploy:
 After deploy, verify the following end-to-end:
 
 1. Log in as a fresh user without personal key:
-   - You can send messages in trial mode.
-   - The 6th user message is blocked with `trial_limit_reached`.
-2. Wait 30+ minutes (or use test data) and verify trial expiry returns `trial_expired`.
+   - You can send messages through shared OpenRouter free models.
+   - The 11th user message is blocked by free-tier quota.
+2. Verify guest sessions enforce expiry independently of free-tier quota.
 3. Open **Settings**:
    - Save personal Anthropic key and verify chat unblocks.
    - Remove key and verify trial status is shown again.
