@@ -37,6 +37,11 @@ for (const scenario of scenarios) {
     }
 
     const before = await composer.boundingBox()
+    expect(before).not.toBeNull()
+    if (before) {
+      expect(before.y + before.height).toBeLessThanOrEqual(scenario.height)
+    }
+
     await scrollContainer.evaluate((node) => {
       node.scrollTop = node.scrollHeight
     })
