@@ -33,6 +33,11 @@ export class MemoryWriteError extends Error {
   }
 }
 
+export interface MemoryBatchEntry {
+  filename: string
+  content: string
+}
+
 function validateMemoryFile(filename: string): void {
   if (!ALLOWED_MEMORY_FILES.includes(filename)) {
     throw new Error(`File not allowed: ${filename}`)
@@ -173,6 +178,45 @@ export async function writeMemoryFile(
       version: nextVersion,
       change_source: changeSource
     })
+}
+
+export async function writeMemoryFilesBatch(
+  userId: string,
+  entries: MemoryBatchEntry[],
+  changeSource: string = 'manual',
+): Promise<void> {
+  if (entries.length === 0) {
+    return
+  }
+
+  for (const entry of entries) {
+    validateMemoryFile(entry.filename)
+  }
+
+  const supabase = createAdminClient()
+  const payload = entries.map((entry) => ({
+    filename: entry.filename,
+    content: entry.content,
+  }))
+
+  const { error } = await supabase.rpc('bulk_upsert_memory_files', {
+    user_id_param: userId,
+    entries_param: payload,
+    change_source_param: changeSource,
+  })
+
+  if (!error) {
+    return
+  }
+
+  if (error.code === '42883') {
+    await Promise.all(
+      entries.map((entry) => writeMemoryFile(userId, entry.filename, entry.content, changeSource)),
+    )
+    return
+  }
+
+  throw new MemoryWriteError('batch', error.code)
 }
 
 export function getAllowedMemoryFiles(): string[] {

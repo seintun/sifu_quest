@@ -34,6 +34,17 @@ export async function GET() {
         prefillName,
         avatarUrl: profile.avatar_url,
       },
+      onboarding: {
+        version: profile.onboarding_version,
+        status: profile.onboarding_status,
+        completionPercent: profile.onboarding_completion_percent,
+        nextPromptKey: profile.onboarding_next_prompt_key,
+        draftAvailable: Boolean(profile.onboarding_draft && Object.keys(profile.onboarding_draft).length > 0),
+      },
+      plan: {
+        status: profile.onboarding_plan_status,
+        lastErrorCode: profile.onboarding_plan_error_code,
+      },
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

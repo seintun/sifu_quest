@@ -6,8 +6,9 @@ import {
   queueOnboardingPlanJob,
 } from '@/lib/onboarding-service'
 import {
-  fromLegacyOnboardingPayload,
+  normalizeEnrichmentAnswers,
   ONBOARDING_SCHEMA_VERSION,
+  validateCoreAnswers,
 } from '@/lib/onboarding-v2'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
@@ -24,14 +25,26 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
-    const legacyPayload = await request.json()
-    const draft = fromLegacyOnboardingPayload(legacyPayload)
+    const body = await request.json()
+    const core = validateCoreAnswers(body?.core)
+    const enrichment = normalizeEnrichmentAnswers(body?.enrichment)
+    const currentStep =
+      typeof body?.currentStep === 'number' && Number.isFinite(body.currentStep)
+        ? Math.max(0, Math.floor(body.currentStep))
+        : 0
 
-    await persistCoreOnboardingFiles(userId, draft.core, draft.enrichment)
+    await persistCoreOnboardingFiles(userId, core, enrichment)
+
+    const draft = {
+      schemaVersion: ONBOARDING_SCHEMA_VERSION,
+      core,
+      enrichment,
+      currentStep,
+    }
     await markCoreOnboardingComplete(userId, draft)
-    await queueOnboardingPlanJob(userId, draft.core, draft.enrichment)
+    await queueOnboardingPlanJob(userId, core, enrichment)
 
-    const displayName = getPersistableOnboardingDisplayName(draft.core.name)
+    const displayName = getPersistableOnboardingDisplayName(core.name)
     if (displayName) {
       const supabaseAdmin = createAdminClient()
       await supabaseAdmin
@@ -41,19 +54,25 @@ export async function POST(request: NextRequest) {
     }
 
     const { logProgressEvent, logAuditEvent } = await import('@/lib/progress')
-    await logProgressEvent(userId, 'onboarding_complete', 'onboarding')
+    await logProgressEvent(userId, 'core_completed', 'onboarding')
     await logProgressEvent(userId, 'plan_queued', 'onboarding')
-    await logAuditEvent(userId, 'account', 'profile', {
-      action: 'onboarding_completed_via_legacy_route',
-      onboardingVersion: ONBOARDING_SCHEMA_VERSION,
-    })
+    await logAuditEvent(userId, 'account', 'profile', { action: 'onboarding_core_completed' })
 
-    return NextResponse.json({ success: true, planStatus: 'queued' })
+    return NextResponse.json({
+      success: true,
+      onboarding: {
+        version: ONBOARDING_SCHEMA_VERSION,
+        status: 'core_complete',
+      },
+      plan: {
+        status: 'queued',
+      },
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json(
-      { error: message || 'We could not process onboarding right now. Please try again.' },
-      { status: 500 },
-    )
+    if (error instanceof Error && error.name === 'OnboardingValidationError') {
+      return NextResponse.json({ error: message }, { status: 400 })
+    }
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
