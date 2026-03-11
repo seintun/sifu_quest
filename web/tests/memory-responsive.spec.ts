@@ -43,15 +43,13 @@ for (const scenario of scenarios) {
     if (scenario.mobile) {
       const controls = page.getByTestId('memory-mobile-controls')
       await expect(controls).toBeVisible()
-
-      const trigger = page.getByTestId('memory-file-picker-trigger')
-      await expect(trigger).toBeVisible()
-      await trigger.click()
-      await expect(page.getByRole('heading', { name: 'Memory Files' })).toBeVisible()
+      await expect(page.getByTestId('memory-mobile-file-switcher')).toBeVisible()
 
       const visibleFileButtons = page.locator('[data-testid^="memory-file-"]:visible')
       const visibleCount = await visibleFileButtons.count()
-      if (visibleCount > 0) {
+      if (visibleCount > 1) {
+        await visibleFileButtons.nth(1).click()
+      } else if (visibleCount > 0) {
         await visibleFileButtons.first().click()
       }
 

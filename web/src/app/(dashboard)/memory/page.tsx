@@ -4,7 +4,6 @@ import { createDashboardMarkdownComponents } from '@/components/markdown/dashboa
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import {
   selectInitialFile,
   shouldShowError,
@@ -85,6 +84,60 @@ function FileList({
   )
 }
 
+function MobileFileSwitcher({
+  files,
+  selectedFile,
+  onSelect,
+}: {
+  files: string[]
+  selectedFile: string
+  onSelect: (file: string) => void
+}) {
+  if (files.length === 0) {
+    return (
+      <div
+        data-testid="memory-mobile-file-switcher"
+        className="flex h-10 flex-1 items-center rounded-lg border border-border/60 px-3 text-xs text-foreground/70"
+      >
+        No files yet
+      </div>
+    )
+  }
+
+  return (
+    <div
+      data-testid="memory-mobile-file-switcher"
+      className="flex-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <div className="inline-flex min-w-full gap-1.5 pr-2">
+        {files.map((file) => {
+          const meta = FILE_META[file] || { icon: FileText, color: 'text-muted-foreground', accent: '', label: file }
+          const Icon = meta.icon
+          const isActive = selectedFile === file
+
+          return (
+            <button
+              key={file}
+              type="button"
+              data-testid={getFileTestId(file)}
+              onClick={() => onSelect(file)}
+              className={cn(
+                'inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors',
+                isActive
+                  ? `border-border bg-surface ${meta.color}`
+                  : 'border-border/50 text-foreground/75 hover:border-border hover:text-foreground',
+              )}
+            >
+              <Icon className={cn('h-3.5 w-3.5 shrink-0', isActive ? meta.color : '')} />
+              <span className="max-w-24 truncate">{meta.label}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function MemoryPage() {
   const [files, setFiles] = useState<string[]>([])
   const [selectedFile, setSelectedFile] = useState('')
@@ -92,7 +145,6 @@ export default function MemoryPage() {
   const [loading, setLoading] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
   const [contentError, setContentError] = useState<string | null>(null)
-  const [pickerOpen, setPickerOpen] = useState(false)
   const [fileCache, setFileCache] = useState<Record<string, string>>({})
 
   const fileCacheRef = useRef<Record<string, string>>({})
@@ -282,15 +334,16 @@ export default function MemoryPage() {
 
   const handleSelectFile = useCallback((file: string) => {
     setSelectedFile(file)
-    setPickerOpen(false)
   }, [])
 
   return (
     <div data-testid="memory-shell" className="flex min-h-[calc(100dvh-3rem)] flex-col">
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="mb-2 flex items-end justify-between gap-2 md:mb-4">
         <div>
           <h1 className="font-display text-2xl font-bold">Memory</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Read-only view of your workspace files</p>
+          <p className="mt-0.5 text-[13px] text-foreground/75 md:mt-1 md:text-sm md:text-muted-foreground">
+            Read-only view of your workspace files
+          </p>
         </div>
         {selectedFile && (
           <div className="hidden items-center gap-3 text-xs text-foreground/70 md:flex">
@@ -303,58 +356,24 @@ export default function MemoryPage() {
         )}
       </div>
 
-      <div className="sticky top-12 z-20 -mx-3 mb-3 border-y border-border/60 bg-background/95 px-3 py-2 backdrop-blur md:hidden">
+      <div className="sticky top-12 z-20 -mx-3 mb-2 border-y border-border/60 bg-background/95 px-3 py-2 backdrop-blur md:hidden">
         <div data-testid="memory-mobile-controls" className="flex items-center gap-2">
-          <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
-            <SheetTrigger
-              render={
-                <button
-                  type="button"
-                  data-testid="memory-file-picker-trigger"
-                  className="inline-flex h-11 min-w-24 items-center justify-center rounded-lg border border-border px-3 text-sm font-medium text-foreground"
-                />
-              }
-            >
-              Files
-            </SheetTrigger>
-            <SheetContent side="bottom" className="h-[70dvh] rounded-t-2xl border-t border-border bg-surface p-0">
-              <SheetHeader className="border-b border-border pb-3">
-                <SheetTitle>Memory Files</SheetTitle>
-              </SheetHeader>
-              <div className="h-[calc(70dvh-4.5rem)] overflow-y-auto p-3">
-                {files.length > 0 ? (
-                  <FileList
-                    files={files}
-                    selectedFile={selectedFile}
-                    onSelect={handleSelectFile}
-                  />
-                ) : (
-                  <p className="text-sm text-muted-foreground">No memory files are available yet.</p>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
-
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-foreground">{meta.label || 'No file selected'}</p>
-            {selectedFile ? (
-              <p className="truncate text-xs text-foreground/70">{lineCount} lines • {sectionCount} sections</p>
-            ) : (
-              <p className="text-xs text-foreground/70">Select a memory file</p>
-            )}
-          </div>
+          <MobileFileSwitcher files={files} selectedFile={selectedFile} onSelect={handleSelectFile} />
 
           <Button
             size="sm"
             type="button"
             variant="ghost"
-            className="h-11 px-3"
+            className="h-10 w-10 shrink-0 px-0"
             onClick={refreshSelectedFile}
             disabled={!selectedFile || loading}
           >
             <RefreshCcw className={cn('h-4 w-4', loading ? 'animate-spin' : '')} />
             <span className="sr-only">Refresh current file</span>
           </Button>
+        </div>
+        <div className="mt-1.5 px-0.5 text-[11px] text-foreground/70">
+          {selectedFile ? `${meta.label} • ${lineCount} lines • ${sectionCount} sections` : 'Select a memory file to read'}
         </div>
       </div>
 
@@ -371,9 +390,9 @@ export default function MemoryPage() {
           )}
         </div>
 
-        <Card className="flex min-h-0 flex-1 flex-col overflow-hidden border-border bg-surface">
+        <Card className="-mx-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-x-0 bg-surface ring-0 md:mx-0 md:rounded-xl md:border-border md:ring-1">
           {selectedFile && (
-            <CardHeader className="shrink-0 border-b border-border/30 px-4 pt-3 pb-0 sm:px-5">
+            <CardHeader className="hidden shrink-0 border-b border-border/30 px-4 pt-3 pb-0 sm:px-5 md:block">
               <CardTitle className="pb-3 text-sm font-medium">
                 <div className="flex items-center gap-2">
                   <ActiveIcon className={cn('h-4 w-4', meta.color)} />
@@ -392,7 +411,7 @@ export default function MemoryPage() {
           )}
 
           <div data-testid="memory-reader" className="memory-prose flex-1 min-h-0 overflow-y-auto">
-            <div className="max-w-none px-4 py-4 sm:px-5 sm:py-5 md:max-w-3xl">
+            <div className="max-w-none px-3 py-3 sm:px-4 sm:py-4 md:max-w-3xl md:px-5 md:py-5">
               {loading ? (
                 <div className="space-y-3">
                   <div className="h-4 w-11/12 animate-pulse rounded bg-elevated/50" />
