@@ -26,6 +26,15 @@ function buildSafeApiKeySaveError(error: unknown): { error: string; code?: strin
   }
 }
 
+function extractDbErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object') {
+    return null
+  }
+
+  const maybeCode = (error as { code?: unknown }).code
+  return typeof maybeCode === 'string' ? maybeCode : null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
@@ -69,6 +78,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true })
     
   } catch (error) {
+    if (extractDbErrorCode(error) === '23503') {
+      return NextResponse.json(
+        { error: 'Session identity is out of sync. Please sign out and sign in again.', code: 'identity_mismatch' },
+        { status: 409 },
+      )
+    }
     console.error('Failed to process API key save request:', error)
     return NextResponse.json(buildSafeApiKeySaveError(error), { status: 500 })
   }
@@ -97,6 +112,12 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true })
     
   } catch (error) {
+    if (extractDbErrorCode(error) === '23503') {
+      return NextResponse.json(
+        { error: 'Session identity is out of sync. Please sign out and sign in again.', code: 'identity_mismatch' },
+        { status: 409 },
+      )
+    }
     console.error('Failed to process API key delete request:', error)
     return NextResponse.json({ error: 'Failed to remove API key. Please try again.' }, { status: 500 })
   }

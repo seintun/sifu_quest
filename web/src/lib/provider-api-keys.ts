@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { toProviderApiKeyStoreError } from './provider-api-key-errors'
 import { createAdminClient } from './supabase-admin'
 
 type ProviderApiKey = {
@@ -7,9 +8,18 @@ type ProviderApiKey = {
   api_key_enc: string
 }
 
+type DbErrorLike = {
+  code?: string | null
+  message?: string | null
+}
+
 function isMissingUserApiKeysTable(error: { code?: string; message?: string } | null | undefined): boolean {
   if (!error) return false
   return error.code === '42P01' || Boolean(error.message?.includes('user_api_keys'))
+}
+
+function throwProviderApiKeyStoreError(context: string, error: DbErrorLike): never {
+  throw toProviderApiKeyStoreError(context, error)
 }
 
 async function getLegacyAnthropicApiKey(
@@ -23,7 +33,7 @@ async function getLegacyAnthropicApiKey(
     .maybeSingle()
 
   if (legacy.error) {
-    throw new Error(`Failed to load legacy API key: ${legacy.error.message}`)
+    throwProviderApiKeyStoreError('Failed to load legacy API key', legacy.error)
   }
 
   return legacy.data?.api_key_enc ?? null
@@ -52,7 +62,7 @@ export async function getEncryptedProviderApiKey(
   }
 
   if (!isMissingUserApiKeysTable(modern.error)) {
-    throw new Error(`Failed to load provider API key: ${modern.error.message}`)
+    throwProviderApiKeyStoreError('Failed to load provider API key', modern.error)
   }
 
   if (provider !== 'anthropic') {
@@ -82,7 +92,7 @@ export async function upsertEncryptedProviderApiKey(
     )
 
   if (modern.error && !isMissingUserApiKeysTable(modern.error)) {
-    throw new Error(`Failed to save provider API key: ${modern.error.message}`)
+    throwProviderApiKeyStoreError('Failed to save provider API key', modern.error)
   }
 
   if (modern.error && provider !== 'anthropic') {
@@ -103,7 +113,7 @@ export async function upsertEncryptedProviderApiKey(
       )
 
     if (legacy.error) {
-      throw new Error(`Failed to save legacy Anthropic API key: ${legacy.error.message}`)
+      throwProviderApiKeyStoreError('Failed to save legacy Anthropic API key', legacy.error)
     }
   }
 }
@@ -120,7 +130,7 @@ export async function deleteEncryptedProviderApiKey(
     .eq('provider', provider)
 
   if (modern.error && !isMissingUserApiKeysTable(modern.error)) {
-    throw new Error(`Failed to delete provider API key: ${modern.error.message}`)
+    throwProviderApiKeyStoreError('Failed to delete provider API key', modern.error)
   }
 
   if (provider === 'anthropic') {
@@ -136,7 +146,7 @@ export async function deleteEncryptedProviderApiKey(
       )
 
     if (legacy.error) {
-      throw new Error(`Failed to clear legacy Anthropic API key: ${legacy.error.message}`)
+      throwProviderApiKeyStoreError('Failed to clear legacy Anthropic API key', legacy.error)
     }
   }
 }
@@ -161,7 +171,7 @@ export async function loadAllEncryptedProviderKeys(userId: string): Promise<Prov
   }
 
   if (!isMissingUserApiKeysTable(modern.error)) {
-    throw new Error(`Failed to load provider API keys: ${modern.error.message}`)
+    throwProviderApiKeyStoreError('Failed to load provider API keys', modern.error)
   }
 
   const legacyKey = await getLegacyAnthropicApiKey(supabase, userId)
