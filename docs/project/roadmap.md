@@ -4,6 +4,10 @@
 
 Sifu Quest repo is a markdown-based Claude Code coaching workspace (no existing code). The goal is to build a local web app (Next.js) that serves as a visual diary and dashboard for the job search journey — showing progress metrics, a calendar, domain-specific trackers, an interactive plan, and an integrated coaching chat. All data lives in the existing `/memory/*.md` files, which the app reads and selectively updates through structured UI interactions. The Memory Viewer page is **read-only** — no freeform editing. Updates to memory happen only through structured UI actions (plan checkboxes, DSA problem logging, job app forms) and the coaching chat.
 
+Related onboarding references:
+- `docs/project/onboarding-v2-plan-revision.md`
+- `docs/technical/onboarding-v2-technical-decisions.md`
+
 ---
 
 ## Tech Stack

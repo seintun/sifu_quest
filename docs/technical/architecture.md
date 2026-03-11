@@ -2,6 +2,7 @@
 > Overview of Sifu Quest runtime, infrastructure, and core modules.
 >
 > See also: [Provider, Pricing, and Telemetry Technical Decision Roadmap](./provider-pricing-roadmap.md) for the planned OpenRouter + Anthropic rollout, quota policy, and usage telemetry design.
+> See also: [Onboarding V2 Technical Decisions](./onboarding-v2-technical-decisions.md) for queueing, refresh, and migration/error-handling decisions.
 
 ## High-Level Architecture
 
