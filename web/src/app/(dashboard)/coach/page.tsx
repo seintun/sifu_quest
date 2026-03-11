@@ -249,13 +249,13 @@ export default function CoachPage() {
       </div>
 
       {isAnthropicLocked && anthropicProvider?.reason && (
-        <div className="mb-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning flex items-start justify-between gap-3 shrink-0">
-          <span className="inline-flex items-center gap-1.5 flex-1 min-w-0 leading-5">
-            <KeyRound className="h-3.5 w-3.5" />
-            {anthropicProvider.reason}
+        <div className="mb-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] text-warning flex items-center justify-between gap-2 shrink-0">
+          <span className="inline-flex items-center gap-1.5 flex-1 min-w-0 whitespace-nowrap">
+            <KeyRound className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">BYOK in Settings for unlimited chat.</span>
           </span>
           <Link href="/settings" className="underline underline-offset-2 whitespace-nowrap hover:text-warning/90 shrink-0">
-            Open Settings
+            Settings
           </Link>
         </div>
       )}

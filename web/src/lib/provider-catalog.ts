@@ -126,7 +126,7 @@ export async function buildProviderCatalog(
     provider: 'anthropic',
     isFree: false,
     availability: hasAnthropicKey ? 'available' : 'requires_key',
-    reason: hasAnthropicKey ? undefined : 'Add your Anthropic API key in Settings to use Anthropic models.',
+    reason: hasAnthropicKey ? undefined : 'Add Anthropic BYOK in Settings for unlimited AI chat.',
   }))
 
   return {
@@ -140,7 +140,7 @@ export async function buildProviderCatalog(
         id: 'anthropic',
         label: 'Anthropic',
         availability: hasAnthropicKey ? 'available' : 'requires_key',
-        reason: hasAnthropicKey ? undefined : 'Add your Anthropic API key in Settings to enable Anthropic models.',
+        reason: hasAnthropicKey ? undefined : 'Add Anthropic BYOK in Settings for unlimited AI chat.',
       },
     ],
     modelsByProvider: {
