@@ -384,6 +384,12 @@ export default function DashboardPage() {
           <CardHeader className="pb-2 border-b border-border/40">
             <CardTitle className="text-sm font-medium">{activePrompt.title}</CardTitle>
             <p className="text-xs text-muted-foreground">{activePrompt.hint}</p>
+            <div className="mt-2 inline-flex items-center rounded-md border border-plan/30 bg-plan/10 px-2 py-1 text-[11px] font-medium text-plan">
+              Personalization question
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              This helps tailor your plan and coaching experience to you.
+            </p>
           </CardHeader>
           <CardContent className="pt-4 space-y-3">
             <div className="flex flex-wrap gap-2">

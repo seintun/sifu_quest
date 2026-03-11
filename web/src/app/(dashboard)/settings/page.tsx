@@ -444,6 +444,12 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle>{activePrompt.title}</CardTitle>
             <CardDescription>{activePrompt.hint}</CardDescription>
+            <div className="mt-2 inline-flex items-center rounded-md border border-plan/30 bg-plan/10 px-2 py-1 text-[11px] font-medium text-plan">
+              Personalization question
+            </div>
+            <CardDescription className="mt-1 text-[11px]">
+              This helps tailor your plan and coaching experience to you.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex flex-wrap gap-2">
