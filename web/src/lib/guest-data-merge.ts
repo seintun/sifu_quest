@@ -88,7 +88,11 @@ export async function mergeGuestDataIntoUser(guestUserId: string, targetUserId: 
 
   const mergedProfile = {
     id: targetUserId,
-    display_name: targetProfile?.display_name ?? guestProfile?.display_name ?? null,
+    // Prefer the guest's display_name — it has the real onboarding name (e.g. "The Odd One").
+    // The target Google profile is freshly created with display_name=null, so we'd get a
+    // misleading "Guest" prefill from the session name if we used targetProfile first.
+    // Only fall back to target's display_name if the guest genuinely has none.
+    display_name: guestProfile?.display_name ?? targetProfile?.display_name ?? null,
     avatar_url: targetProfile?.avatar_url ?? guestProfile?.avatar_url ?? null,
     is_guest: false,
     guest_expires_at: null,
