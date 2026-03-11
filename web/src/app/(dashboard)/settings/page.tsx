@@ -4,6 +4,8 @@ import { Suspense } from 'react'
 import { signOut } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 import { canSaveAnthropicApiKey, shouldShowRemoveApiKey } from '@/lib/account-settings-ui'
 import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
 import { getOnboardingPrefillName } from '@/lib/onboarding-name'
@@ -138,14 +140,6 @@ function SettingsPageContent() {
   const [isRemovingKey, setIsRemovingKey] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null)
-  const [isAccountStatusLoading, setIsAccountStatusLoading] = useState(false)
-  const [isAccountStatusInitialized, setIsAccountStatusInitialized] = useState(false)
-  const [accountStatusError, setAccountStatusError] = useState('')
-  const [usage, setUsage] = useState<AccountUsage | null>(null)
-  const [isUsageLoading, setIsUsageLoading] = useState(false)
-  const [usageError, setUsageError] = useState('')
-  const [onboardingState, setOnboardingState] = useState<OnboardingStateResponse | null>(null)
   const [enrichmentDraft, setEnrichmentDraft] = useState<OnboardingEnrichmentAnswers>(createEmptyEnrichmentAnswers())
   const [isSavingEnrichment, setIsSavingEnrichment] = useState(false)
   const [showAllPromptOptions, setShowAllPromptOptions] = useState(false)
@@ -157,80 +151,45 @@ function SettingsPageContent() {
 
   const isDeletePhraseValid = deleteConfirmText === 'DELETE'
 
-  const loadAccountStatus = useCallback(async () => {
-    setIsAccountStatusLoading(true)
-    setAccountStatusError('')
-    try {
-      const res = await fetch('/api/account/status')
-      const data = await res.json()
-      if (res.ok) {
-        setAccountStatus(data.account)
-        setFullName(getOnboardingPrefillName(data.account?.displayName, data.account?.prefillName))
-      } else if (res.status === 401) {
-        router.push('/api/auth/signin')
-        return
-      } else {
-        setAccountStatusError(data.error || 'Unable to load account status right now.')
-      }
-    } catch {
-      setAccountStatusError('Unable to load account status right now.')
-    } finally {
-      setIsAccountStatusLoading(false)
-      setIsAccountStatusInitialized(true)
-    }
-  }, [router])
+  const { data: accountData, mutate: mutateAccountStatus, isLoading: isAccountStatusLoading } = useSWR('/api/account/status', fetcher)
+  const { data: usageData, mutate: mutateUsage, isLoading: isUsageLoading } = useSWR('/api/account/usage', fetcher)
+  const { data: onboardingData, mutate: mutateOnboarding } = useSWR('/api/onboarding/status?kick=true', fetcher)
 
-  const loadUsage = useCallback(async () => {
-    setIsUsageLoading(true)
-    setUsageError('')
-    try {
-      const res = await fetch('/api/account/usage')
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setUsageError(data.message || data.error || 'Unable to load usage metrics right now.')
-        return
-      }
-      setUsage(data as AccountUsage)
-    } catch {
-      setUsageError('Unable to load usage metrics right now.')
-    } finally {
-      setIsUsageLoading(false)
-    }
-  }, [])
+  const accountStatus = accountData?.account as AccountStatus | undefined
+  const accountStatusError = accountData?.error || ''
+  const isAccountStatusInitialized = accountData !== undefined || accountStatusError !== ''
 
-  const loadOnboardingStatus = useCallback(async (options?: { kick?: boolean }) => {
-    const kick = options?.kick ?? true
-    try {
-      const res = await fetch(kick ? '/api/onboarding/status?kick=true' : '/api/onboarding/status')
-      if (!res.ok) {
-        return
-      }
-      const data = (await res.json()) as OnboardingStateResponse
-      setOnboardingState(data)
-      setEnrichmentDraft((prev) => ({
-        ...prev,
-        ...(data.draft?.enrichment ?? {}),
-      }))
-    } catch {
-      // Non-blocking in settings.
-    }
-  }, [])
+  const usage = usageData as AccountUsage | undefined
+  const usageError = usageData?.message || usageData?.error || ''
+
+  const onboardingState = onboardingData as OnboardingStateResponse | undefined
 
   useEffect(() => {
-    void loadAccountStatus()
-    void loadUsage()
-    void loadOnboardingStatus()
-  }, [loadAccountStatus, loadUsage, loadOnboardingStatus])
+    if (accountData?.error && String(accountData.error).toLowerCase().includes('unauthorized')) {
+      router.push('/api/auth/signin')
+    } else if (accountStatus && !fullName) {
+      setFullName(getOnboardingPrefillName(accountStatus.displayName, accountStatus.prefillName))
+    }
+  }, [accountData, accountStatus, fullName, router])
+
+  useEffect(() => {
+    if (onboardingState?.draft?.enrichment) {
+      setEnrichmentDraft(prev => ({
+        ...prev,
+        ...onboardingState.draft.enrichment,
+      }))
+    }
+  }, [onboardingState?.draft?.enrichment])
 
   useEffect(() => {
     if (searchParams.get('success') === 'linked') {
       setMessage({ text: 'Google account linked. Your guest profile has been upgraded without losing any data.', type: 'success' })
-      void loadAccountStatus()
-      void loadOnboardingStatus()
+      mutateAccountStatus()
+      mutateOnboarding()
     } else if (searchParams.get('error') === 'link_failed') {
       setMessage({ text: 'Failed to link your Google account. Please try again.', type: 'error' })
     }
-  }, [searchParams, loadAccountStatus, loadOnboardingStatus])
+  }, [searchParams, mutateAccountStatus, mutateOnboarding])
 
   const handleSaveName = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -256,7 +215,7 @@ function SettingsPageContent() {
       }
 
       setFullName(data.account?.displayName || validation.value)
-      setAccountStatus((prev) => (prev ? { ...prev, displayName: data.account?.displayName || validation.value } : prev))
+      mutateAccountStatus()
       setMessage({ text: 'Full name updated successfully.', type: 'success' })
     } catch {
       setMessage({ text: 'An unexpected error occurred while updating your full name.', type: 'error' })
@@ -282,7 +241,7 @@ function SettingsPageContent() {
       if (res.ok) {
         setMessage({ text: 'API key saved successfully.', type: 'success' })
         setApiKey('')
-        await loadAccountStatus()
+        mutateAccountStatus()
       } else {
         if (data.code === 'apikey_config_error') {
           setApiKeyFieldError('Secure key storage is temporarily unavailable. Your key was not saved. Please try again later.')
@@ -309,7 +268,7 @@ function SettingsPageContent() {
         return
       }
       setMessage({ text: 'API key removed.', type: 'success' })
-      await loadAccountStatus()
+      mutateAccountStatus()
     } catch {
       setMessage({ text: 'An unexpected error occurred while removing API key.', type: 'error' })
     } finally {
@@ -437,24 +396,28 @@ function SettingsPageContent() {
         plan?: { status?: OnboardingStateResponse['plan']['status'] }
       }
       if (data.onboarding) {
-        setOnboardingState((prev) => ({
-          onboarding: data.onboarding as OnboardingStateResponse['onboarding'],
-          plan: {
-            status: data.plan?.status ?? prev?.plan.status ?? 'queued',
-            lastErrorCode: prev?.plan.lastErrorCode ?? null,
-          },
-          draft: {
-            enrichment: enrichmentDraft,
-          },
-        }))
+        mutateOnboarding((prev: any) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            onboarding: data.onboarding as OnboardingStateResponse['onboarding'],
+            plan: {
+              status: data.plan?.status ?? prev.plan.status ?? 'queued',
+              lastErrorCode: prev.plan.lastErrorCode ?? null,
+            },
+            draft: {
+              enrichment: enrichmentDraft,
+            },
+          }
+        }, { revalidate: false })
       }
-      void loadOnboardingStatus({ kick: false })
+      void mutateOnboarding()
     } catch {
       setMessage({ text: 'Failed to save onboarding enrichment.', type: 'error' })
     } finally {
       setIsSavingEnrichment(false)
     }
-  }, [enrichmentDraft, loadOnboardingStatus])
+  }, [enrichmentDraft, mutateOnboarding])
 
   const isGuest = Boolean(accountStatus?.isGuest)
   const showGuestUpgradeSection = isGuest || Boolean(accountStatusError)
@@ -506,7 +469,7 @@ function SettingsPageContent() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => void loadAccountStatus()}
+              onClick={() => mutateAccountStatus()}
               disabled={isAccountStatusLoading}
             >
               {isAccountStatusLoading ? 'Refreshing...' : 'Retry Status'}
@@ -718,7 +681,7 @@ function SettingsPageContent() {
             <p className="text-muted-foreground">No usage metrics yet.</p>
           )}
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => void loadUsage()} disabled={isUsageLoading}>
+            <Button variant="outline" onClick={() => mutateUsage()} disabled={isUsageLoading}>
               {isUsageLoading ? 'Refreshing...' : 'Refresh Usage'}
             </Button>
           </div>

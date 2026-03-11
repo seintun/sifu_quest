@@ -13,6 +13,8 @@ import { buildSystemMeta, getSystemMessage } from '@/lib/chat-system-messages'
 import { KeyRound, MessageCircle, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 
 const MODE_STARTERS: Record<string, string[]> = {
   dsa: ['Give me a medium array problem', 'Practice dynamic programming', 'Quiz me on graphs', 'Review sliding window'],
@@ -89,8 +91,6 @@ export default function CoachPage() {
     formatMicrousd,
   } = useChat(mode)
 
-  const [accountIsGuest, setAccountIsGuest] = useState<boolean | null>(null)
-  const [isAnonymousSession, setIsAnonymousSession] = useState<boolean | null>(null)
   const [dismissedPrompt, setDismissedPrompt] = useState(false)
   const [statusExpanded, setStatusExpanded] = useState(false)
   const [input, setInput] = useState('')
@@ -100,7 +100,11 @@ export default function CoachPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const shouldAutoScrollRef = useRef(true)
 
-  const isGuest = isAnonymousSession === null ? (accountIsGuest ?? Boolean(freeQuota?.isGuest)) : isAnonymousSession
+  const { data: accountStatusResponse } = useSWR('/api/account/status', fetcher)
+  const accountData = accountStatusResponse?.account
+
+  const isGuest = accountData?.isAnonymousSession ?? (accountData?.isGuest ?? Boolean(freeQuota?.isGuest))
+
   const isQuotaBlocked = Boolean(
     freeQuota?.isFreeTier &&
     freeQuota.remaining <= 0 &&
@@ -109,33 +113,7 @@ export default function CoachPage() {
 
   const selectedModeLabel = useMemo(() => MODES.find((entry) => entry.value === mode)?.label ?? mode, [mode])
 
-  useEffect(() => {
-    let cancelled = false
 
-    async function loadAccountStatus() {
-      try {
-        const res = await fetch('/api/account/status')
-        if (!res.ok || cancelled) {
-          return
-        }
-
-        const data = (await res.json()) as { account?: { isGuest?: boolean; isAnonymousSession?: boolean } }
-        if (typeof data.account?.isGuest === 'boolean') {
-          setAccountIsGuest(data.account.isGuest)
-        }
-        if (typeof data.account?.isAnonymousSession === 'boolean') {
-          setIsAnonymousSession(data.account.isAnonymousSession)
-        }
-      } catch {
-        // No-op: fallback to freeQuota.isGuest behavior.
-      }
-    }
-
-    void loadAccountStatus()
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   useEffect(() => {
     if (!isLoaded) return

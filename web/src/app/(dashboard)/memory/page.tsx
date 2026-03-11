@@ -25,7 +25,9 @@ import {
   TrendingUp,
   User,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -139,136 +141,31 @@ function MobileFileSwitcher({
 }
 
 export default function MemoryPage() {
-  const [files, setFiles] = useState<string[]>([])
+  const { data: dirData, error: dirError, mutate: mutateDir } = useSWR('/api/memory', fetcher)
+  
+  const files: string[] = useMemo(() => {
+    if (!dirData?.files || !Array.isArray(dirData.files)) return []
+    const incoming: string[] = dirData.files
+    return sortMemoryFiles(incoming.filter((f: string) => f !== 'plan.md'))
+  }, [dirData])
+  
+  const listError = dirError ? toMemoryErrorMessage(dirError, 'Unable to load memory files right now.') : (dirData?.error ? dirData.error : null)
+
   const [selectedFile, setSelectedFile] = useState('')
-  const [content, setContent] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [listError, setListError] = useState<string | null>(null)
-  const [contentError, setContentError] = useState<string | null>(null)
-  const [fileCache, setFileCache] = useState<Record<string, string>>({})
 
-  const fileCacheRef = useRef<Record<string, string>>({})
-  const fileRequestIdRef = useRef(0)
-
-  const updateCache = useCallback((file: string, value: string) => {
-    setFileCache((previous) => {
-      const next = { ...previous, [file]: value }
-      fileCacheRef.current = next
-      return next
-    })
-  }, [])
-
-  const loadFiles = useCallback(async () => {
-    try {
-      const response = await fetch('/api/memory')
-      const data = await response.json()
-
-      if (!response.ok || data.error) {
-        throw new Error(typeof data.error === 'string' ? data.error : 'Unable to load memory files.')
-      }
-
-      const incomingFiles: string[] = Array.isArray(data.files)
-        ? data.files.filter((file: unknown): file is string => typeof file === 'string')
-        : []
-      const filteredFiles = incomingFiles.filter((file) => file !== 'plan.md')
-      const orderedFiles = sortMemoryFiles(filteredFiles)
-
-      setFiles(orderedFiles)
-      setListError(null)
-
-      setFileCache((previous) => {
-        const prunedEntries = orderedFiles
-          .filter((file) => previous[file] !== undefined)
-          .map((file) => [file, previous[file]] as const)
-        const next = Object.fromEntries(prunedEntries)
-        fileCacheRef.current = next
-        return next
-      })
-
-      const preferredFile = typeof window !== 'undefined'
-        ? new URLSearchParams(window.location.search).get('file')
-        : null
-
-      setSelectedFile((current) => {
-        if (current && orderedFiles.includes(current)) {
-          return current
-        }
-
-        return selectInitialFile(orderedFiles, preferredFile)
-      })
-    } catch (error) {
-      setFiles([])
-      setSelectedFile('')
-      setContent('')
-      setListError(toMemoryErrorMessage(error, 'Unable to load memory files right now.'))
-    }
-  }, [])
-
-  const loadFileContent = useCallback(
-    async (file: string, options?: { force?: boolean }) => {
-      if (!file) {
-        return
-      }
-
-      const cached = fileCacheRef.current[file]
-      if (cached !== undefined && !options?.force) {
-        setContent(cached)
-        setLoading(false)
-        setContentError(null)
-        return
-      }
-
-      const requestId = fileRequestIdRef.current + 1
-      fileRequestIdRef.current = requestId
-
-      setLoading(true)
-      setContentError(null)
-
-      try {
-        const response = await fetch(`/api/memory?file=${encodeURIComponent(file)}`)
-        const data = await response.json()
-
-        if (!response.ok || data.error) {
-          throw new Error(typeof data.error === 'string' ? data.error : 'Unable to load this memory file.')
-        }
-
-        const nextContent = typeof data.content === 'string' ? data.content : ''
-
-        if (fileRequestIdRef.current !== requestId) {
-          return
-        }
-
-        setContent(nextContent)
-        updateCache(file, nextContent)
-      } catch (error) {
-        if (fileRequestIdRef.current !== requestId) {
-          return
-        }
-
-        setContent('')
-        setContentError(toMemoryErrorMessage(error, 'Unable to load this memory file.'))
-      } finally {
-        if (fileRequestIdRef.current === requestId) {
-          setLoading(false)
-        }
-      }
-    },
-    [updateCache],
-  )
+  const { data: contentData, error: fetchContentError, isValidating: loading, mutate: mutateContent } = useSWR(selectedFile ? `/api/memory?file=${encodeURIComponent(selectedFile)}` : null, fetcher)
+  
+  const content = typeof contentData?.content === 'string' ? contentData.content : ''
+  const contentError = fetchContentError ? toMemoryErrorMessage(fetchContentError, 'Unable to load this memory file.') : (contentData?.error ? contentData.error : null)
 
   useEffect(() => {
-    void loadFiles()
-  }, [loadFiles])
-
-  useEffect(() => {
-    if (!selectedFile) {
-      setContent('')
-      setContentError(null)
-      return
+    if (files.length > 0 && !selectedFile) {
+      const preferredFile = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('file') : null
+      setSelectedFile(selectInitialFile(files, preferredFile))
     }
+  }, [files, selectedFile])
 
-    void loadFileContent(selectedFile)
-  }, [selectedFile, loadFileContent])
+
 
   useEffect(() => {
     if (!selectedFile || typeof window === 'undefined') {
@@ -304,7 +201,7 @@ export default function MemoryPage() {
 
   const lineCount = content ? content.split('\n').length : 0
   const sectionCount = content ? (content.match(/^## /gm) || []).length : 0
-  const isCurrentFileCached = selectedFile ? fileCache[selectedFile] !== undefined : false
+  const isCurrentFileCached = selectedFile ? !!contentData : false
   const activeError = listError || contentError
   const showError = shouldShowError({
     error: activeError,
@@ -314,23 +211,19 @@ export default function MemoryPage() {
   })
 
   const refreshSelectedFile = useCallback(() => {
-    if (!selectedFile) {
-      return
-    }
-
-    void loadFileContent(selectedFile, { force: true })
-  }, [selectedFile, loadFileContent])
+    if (selectedFile) mutateContent()
+  }, [selectedFile, mutateContent])
 
   const retry = useCallback(() => {
     if (listError) {
-      void loadFiles()
+      void mutateDir()
       return
     }
 
     if (selectedFile) {
-      void loadFileContent(selectedFile, { force: true })
+      void mutateContent()
     }
-  }, [listError, loadFiles, selectedFile, loadFileContent])
+  }, [listError, mutateDir, selectedFile, mutateContent])
 
   const handleSelectFile = useCallback((file: string) => {
     setSelectedFile(file)

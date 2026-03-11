@@ -27,7 +27,9 @@ import {
   Target,
 } from 'lucide-react'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 
 interface DashboardMetrics {
   dsaPatternsTotal: number
@@ -254,52 +256,31 @@ function QuickActionCard({
 }
 
 export default function DashboardPage() {
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
-  const [onboardingState, setOnboardingState] = useState<OnboardingStateResponse | null>(null)
-  const [enrichmentDraft, setEnrichmentDraft] = useState<OnboardingEnrichmentAnswers>(createEmptyEnrichmentAnswers())
+  const { data: metrics } = useSWR<DashboardMetrics>('/api/progress', fetcher)
+  const { data: onboardingData, mutate: mutateOnboarding } = useSWR('/api/onboarding/status?kick=true', fetcher)
+
+  const onboardingState = onboardingData ? (onboardingData as OnboardingStateResponse) : null
+
+  // We only track the enrichment drafting locally since it's a WIP form state
+  const [enrichmentDraft, setEnrichmentDraft] = useState<OnboardingEnrichmentAnswers>(
+    onboardingState?.draft?.enrichment
+      ? { ...createEmptyEnrichmentAnswers(), ...onboardingState.draft.enrichment }
+      : createEmptyEnrichmentAnswers()
+  )
   const [savingEnrichment, setSavingEnrichment] = useState(false)
   const [showAllPromptOptions, setShowAllPromptOptions] = useState(false)
 
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/progress').then((res) => res.json()),
-      fetch('/api/onboarding/status?kick=true')
-        .then((res) => (res.ok ? res.json() : null))
-        .catch(() => null),
-    ])
-      .then(([metricsData, onboardingData]) => {
-        setMetrics(metricsData)
-        if (onboardingData) {
-          const typed = onboardingData as OnboardingStateResponse
-          setOnboardingState(typed)
-          setEnrichmentDraft((prev) => ({
-            ...prev,
-            ...(typed.draft?.enrichment ?? {}),
-          }))
-        }
-      })
-      .catch(() => {})
-  }, [])
-
   const nextPromptKey = onboardingState?.onboarding.nextPromptKey ?? null
-
-  useEffect(() => {
-    setShowAllPromptOptions(false)
-  }, [nextPromptKey])
-
-  if (!metrics) {
-    return <DashboardSkeleton />
-  }
 
   const planHref = '/plan'
   const planLabel = 'Game Plan'
-  const overallPlanPct = metrics.planItemsTotal > 0
-    ? Math.round((metrics.planItemsCompleted / metrics.planItemsTotal) * 100)
+  const overallPlanPct = (metrics?.planItemsTotal ?? 0) > 0
+    ? Math.round(((metrics?.planItemsCompleted ?? 0) / (metrics?.planItemsTotal ?? 1)) * 100)
     : 0
-  const dsaMasteryPct = metrics.dsaPatternsTotal > 0
-    ? Math.round((metrics.dsaPatternsMastered / metrics.dsaPatternsTotal) * 100)
+  const dsaMasteryPct = (metrics?.dsaPatternsTotal ?? 0) > 0
+    ? Math.round(((metrics?.dsaPatternsMastered ?? 0) / (metrics?.dsaPatternsTotal ?? 1)) * 100)
     : 0
-  const applicationsSummary = Object.entries(metrics.jobApplicationsByStatus ?? {})
+  const applicationsSummary = Object.entries(metrics?.jobApplicationsByStatus ?? {})
     .map(([status, count]) => `${count} ${status}`)
     .join(', ') || 'No pipeline yet'
   const quickActions: Array<{
@@ -408,30 +389,34 @@ export default function DashboardPage() {
         | null
 
       if (responseData?.onboarding) {
-        setOnboardingState((prev) => ({
-          onboarding: responseData.onboarding as OnboardingStateResponse['onboarding'],
-          plan: {
-            status: responseData.plan?.status ?? prev?.plan.status ?? 'queued',
-            lastErrorCode: prev?.plan.lastErrorCode ?? null,
+        mutateOnboarding(
+          (prev: any) => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              onboarding: responseData.onboarding as OnboardingStateResponse['onboarding'],
+              plan: {
+                status: responseData.plan?.status ?? prev.plan.status ?? 'queued',
+                lastErrorCode: prev.plan.lastErrorCode ?? null,
+              },
+              draft: {
+                enrichment: enrichmentDraft,
+              },
+            }
           },
-          draft: {
-            enrichment: enrichmentDraft,
-          },
-        }))
+          { revalidate: false } // Don't revalidate immediately, let the fetch below handle it
+        )
       }
 
       // Refresh latest draft/status without blocking the save interaction.
-      void fetch('/api/onboarding/status')
-        .then((res) => (res.ok ? res.json() : null))
-        .then((refreshed) => {
+      void mutateOnboarding() // Revalidate the onboarding status
+        .then((refreshed: any) => {
           if (!refreshed) {
             return
           }
-          const typed = refreshed as OnboardingStateResponse
-          setOnboardingState(typed)
           setEnrichmentDraft((prev) => ({
             ...prev,
-            ...(typed.draft?.enrichment ?? {}),
+            ...(refreshed.draft?.enrichment ?? {}),
           }))
         })
         .catch(() => {})
@@ -451,16 +436,25 @@ export default function DashboardPage() {
               <h1 className="font-display text-2xl font-bold">Dashboard</h1>
               <p className="text-muted-foreground text-sm mt-1">Your job search at a glance</p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="rounded-md border border-border bg-elevated/70 px-2.5 py-1 text-xs text-muted-foreground">
-                  {overallPlanPct}% complete
-                </span>
-                <span className="rounded-md border border-border bg-elevated/70 px-2.5 py-1 text-xs text-muted-foreground">
-                  {metrics.currentStreak ?? 0} day streak
-                </span>
+                {metrics ? (
+                  <>
+                    <span className="rounded-md border border-border bg-elevated/70 px-2.5 py-1 text-xs text-muted-foreground">
+                      {overallPlanPct}% complete
+                    </span>
+                    <span className="rounded-md border border-border bg-elevated/70 px-2.5 py-1 text-xs text-muted-foreground">
+                      {metrics?.currentStreak ?? 0} day streak
+                    </span>
+                  </>
+                ) : (
+                  <div className="flex gap-2 animate-pulse mt-0.5">
+                    <div className="h-6 w-24 bg-muted/80 rounded-md" />
+                    <div className="h-6 w-24 bg-muted/80 rounded-md" />
+                  </div>
+                )}
               </div>
             </div>
 
-            {metrics.todayFocus && (
+            {metrics?.todayFocus && (
               <div className="min-w-[230px] rounded-xl border border-streak/30 bg-streak/10 p-4">
                 <div className="flex items-start gap-3">
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-streak/30 bg-streak/15">
@@ -576,33 +570,51 @@ export default function DashboardPage() {
       {/* Metrics Grid */}
       <div className="max-h-[33vh] overflow-y-auto pr-1 sm:max-h-none sm:overflow-visible sm:pr-0">
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3">
-          <MetricCard
-            title="DSA Problems"
-            value={metrics.dsaProblemsCompleted ?? 0}
-            subtitle={`${metrics.dsaPatternsMastered ?? 0}/${metrics.dsaPatternsTotal ?? 0} patterns mastered (${dsaMasteryPct}%)`}
-            icon={Code2}
-            domain="dsa"
-          />
-          <MetricCard
-            title="Applications"
-            value={metrics.jobApplicationsTotal ?? 0}
-            subtitle={applicationsSummary}
-            icon={Briefcase}
-            domain="jobs"
-          />
-          <MetricCard
-            title="System Design"
-            value={metrics.systemDesignConceptsCovered ?? 0}
-            subtitle="concepts covered"
-            icon={Network}
-            domain="design"
-          />
-          <MetricCard
-            title="Streak"
-            value={`${metrics.currentStreak ?? 0} days`}
-            icon={Flame}
-            domain="streak"
-          />
+          {(!metrics) ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i} className="h-[104px] border-border bg-surface animate-pulse">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-3">
+                      <div className="h-3 w-20 bg-muted rounded" />
+                      <div className="h-8 w-12 bg-muted/80 rounded" />
+                    </div>
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 bg-muted rounded-lg" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <>
+              <MetricCard
+                title="DSA Problems"
+                value={metrics?.dsaProblemsCompleted ?? 0}
+                subtitle={`${metrics?.dsaPatternsMastered ?? 0}/${metrics?.dsaPatternsTotal ?? 0} patterns mastered (${dsaMasteryPct}%)`}
+                icon={Code2}
+                domain="dsa"
+              />
+              <MetricCard
+                title="Applications"
+                value={metrics?.jobApplicationsTotal ?? 0}
+                subtitle={applicationsSummary}
+                icon={Briefcase}
+                domain="jobs"
+              />
+              <MetricCard
+                title="System Design"
+                value={metrics?.systemDesignConceptsCovered ?? 0}
+                subtitle="concepts covered"
+                icon={Network}
+                domain="design"
+              />
+              <MetricCard
+                title="Streak"
+                value={`${metrics?.currentStreak ?? 0} days`}
+                icon={Flame}
+                domain="streak"
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -645,20 +657,35 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4 pt-4">
-            <ProgressBar
-              label="Overall Plan"
-              current={metrics.planItemsCompleted ?? 0}
-              total={metrics.planItemsTotal ?? 0}
-              startHex={DOMAIN_COLORS.plan.hex}
-              endHex="#FB923C"
-            />
-            <ProgressBar
-              label="DSA Patterns"
-              current={metrics.dsaPatternsMastered ?? 0}
-              total={metrics.dsaPatternsTotal ?? 0}
-              startHex={DOMAIN_COLORS.dsa.hex}
-              endHex={DOMAIN_COLORS.design.hex}
-            />
+            {!metrics ? (
+              <div className="space-y-6 animate-pulse">
+                <div className="space-y-2">
+                  <div className="h-3 w-1/4 bg-muted/60 rounded" />
+                  <div className="h-2 w-full bg-muted rounded-full" />
+                </div>
+                <div className="space-y-2">
+                  <div className="h-3 w-1/4 bg-muted/60 rounded" />
+                  <div className="h-2 w-full bg-muted rounded-full" />
+                </div>
+              </div>
+            ) : (
+              <>
+                <ProgressBar
+                  label="Overall Plan"
+                  current={metrics?.planItemsCompleted ?? 0}
+                  total={metrics?.planItemsTotal ?? 0}
+                  startHex={DOMAIN_COLORS.plan.hex}
+                  endHex="#FB923C"
+                />
+                <ProgressBar
+                  label="DSA Patterns"
+                  current={metrics?.dsaPatternsMastered ?? 0}
+                  total={metrics?.dsaPatternsTotal ?? 0}
+                  startHex={DOMAIN_COLORS.dsa.hex}
+                  endHex={DOMAIN_COLORS.design.hex}
+                />
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -671,10 +698,16 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            {metrics.weeklyRhythm?.length > 0 ? (
+            {!metrics ? (
+              <div className="grid grid-cols-2 gap-2 animate-pulse">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-14 bg-muted/30 rounded-lg" />
+                ))}
+              </div>
+            ) : (metrics?.weeklyRhythm?.length ?? 0) > 0 ? (
               <div className="grid grid-cols-2 gap-2">
-                {metrics.weeklyRhythm.map(entry => {
-                  const isToday = metrics.todayFocus?.day === entry.day
+                {metrics?.weeklyRhythm?.map(entry => {
+                  const isToday = metrics?.todayFocus?.day === entry.day
                   return (
                     <div
                       key={entry.day}
