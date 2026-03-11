@@ -374,15 +374,8 @@ function SettingsPageContent() {
               <LogOut className="h-4 w-4" />
               Sign Out
             </Button>
-            {isGuest && (
-              <Button
-                variant="outline"
-                onClick={() => mutateAccountStatus()}
-                disabled={isAccountStatusLoading}
-              >
-                {isAccountStatusLoading ? 'Refreshing...' : 'Retry Status'}
-              </Button>
-            )}
+
+
           </CardContent>
         </Card>
       )}
