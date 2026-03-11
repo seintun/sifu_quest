@@ -83,7 +83,7 @@ You ←→ Sifu Quest (Next.js on Vercel) ←→ Claude AI (Anthropic)
 ```
 
 1. **Sign in** with Google or try as a Guest (free mode starts without personal key)
-2. **Complete onboarding** — Sifu asks a few questions and builds your personalized coaching profile
+2. **Complete onboarding** — finish a fast 4-6 step core setup; Sifu queues your personalized plan in the background
 3. **Pick a mode** (DSA, System Design, Interview, Job Search, or Business Ideas)
 4. **Start learning** — Sifu reads your Supabase memory files to give context-aware coaching
 5. **Track progress** — your dashboard updates automatically as you log problems, toggle plan items, and chat

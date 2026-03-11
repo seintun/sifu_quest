@@ -75,7 +75,12 @@ All routes live under `src/app/api/` and require authentication via `auth()` fro
 | `/api/jobs`                      | POST   | Log job application updates                    |
 | `/api/link-google/callback`      | GET    | Supabase OAuth callback for identity linking   |
 | `/api/memory`                    | GET    | Read memory files or list all files            |
-| `/api/onboarding`                | POST   | Complete user onboarding, generate plan        |
+| `/api/onboarding`                | POST   | Legacy compatibility shim for onboarding submit |
+| `/api/onboarding/draft`          | PATCH  | Autosave onboarding draft state                 |
+| `/api/onboarding/core/complete`  | POST   | Complete core onboarding and queue plan job     |
+| `/api/onboarding/enrichment`     | POST   | Save incremental enrichment answers and requeue plan |
+| `/api/onboarding/status`         | GET    | Fetch onboarding + plan status and resume draft |
+| `/api/internal/plan-jobs/run`    | POST   | Worker endpoint to process queued onboarding plans |
 | `/api/plan/toggle`               | POST   | Toggle plan checklist items                    |
 | `/api/progress`                  | GET    | Compute dashboard metrics (streak, counters)   |
 | `/api/progress/events`           | GET    | Raw progress events for calendar heatmap       |

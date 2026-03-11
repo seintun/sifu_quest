@@ -409,25 +409,25 @@ All data lives in the existing `/memory/*.md` markdown files — **no database**
 
 ## Onboarding Wizard (First Launch)
 
-On first launch, if `memory/profile.md` has no name/content yet, the app shows a full-screen setup wizard **before** the dashboard. It mirrors the existing `/start` Claude command (`.claude/commands/start.md`) with the same 8 questions:
+On first launch, users complete **Onboarding V2 Core** in a conditional 4-6 step flow:
 
-1. What's your name?
-2. What's your current situation? (employed, job searching, etc.)
-3. What are your target roles?
-4. What's your primary programming language + DSA interview language?
-5. Target companies or tiers?
-6. What's your timeline?
-7. What are your 2–3 strongest areas?
-8. What are 1–2 areas you need to work on?
+1. Name
+2. Primary goals (1-2)
+3. Context (situation + experience)
+4. Constraints (timeline + hours/week)
+5. Conditional role/language steps (only when required by branch rules)
+6. Growth gaps (1-2)
+
+After core completion, the app unlocks immediately. Plan generation runs asynchronously in the background while users can continue using the product.
 
 **Implementation:**
 
-- New page: `/app/onboarding/page.tsx` — multi-step wizard with a progress bar
-- Each step is its own component: `components/onboarding/Step{N}.tsx`
-- Final step: constructs `profile.md` and `progress.md` content, POSTs to `/api/onboarding` which writes both files
-- After save: redirects to `/` (Dashboard)
-- The root layout checks for an empty `profile.md` on load and redirects to `/onboarding` if needed
-- The `/start` Claude Code command continues to work as-is for CLI users — the web wizard is a parallel path
+- `/onboarding` uses autosaved draft + resume (`PATCH /api/onboarding/draft`, localStorage fallback)
+- Core completion calls `POST /api/onboarding/core/complete`
+- Enrichment is progressive (dashboard prompt, coach greeting prompt, settings path) via `POST /api/onboarding/enrichment`
+- Status + resume source of truth is `GET /api/onboarding/status`
+- Plan generation is queued and processed by `POST /api/internal/plan-jobs/run`
+- Legacy `POST /api/onboarding` remains as a compatibility shim for one release
 
 ---
 
@@ -435,7 +435,7 @@ On first launch, if `memory/profile.md` has no name/content yet, the app shows a
 
 | Route            | Purpose                                                                               |
 | ---------------- | ------------------------------------------------------------------------------------- |
-| `/onboarding`    | First-launch wizard: 8-question setup, writes profile.md + progress.md                |
+| `/onboarding`    | First-launch wizard: conditional 4-6 core steps with autosave + resume                |
 | `/`              | Dashboard: today's focus, metrics grid, progress bars, action items, activity feed    |
 | `/calendar`      | Monthly grid with color-coded activity dots, streak counter, day detail drawer        |
 | `/dsa`           | Pattern mastery table (🔴🟡🟢), problem history, Problem of the Day, log problem form |
@@ -520,7 +520,11 @@ MODES_DIR=../modes
 | -------------------- | ------ | -------------------------------------------------- |
 | `/api/memory?file=X` | GET    | Read a memory file (raw content + parsed data)     |
 | `/api/progress`      | GET    | Compute and return `DashboardMetrics`              |
-| `/api/onboarding`    | POST   | Write profile.md + progress.md from wizard answers |
+| `/api/onboarding`    | POST   | Legacy onboarding compatibility shim |
+| `/api/onboarding/draft` | PATCH | Save onboarding draft |
+| `/api/onboarding/core/complete` | POST | Complete core onboarding and queue plan |
+| `/api/onboarding/enrichment` | POST | Save enrichment answers and queue plan regeneration |
+| `/api/onboarding/status` | GET | Fetch onboarding + plan state for resume |
 | `/api/plan/toggle`   | POST   | `{ itemId, checked }` → patch plan.md              |
 | `/api/dsa/log`       | POST   | Append problem attempt to dsa-patterns.md          |
 | `/api/jobs`          | POST   | Add/update application in job-search.md            |
