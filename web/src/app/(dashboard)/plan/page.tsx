@@ -56,6 +56,61 @@ function formatPlanStatus(status: OnboardingPlanStatus): string {
     .join(' ')
 }
 
+function getMobileTitle(title: string): { heading: string; subtitle: string | null } {
+  if (title.length <= 48) {
+    return { heading: title, subtitle: null }
+  }
+
+  const truncated = title.length > 88 ? `${title.slice(0, 87).trimEnd()}...` : title
+  return {
+    heading: 'Your Game Plan',
+    subtitle: truncated,
+  }
+}
+
+function PlanStatusControls({
+  planStatus,
+  planErrorCode,
+  canRequestRefresh,
+  isQueueingPlanRefresh,
+  onQueuePlanRefresh,
+}: {
+  planStatus: OnboardingPlanStatus
+  planErrorCode: string | null
+  canRequestRefresh: boolean
+  isQueueingPlanRefresh: boolean
+  onQueuePlanRefresh: () => void
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-surface/60 p-2.5 sm:flex-row sm:items-center sm:justify-between sm:border-0 sm:bg-transparent sm:p-0">
+      <div className="flex flex-wrap items-center gap-2">
+        {planStatus === 'not_queued' && (
+          <Badge variant="outline" className="cursor-default pointer-events-none border-info/40 bg-info/10 text-info">
+            New profile updates available
+          </Badge>
+        )}
+        <Badge variant="outline" className="cursor-default pointer-events-none border-border/60 bg-elevated/70 text-muted-foreground">
+          Status: {formatPlanStatus(planStatus)}
+        </Badge>
+        {planErrorCode && (
+          <Badge variant="outline" className="cursor-default pointer-events-none border-danger/40 bg-danger/10 text-danger">
+            Error: {planErrorCode}
+          </Badge>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={onQueuePlanRefresh}
+        disabled={!canRequestRefresh || isQueueingPlanRefresh}
+        className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 py-2 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 sm:w-auto sm:justify-start sm:py-1.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+      >
+        <RefreshCw className={`h-3.5 w-3.5 ${isQueueingPlanRefresh ? 'animate-spin' : ''}`} />
+        {isQueueingPlanRefresh ? 'Queueing update...' : 'Generate Updated Plan'}
+      </button>
+    </div>
+  )
+}
+
 function PlanCheckItem({
   item,
   onToggle,
@@ -244,50 +299,32 @@ export default function PlanPage() {
   }
 
   const title = extractTitle(rawContent)
+  const mobileTitle = getMobileTitle(title)
   const firstMonthValue = plan.months[0] ? `month${plan.months[0].month}` : ''
   const canRequestRefresh = planStatus !== 'queued' && planStatus !== 'running'
 
   // AI-generated plan: fall back to markdown rendering
   if (!hasStructuredContent(plan)) {
     return (
-      <div className="space-y-6 max-w-4xl">
+      <div className="max-w-4xl space-y-4 sm:space-y-6">
         <div>
-          <h1 className="font-display text-2xl font-bold">{title}</h1>
+          <h1 className="font-display hidden text-2xl font-bold leading-tight sm:block">{title}</h1>
+          <h1 className="font-display text-[1.7rem] font-bold leading-tight sm:hidden">{mobileTitle.heading}</h1>
+          {mobileTitle.subtitle && <p className="mt-1 text-xs text-muted-foreground sm:hidden">{mobileTitle.subtitle}</p>}
           <p className="text-muted-foreground text-sm mt-1">Your personalized roadmap</p>
         </div>
         {(isPlanPlaceholder || planStatus === 'not_queued') && (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              {planStatus === 'not_queued' && (
-                <Badge variant="outline" className="cursor-default pointer-events-none border-info/40 bg-info/10 text-info">
-                  New profile updates available
-                </Badge>
-              )}
-              <Badge variant="outline" className="cursor-default pointer-events-none border-border/60 bg-elevated/70 text-muted-foreground">
-                Status: {formatPlanStatus(planStatus)}
-              </Badge>
-              {planErrorCode && (
-                <Badge variant="outline" className="cursor-default pointer-events-none border-danger/40 bg-danger/10 text-danger">
-                  Error: {planErrorCode}
-                </Badge>
-              )}
-            </div>
-            <div className="flex justify-start sm:justify-end">
-              <button
-                type="button"
-                onClick={() => void queuePlanRefresh()}
-                disabled={!canRequestRefresh || isQueueingPlanRefresh}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 py-1.5 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${isQueueingPlanRefresh ? 'animate-spin' : ''}`} />
-                {isQueueingPlanRefresh ? 'Queueing update...' : 'Generate Updated Plan'}
-              </button>
-            </div>
-          </div>
+          <PlanStatusControls
+            planStatus={planStatus}
+            planErrorCode={planErrorCode}
+            canRequestRefresh={canRequestRefresh}
+            isQueueingPlanRefresh={isQueueingPlanRefresh}
+            onQueuePlanRefresh={() => void queuePlanRefresh()}
+          />
         )}
         {rawContent ? (
           <Card className="border-border bg-surface">
-            <CardContent className="px-6 py-5">
+            <CardContent className="px-4 py-4 sm:px-6 sm:py-5">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
                 {rawContent}
               </ReactMarkdown>
@@ -301,46 +338,20 @@ export default function PlanPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="max-w-4xl space-y-4 sm:space-y-6">
       <div>
-        <h1 className="font-display text-2xl font-bold">{title}</h1>
+        <h1 className="font-display hidden text-2xl font-bold leading-tight sm:block">{title}</h1>
+        <h1 className="font-display text-[1.7rem] font-bold leading-tight sm:hidden">{mobileTitle.heading}</h1>
+        {mobileTitle.subtitle && <p className="mt-1 text-xs text-muted-foreground sm:hidden">{mobileTitle.subtitle}</p>}
         <p className="text-muted-foreground text-sm mt-1">Your structured roadmap to interview success</p>
       </div>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          {planStatus === 'not_queued' && (
-            <Badge variant="outline" className="cursor-default pointer-events-none border-info/40 bg-info/10 text-info">
-              New profile updates available
-            </Badge>
-          )}
-          {(planStatus === 'queued' || planStatus === 'running') && (
-            <Badge variant="outline" className="cursor-default pointer-events-none border-border/60 bg-elevated/70 text-muted-foreground">
-              Status: {formatPlanStatus(planStatus)}
-            </Badge>
-          )}
-          {planStatus === 'failed' && (
-            <Badge variant="outline" className="cursor-default pointer-events-none border-danger/40 bg-danger/10 text-danger">
-              Plan generation failed
-            </Badge>
-          )}
-          {planErrorCode && (
-            <Badge variant="outline" className="cursor-default pointer-events-none border-danger/40 bg-danger/10 text-danger">
-              Error: {planErrorCode}
-            </Badge>
-          )}
-        </div>
-        <div className="flex justify-start sm:justify-end">
-          <button
-            type="button"
-            onClick={() => void queuePlanRefresh()}
-            disabled={!canRequestRefresh || isQueueingPlanRefresh}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 py-1.5 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isQueueingPlanRefresh ? 'animate-spin' : ''}`} />
-            {isQueueingPlanRefresh ? 'Queueing update...' : 'Generate Updated Plan'}
-          </button>
-        </div>
-      </div>
+      <PlanStatusControls
+        planStatus={planStatus}
+        planErrorCode={planErrorCode}
+        canRequestRefresh={canRequestRefresh}
+        isQueueingPlanRefresh={isQueueingPlanRefresh}
+        onQueuePlanRefresh={() => void queuePlanRefresh()}
+      />
 
       {/* Weekly Rhythm */}
       {plan.weeklyRhythm?.length > 0 && (
