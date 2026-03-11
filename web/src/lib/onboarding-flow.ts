@@ -1,24 +1,4 @@
-import type { OnboardingCoreAnswers } from './onboarding-v2'
-
-const TARGET_ROLE_REQUIRED_SITUATIONS = new Set<string>([
-  'actively_job_searching',
-  'quietly_looking',
-  'between_jobs',
-  'student_bootcamp',
-  'career_pivot',
-])
-
-const INTERVIEW_LANGUAGE_REQUIRED_GOALS = new Set<string>([
-  'dsa_leetcode',
-])
-
-function requiresTargetRoles(situation: string): boolean {
-  return TARGET_ROLE_REQUIRED_SITUATIONS.has(situation)
-}
-
-function requiresInterviewLanguage(goals: readonly string[]): boolean {
-  return goals.some((goal) => INTERVIEW_LANGUAGE_REQUIRED_GOALS.has(goal))
-}
+import { type OnboardingCoreAnswers, requiresInterviewLanguage, requiresTargetRoles } from './onboarding-v2.ts'
 
 export type OnboardingCoreStepKey =
   | 'name'

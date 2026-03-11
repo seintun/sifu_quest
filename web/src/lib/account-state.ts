@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { ONBOARDING_SCHEMA_VERSION } from './onboarding-v2'
 import { createAdminClient } from './supabase-admin'
 
 export type UserProfileState = {
@@ -89,7 +90,7 @@ export async function ensureUserProfile(userId: string, sessionEmail?: string | 
         default_provider: 'openrouter',
         default_model: null,
         onboarding_status: 'not_started',
-        onboarding_version: 2,
+        onboarding_version: ONBOARDING_SCHEMA_VERSION,
         onboarding_completion_percent: 0,
         onboarding_next_prompt_key: null,
         onboarding_core_completed_at: null,
@@ -112,7 +113,7 @@ export async function ensureUserProfile(userId: string, sessionEmail?: string | 
       default_provider: profile.default_provider === 'anthropic' ? 'anthropic' : 'openrouter',
       default_model: profile.default_model ?? null,
       onboarding_status: profile.onboarding_status ?? 'not_started',
-      onboarding_version: profile.onboarding_version ?? 2,
+      onboarding_version: profile.onboarding_version ?? ONBOARDING_SCHEMA_VERSION,
       onboarding_completion_percent: profile.onboarding_completion_percent ?? 0,
       onboarding_next_prompt_key: profile.onboarding_next_prompt_key ?? null,
       onboarding_core_completed_at: profile.onboarding_core_completed_at ?? null,
@@ -139,7 +140,7 @@ export async function ensureUserProfile(userId: string, sessionEmail?: string | 
       default_provider: 'openrouter',
       default_model: null,
       onboarding_status: 'not_started',
-      onboarding_version: 2,
+      onboarding_version: ONBOARDING_SCHEMA_VERSION,
       onboarding_completion_percent: 0,
       onboarding_next_prompt_key: null,
       onboarding_core_completed_at: null,
@@ -175,7 +176,7 @@ export async function ensureUserProfile(userId: string, sessionEmail?: string | 
         default_provider: 'openrouter',
         default_model: null,
         onboarding_status: 'not_started',
-        onboarding_version: 2,
+        onboarding_version: ONBOARDING_SCHEMA_VERSION,
         onboarding_completion_percent: 0,
         onboarding_next_prompt_key: null,
         onboarding_core_completed_at: null,
@@ -221,7 +222,7 @@ export async function ensureUserProfile(userId: string, sessionEmail?: string | 
               default_provider: 'openrouter',
               default_model: null,
               onboarding_status: 'not_started',
-              onboarding_version: 2,
+              onboarding_version: ONBOARDING_SCHEMA_VERSION,
               onboarding_completion_percent: 0,
               onboarding_next_prompt_key: null,
               onboarding_core_completed_at: null,
@@ -246,7 +247,7 @@ export async function ensureUserProfile(userId: string, sessionEmail?: string | 
           default_provider: existingProfile.default_provider === 'anthropic' ? 'anthropic' : 'openrouter',
           default_model: existingProfile.default_model ?? null,
           onboarding_status: existingProfile.onboarding_status ?? 'not_started',
-          onboarding_version: existingProfile.onboarding_version ?? 2,
+          onboarding_version: existingProfile.onboarding_version ?? ONBOARDING_SCHEMA_VERSION,
           onboarding_completion_percent: existingProfile.onboarding_completion_percent ?? 0,
           onboarding_next_prompt_key: existingProfile.onboarding_next_prompt_key ?? null,
           onboarding_core_completed_at: existingProfile.onboarding_core_completed_at ?? null,
@@ -271,7 +272,7 @@ export async function ensureUserProfile(userId: string, sessionEmail?: string | 
     default_provider: createdProfile.default_provider === 'anthropic' ? 'anthropic' : 'openrouter',
     default_model: createdProfile.default_model ?? null,
     onboarding_status: createdProfile.onboarding_status ?? 'not_started',
-    onboarding_version: createdProfile.onboarding_version ?? 2,
+    onboarding_version: createdProfile.onboarding_version ?? ONBOARDING_SCHEMA_VERSION,
     onboarding_completion_percent: createdProfile.onboarding_completion_percent ?? 0,
     onboarding_next_prompt_key: createdProfile.onboarding_next_prompt_key ?? null,
     onboarding_core_completed_at: createdProfile.onboarding_core_completed_at ?? null,
