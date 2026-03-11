@@ -50,6 +50,9 @@ const GUEST_LIMIT_REACHED_MESSAGE =
 const PROVIDER_KEY_REQUIRED_MESSAGE =
   'Anthropic models require your own Anthropic API key. Add your key in **Settings** and try again.'
 
+const INVALID_PROVIDER_KEY_MESSAGE =
+  'Your saved Anthropic API key could not be used. Re-add your key in **Settings** and try again.'
+
 const CHAT_TEMPORARY_ERROR_MESSAGE =
   'I hit a temporary issue loading your workspace. Please try again in a moment.'
 
@@ -168,6 +171,7 @@ export function useChat(mode: string) {
   }, [mode, applySelection])
 
   const updateProviderSelection = useCallback((provider: ChatProvider) => {
+    setUpgradeRequired(null)
     setSelectedProvider(provider)
     setSelectedModel((prev) => {
       const models = modelsByProvider[provider] ?? []
@@ -180,6 +184,7 @@ export function useChat(mode: string) {
   }, [modelsByProvider])
 
   const updateModelSelection = useCallback((modelId: string) => {
+    setUpgradeRequired(null)
     setSelectedModel(modelId)
   }, [])
 
@@ -215,6 +220,7 @@ export function useChat(mode: string) {
       { role: 'user', content: userMessage },
     ]
     setMessages(newMessages)
+    setUpgradeRequired(null)
     setIsStreaming(true)
     setStreamPhase('thinking')
 
@@ -261,15 +267,19 @@ export function useChat(mode: string) {
         }
 
         if (res.status === 403) {
-          setUpgradeRequired(errorCode || 'missing_api_key')
+          const normalizedUpgradeCode =
+            errorCode === 'invalid_api_key'
+              ? 'provider_key_required'
+              : (errorCode || 'missing_api_key')
+          setUpgradeRequired(normalizedUpgradeCode)
           const isGuestBlocked = errorCode === 'guest_limit_reached' || errorCode === 'session_expired'
-          const isProviderKeyRequired = errorCode === 'provider_key_required'
+          const isProviderKeyRequired = errorCode === 'provider_key_required' || errorCode === 'invalid_api_key'
           setMessages([
             ...newMessages,
             {
               role: 'assistant',
               content: isProviderKeyRequired
-                ? PROVIDER_KEY_REQUIRED_MESSAGE
+                ? (errorCode === 'invalid_api_key' ? INVALID_PROVIDER_KEY_MESSAGE : PROVIDER_KEY_REQUIRED_MESSAGE)
                 : isGuestBlocked
                   ? GUEST_LIMIT_REACHED_MESSAGE
                   : FREE_TIER_EXHAUSTED_MESSAGE,
@@ -395,6 +405,7 @@ export function useChat(mode: string) {
 
   const greet = useCallback(async () => {
     if (isStreaming) return
+    setUpgradeRequired(null)
     setIsStreaming(true)
     setStreamPhase('thinking')
 
@@ -430,7 +441,11 @@ export function useChat(mode: string) {
         }
 
         if (res.status === 403) {
-          setUpgradeRequired(errorCode || 'missing_api_key')
+          const normalizedUpgradeCode =
+            errorCode === 'invalid_api_key'
+              ? 'provider_key_required'
+              : (errorCode || 'missing_api_key')
+          setUpgradeRequired(normalizedUpgradeCode)
           setIsStreaming(false)
           return
         }

@@ -461,7 +461,7 @@ export default function CoachPage() {
 
           {/* Input */}
           <div className="border-t border-border p-3 shrink-0">
-            {freeQuota?.isFreeTier && (
+            {freeQuota?.isFreeTier && selectedProvider === 'openrouter' && (
               <div className="mb-2 rounded-md border border-border/60 bg-elevated/40 px-3 py-2 animate-in fade-in slide-in-from-bottom-1 duration-300">
                 <div className="flex items-center justify-between gap-2 text-xs font-medium text-foreground/80">
                   <span className="inline-flex items-center gap-1.5">

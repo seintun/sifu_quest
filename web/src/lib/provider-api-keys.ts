@@ -12,6 +12,23 @@ function isMissingUserApiKeysTable(error: { code?: string; message?: string } | 
   return error.code === '42P01' || Boolean(error.message?.includes('user_api_keys'))
 }
 
+async function getLegacyAnthropicApiKey(
+  supabase: ReturnType<typeof createAdminClient>,
+  userId: string,
+): Promise<string | null> {
+  const legacy = await supabase
+    .from('user_profiles')
+    .select('api_key_enc')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (legacy.error) {
+    throw new Error(`Failed to load legacy API key: ${legacy.error.message}`)
+  }
+
+  return legacy.data?.api_key_enc ?? null
+}
+
 export async function getEncryptedProviderApiKey(
   userId: string,
   provider: 'anthropic' | 'openrouter',
@@ -25,7 +42,13 @@ export async function getEncryptedProviderApiKey(
     .maybeSingle()
 
   if (!modern.error) {
-    return modern.data?.api_key_enc ?? null
+    const modernKey = modern.data?.api_key_enc ?? null
+    if (modernKey || provider !== 'anthropic') {
+      return modernKey
+    }
+
+    // Keep reading legacy Anthropic key for accounts that predate provider-key rows.
+    return await getLegacyAnthropicApiKey(supabase, userId)
   }
 
   if (!isMissingUserApiKeysTable(modern.error)) {
@@ -37,17 +60,7 @@ export async function getEncryptedProviderApiKey(
   }
 
   // Legacy fallback before provider-key table rollout.
-  const legacy = await supabase
-    .from('user_profiles')
-    .select('api_key_enc')
-    .eq('id', userId)
-    .maybeSingle()
-
-  if (legacy.error) {
-    throw new Error(`Failed to load legacy API key: ${legacy.error.message}`)
-  }
-
-  return legacy.data?.api_key_enc ?? null
+  return await getLegacyAnthropicApiKey(supabase, userId)
 }
 
 export async function upsertEncryptedProviderApiKey(
@@ -151,19 +164,10 @@ export async function loadAllEncryptedProviderKeys(userId: string): Promise<Prov
     throw new Error(`Failed to load provider API keys: ${modern.error.message}`)
   }
 
-  const legacy = await supabase
-    .from('user_profiles')
-    .select('api_key_enc')
-    .eq('id', userId)
-    .maybeSingle()
-
-  if (legacy.error) {
-    throw new Error(`Failed to load legacy provider API key: ${legacy.error.message}`)
-  }
-
-  if (!legacy.data?.api_key_enc) {
+  const legacyKey = await getLegacyAnthropicApiKey(supabase, userId)
+  if (!legacyKey) {
     return []
   }
 
-  return [{ provider: 'anthropic', api_key_enc: legacy.data.api_key_enc }]
+  return [{ provider: 'anthropic', api_key_enc: legacyKey }]
 }
