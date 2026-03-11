@@ -64,11 +64,52 @@ function shouldShowPlanStatusBanner(status: OnboardingPlanStatus | null): boolea
   return status === 'not_queued' || status === 'queued' || status === 'running' || status === 'failed'
 }
 
-function PlanUpToDateBadge() {
+function PlanRoadmapBadges({
+  planStatus,
+  planErrorCode,
+}: {
+  planStatus: OnboardingPlanStatus | null
+  planErrorCode: string | null
+}) {
+  if (!planStatus) {
+    return null
+  }
+
+  const baseBadgeClass = 'h-7 cursor-default pointer-events-none px-2.5 text-[11px] font-medium'
+
   return (
-    <Badge variant="outline" className="h-8 cursor-default pointer-events-none border-success/40 bg-success/10 px-3 text-xs font-medium text-success">
-      Plan up to date
-    </Badge>
+    <div className="flex flex-wrap items-center gap-1.5">
+      {planStatus === 'ready' && (
+        <Badge variant="outline" className={`${baseBadgeClass} border-success/40 bg-success/10 text-success`}>
+          Plan up to date
+        </Badge>
+      )}
+      {planStatus === 'not_queued' && (
+        <>
+          <Badge variant="outline" className={`${baseBadgeClass} border-info/40 bg-info/10 text-info`}>
+            New updates available
+          </Badge>
+          <Badge variant="outline" className={`${baseBadgeClass} border-border/60 bg-elevated/70 text-muted-foreground`}>
+            Status: Not queued
+          </Badge>
+        </>
+      )}
+      {(planStatus === 'queued' || planStatus === 'running') && (
+        <Badge variant="outline" className={`${baseBadgeClass} border-border/60 bg-elevated/70 text-muted-foreground`}>
+          Status: {formatPlanStatus(planStatus)}
+        </Badge>
+      )}
+      {planStatus === 'failed' && (
+        <Badge variant="outline" className={`${baseBadgeClass} border-danger/40 bg-danger/10 text-danger`}>
+          Status: Failed
+        </Badge>
+      )}
+      {planErrorCode && (
+        <Badge variant="outline" className={`${baseBadgeClass} border-danger/40 bg-danger/10 text-danger`}>
+          Error: {planErrorCode}
+        </Badge>
+      )}
+    </div>
   )
 }
 
@@ -76,34 +117,25 @@ function PlanHeader({
   title,
   mobileTitle,
   subtitle,
-  showPlanUpToDate,
+  planStatus,
+  planErrorCode,
 }: {
   title: string
   mobileTitle: { heading: string; subtitle: string | null }
   subtitle: string
-  showPlanUpToDate: boolean
+  planStatus: OnboardingPlanStatus | null
+  planErrorCode: string | null
 }) {
   return (
     <div>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-display hidden text-2xl font-bold leading-tight sm:block">{title}</h1>
-          <h1 className="font-display text-[1.7rem] font-bold leading-tight sm:hidden">{mobileTitle.heading}</h1>
-          {mobileTitle.subtitle && <p className="mt-1 text-xs text-muted-foreground sm:hidden">{mobileTitle.subtitle}</p>}
-        </div>
-        {showPlanUpToDate && (
-          <div className="hidden shrink-0 pt-0.5 sm:block">
-            <PlanUpToDateBadge />
-          </div>
-        )}
+      <div className="min-w-0">
+        <h1 className="font-display hidden text-2xl font-bold leading-tight sm:block">{title}</h1>
+        <h1 className="font-display text-[1.7rem] font-bold leading-tight sm:hidden">{mobileTitle.heading}</h1>
+        {mobileTitle.subtitle && <p className="mt-1 text-xs text-muted-foreground sm:hidden">{mobileTitle.subtitle}</p>}
       </div>
-      <div className="mt-1 flex items-center justify-between gap-2">
+      <div className="mt-1 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">{subtitle}</p>
-        {showPlanUpToDate && (
-          <div className="shrink-0 sm:hidden">
-            <PlanUpToDateBadge />
-          </div>
-        )}
+        <PlanRoadmapBadges planStatus={planStatus} planErrorCode={planErrorCode} />
       </div>
     </div>
   )
@@ -123,18 +155,15 @@ function getMobileTitle(title: string): { heading: string; subtitle: string | nu
 
 function PlanStatusControls({
   planStatus,
-  planErrorCode,
   canRequestRefresh,
   isQueueingPlanRefresh,
   onQueuePlanRefresh,
 }: {
   planStatus: OnboardingPlanStatus | null
-  planErrorCode: string | null
   canRequestRefresh: boolean
   isQueueingPlanRefresh: boolean
   onQueuePlanRefresh: () => void
 }) {
-  const baseBadgeClass = 'h-9 cursor-default pointer-events-none px-3 text-xs font-medium'
   const isGenerating = planStatus === 'queued' || planStatus === 'running' || isQueueingPlanRefresh
   const buttonLabel = isQueueingPlanRefresh
     ? 'Queueing update...'
@@ -145,22 +174,7 @@ function PlanStatusControls({
         : 'Generate Updated Plan'
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-surface/60 p-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex flex-wrap items-center gap-2">
-        {planStatus === 'not_queued' && (
-          <Badge variant="outline" className={`${baseBadgeClass} border-info/40 bg-info/10 text-info`}>
-            New profile updates available
-          </Badge>
-        )}
-        <Badge variant="outline" className={`${baseBadgeClass} border-border/60 bg-elevated/70 text-muted-foreground`}>
-          Status: {planStatus ? formatPlanStatus(planStatus) : 'Loading'}
-        </Badge>
-        {planErrorCode && (
-          <Badge variant="outline" className={`${baseBadgeClass} border-danger/40 bg-danger/10 text-danger`}>
-            Error: {planErrorCode}
-          </Badge>
-        )}
-      </div>
+    <div className="flex justify-start sm:justify-end">
       <button
         type="button"
         onClick={onQueuePlanRefresh}
@@ -370,7 +384,6 @@ export default function PlanPage() {
   const firstMonthValue = plan.months[0] ? `month${plan.months[0].month}` : ''
   const canRequestRefresh = planStatus !== null && planStatus !== 'queued' && planStatus !== 'running'
   const showPlanStatusBanner = shouldShowPlanStatusBanner(planStatus)
-  const showPlanUpToDate = planStatus === 'ready'
   const fallbackMarkdownContent = stripLeadingHeading(rawContent)
 
   // AI-generated plan: fall back to markdown rendering
@@ -381,12 +394,12 @@ export default function PlanPage() {
           title={title}
           mobileTitle={mobileTitle}
           subtitle="Your personalized roadmap"
-          showPlanUpToDate={showPlanUpToDate}
+          planStatus={planStatus}
+          planErrorCode={planErrorCode}
         />
         {showPlanStatusBanner && (
           <PlanStatusControls
             planStatus={planStatus}
-            planErrorCode={planErrorCode}
             canRequestRefresh={canRequestRefresh}
             isQueueingPlanRefresh={isQueueingPlanRefresh}
             onQueuePlanRefresh={() => void queuePlanRefresh()}
@@ -413,12 +426,12 @@ export default function PlanPage() {
         title={title}
         mobileTitle={mobileTitle}
         subtitle="Your structured roadmap to interview success"
-        showPlanUpToDate={showPlanUpToDate}
+        planStatus={planStatus}
+        planErrorCode={planErrorCode}
       />
       {showPlanStatusBanner && (
         <PlanStatusControls
           planStatus={planStatus}
-          planErrorCode={planErrorCode}
           canRequestRefresh={canRequestRefresh}
           isQueueingPlanRefresh={isQueueingPlanRefresh}
           onQueuePlanRefresh={() => void queuePlanRefresh()}
