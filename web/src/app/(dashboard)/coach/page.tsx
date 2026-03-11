@@ -50,10 +50,9 @@ type CodeBlockProps = HTMLAttributes<HTMLElement> & {
 
 function CostTierIcons({ tier }: { tier: 1 | 2 | 3 }) {
   return (
-    <span className="inline-flex items-center gap-0.5 text-warning">
-      {Array.from({ length: tier }).map((_, index) => (
-        <Coins key={index} className="h-3 w-3" />
-      ))}
+    <span className="inline-flex items-center gap-1 text-warning">
+      <Coins className="h-3 w-3" />
+      <span className="text-[11px] leading-none font-medium">x{tier}</span>
     </span>
   )
 }
