@@ -84,7 +84,8 @@ export function parsePersistedOnboardingDraft(raw: unknown): PersistedOnboarding
     core: validateCoreAnswers({
       ...createEmptyOnboardingDraftPayload().core,
       ...(isRecord(raw.core) ? raw.core : {}),
-      // validateCoreAnswers enforces required fields; use relaxed normalization for parsing
+      // NOTE: validateCoreAnswers enforces required fields; this parser is strict.
+      // For parsing possibly partial drafts, use parsePersistedOnboardingDraftRelaxed instead.
     }),
     enrichment: normalizeEnrichmentAnswers(isRecord(raw.enrichment) ? raw.enrichment : {}),
     currentStep:
@@ -339,8 +340,6 @@ export async function updateOnboardingDraft(
       onboarding_last_step: draft.currentStep,
       onboarding_completion_percent: completionPercent,
       onboarding_next_prompt_key: nextPromptKey,
-      onboarding_core_completed_at: status === 'core_complete' || status === 'enriched_complete' ? now : null,
-      onboarding_enriched_completed_at: status === 'enriched_complete' ? now : null,
       last_active_at: now,
     })
     .eq('id', userId)
@@ -439,7 +438,9 @@ export async function loadOnboardingState(userId: string): Promise<{
   }
 
   const fallbackDraft = createEmptyOnboardingDraftPayload()
-  const draft = parsePersistedOnboardingDraftRelaxed(data?.onboarding_draft)
+  const rawDraft = data?.onboarding_draft
+  const hasDraft = isRecord(rawDraft) && Object.keys(rawDraft).length > 0
+  const draft = hasDraft ? parsePersistedOnboardingDraftRelaxed(rawDraft) : fallbackDraft
 
   return {
     onboarding: {
@@ -447,13 +448,13 @@ export async function loadOnboardingState(userId: string): Promise<{
       status: (data?.onboarding_status as OnboardingStatus) ?? 'not_started',
       completionPercent: data?.onboarding_completion_percent ?? 0,
       nextPromptKey: data?.onboarding_next_prompt_key ?? getNextEnrichmentPromptKey(draft.enrichment),
-      draftAvailable: Boolean(data?.onboarding_draft),
+      draftAvailable: hasDraft,
     },
     plan: {
       status: (data?.onboarding_plan_status as OnboardingPlanPayload['status']) ?? 'not_queued',
       lastErrorCode: data?.onboarding_plan_error_code ?? null,
     },
-    draft: data?.onboarding_draft ? draft : fallbackDraft,
+    draft,
   }
 }
 
@@ -461,7 +462,7 @@ async function markPlanJobSuccess(userId: string, attemptCount: number): Promise
   const supabaseAdmin = createAdminClient()
   const now = new Date().toISOString()
 
-  await supabaseAdmin
+  const { data: updatedJob, error: jobError } = await supabaseAdmin
     .from('onboarding_plan_jobs')
     .update({
       status: 'completed',
@@ -471,8 +472,21 @@ async function markPlanJobSuccess(userId: string, attemptCount: number): Promise
       completed_at: now,
     })
     .eq('user_id', userId)
+    .eq('status', 'running')
+    .eq('attempt_count', attemptCount)
+    .select('user_id')
+    .maybeSingle()
 
-  await supabaseAdmin
+  if (jobError) {
+    throw new Error(`Failed to mark plan job successful: ${jobError.message}`)
+  }
+
+  // If no rows were updated, this run is stale (job was re-queued); don't finalize.
+  if (!updatedJob) {
+    return
+  }
+
+  const { error: profileError } = await supabaseAdmin
     .from('user_profiles')
     .update({
       onboarding_plan_status: 'ready',
@@ -482,6 +496,10 @@ async function markPlanJobSuccess(userId: string, attemptCount: number): Promise
       last_active_at: now,
     })
     .eq('id', userId)
+
+  if (profileError) {
+    throw new Error(`Failed to update user profile after plan success: ${profileError.message}`)
+  }
 
   const { logProgressEvent } = await import('./progress')
   await logProgressEvent(userId, 'plan_ready', 'onboarding')
@@ -496,7 +514,7 @@ async function markPlanJobFailure(
   const now = new Date().toISOString()
   const exhausted = attemptCount >= 3
 
-  await supabaseAdmin
+  const { data: updatedJob, error: jobError } = await supabaseAdmin
     .from('onboarding_plan_jobs')
     .update({
       status: exhausted ? 'failed' : 'queued',
@@ -508,8 +526,21 @@ async function markPlanJobFailure(
       updated_at: now,
     })
     .eq('user_id', userId)
+    .eq('status', 'running')
+    .eq('attempt_count', attemptCount)
+    .select('user_id')
+    .maybeSingle()
 
-  await supabaseAdmin
+  if (jobError) {
+    throw new Error(`Failed to mark plan job failure: ${jobError.message}`)
+  }
+
+  // If no rows were updated, this run is stale (job was re-queued); don't finalize.
+  if (!updatedJob) {
+    return
+  }
+
+  const { error: profileError } = await supabaseAdmin
     .from('user_profiles')
     .update({
       onboarding_plan_status: exhausted ? 'failed' : 'queued',
@@ -519,6 +550,10 @@ async function markPlanJobFailure(
       last_active_at: now,
     })
     .eq('id', userId)
+
+  if (profileError) {
+    throw new Error(`Failed to update user profile after plan failure: ${profileError.message}`)
+  }
 
   const { logProgressEvent } = await import('./progress')
   await logProgressEvent(userId, exhausted ? 'plan_failed' : 'plan_retry_queued', 'onboarding', {

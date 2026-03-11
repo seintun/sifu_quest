@@ -620,10 +620,23 @@ function splitAndNormalizeList(rawValue: unknown): string[] {
 }
 
 function pickByLabel(list: string[], options: readonly SelectOption[]): string[] {
-  const byLabel = new Map(options.map((option) => [option.label.toLowerCase(), option.value]))
+  // Sort by descending label length so longer labels are tried before shorter prefixes.
+  const sortedOptions = [...options].sort((a, b) => b.label.length - a.label.length)
+  const byLabel = new Map(sortedOptions.map((option) => [option.label.toLowerCase(), option.value]))
   const selected: string[] = []
   for (const item of list) {
-    const mapped = byLabel.get(item.toLowerCase())
+    const normalized = item.toLowerCase()
+    // Exact match first
+    let mapped = byLabel.get(normalized)
+    // Prefix match to handle legacy values like "Actively job searching. <extra context>"
+    if (!mapped) {
+      for (const [label, value] of byLabel) {
+        if (normalized.startsWith(label)) {
+          mapped = value
+          break
+        }
+      }
+    }
     if (mapped && !selected.includes(mapped)) {
       selected.push(mapped)
     }

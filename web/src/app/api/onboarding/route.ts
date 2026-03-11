@@ -34,10 +34,23 @@ export async function POST(request: NextRequest) {
     const displayName = getPersistableOnboardingDisplayName(draft.core.name)
     if (displayName) {
       const supabaseAdmin = createAdminClient()
-      await supabaseAdmin
+      const { error: profileUpdateError } = await supabaseAdmin
         .from('user_profiles')
         .update({ display_name: displayName, last_active_at: new Date().toISOString() })
         .eq('id', userId)
+
+      if (profileUpdateError) {
+        if ((profileUpdateError as { code?: string }).code === '23503') {
+          return NextResponse.json(
+            { error: 'User profile does not exist for onboarding user.' },
+            { status: 404 },
+          )
+        }
+        return NextResponse.json(
+          { error: 'Failed to update user profile during onboarding.' },
+          { status: 500 },
+        )
+      }
     }
 
     const { logProgressEvent, logAuditEvent } = await import('@/lib/progress')
