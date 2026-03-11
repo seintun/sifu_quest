@@ -245,6 +245,36 @@ Open [http://localhost:3000](http://localhost:3000). You should be able to:
 - Chat in free-tier mode using `OPENROUTER_API_KEY` until quota is exhausted or a personal Anthropic key is added
 - View your dashboard and calendar
 
+### Guest Sessions & Account Conversion
+
+A **guest session** is an anonymous Supabase sign-in with a 30-minute TTL. All data (messages, onboarding answers, memory files) is stored under the guest's user ID, so it survives page refreshes within the session window.
+
+#### Signing out as a guest
+
+Clicking **Sign Out** in the sidebar (or Settings) when signed in as a guest opens the **GuestLogoutDialog**, which:
+
+1. Warns that all data will be **permanently deleted** on sign-out.
+2. Offers a primary **"Create Account & Link Google"** CTA to convert before data is lost.
+3. Provides a secondary **"Sign out anyway"** option for users who explicitly want to discard their session.
+
+#### Converting a guest account to Google
+
+When a guest clicks **Create Account & Link Google** (in the dialog or the Settings page), the following happens:
+
+1. A short-lived token is issued via `POST /api/guest-upgrade/token`, encoding the guest's Supabase user ID.
+2. `next-auth signIn('google')` initiates Google OAuth with `callbackUrl` pointing to `/api/guest-upgrade/complete?token=...`.
+3. After Google consent, `GET /api/guest-upgrade/complete` runs `mergeGuestDataIntoUser(guestId, googleId)` which:
+   - Copies all `memory_files` (profile, progress, plan, chat logs)
+   - Copies all `onboarding_*` columns (status, draft, completion %, plan job) so the user is **not** redirected to `/onboarding` again
+   - Preserves `display_name` from the guest's onboarding answers (not replaced by "Guest")
+   - Transfers `chat_sessions`, `chat_messages`, `progress_events`, and `audit_log` rows
+   - Deletes the guest profile and Supabase auth user
+4. User lands on `/settings?success=linked` with all data intact.
+
+> 💡 **Local tip:** To test the full conversion flow locally, make sure your Google OAuth credentials include `http://localhost:3000/api/auth/callback/google` as an authorized redirect URI (see [Section 2](#2-google-oauth) above) and that the Supabase local emulator has the Google provider enabled.
+
+
+
 ### Verify the build compiles cleanly
 
 ```bash
