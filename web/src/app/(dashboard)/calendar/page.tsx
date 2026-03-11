@@ -22,7 +22,9 @@ import {
     subMonths,
 } from 'date-fns'
 import { ArrowRight, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Flame } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 
 interface DayActivity {
   date: Date
@@ -50,81 +52,91 @@ function intensityClass(count: number): string {
   return 'bg-foreground/[0.15]'
 }
 
+
+
 export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [activities, setActivities] = useState<Map<string, DayActivity>>(new Map())
   const [selectedDay, setSelectedDay] = useState<DayActivity | null>(null)
   const [streak, setStreak] = useState(0)
 
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/memory?file=dsa-patterns.md').then(r => r.json()),
-      fetch('/api/memory?file=job-search.md').then(r => r.json()),
-      fetch('/api/memory?file=system-design.md').then(r => r.json()),
-      fetch('/api/progress/events').then(r => r.json())
-    ]).then(([dsaData, jobData, sdData, progressEvents]) => {
-      const problems: ProblemAttempt[] = parseProblemHistory(dsaData.content || '')
-      const apps: JobApplication[] = parseJobApplications(jobData.content || '')
-      const sdParsed = parseSystemDesign(sdData.content || '')
-      const concepts: SystemDesignConcept[] = sdParsed.concepts
+  // Use a custom multi-fetcher for SWR
+  const { data: rawData } = useSWR(
+    ['/api/memory?file=dsa-patterns.md', '/api/memory?file=job-search.md', '/api/memory?file=system-design.md', '/api/progress/events'],
+    ([url1, url2, url3, url4]) => Promise.all([fetcher(url1), fetcher(url2), fetcher(url3), fetcher(url4)])
+  )
 
-      const actMap = new Map<string, DayActivity>()
+  const activitiesData = useMemo(() => {
+    if (!rawData) return null
 
-      for (const p of problems) {
-        if (p.date && p.date !== '—') {
-          const key = p.date
-          const existing = actMap.get(key) || emptyActivity(new Date(key))
+    const [dsaData, jobData, sdData, progressEvents] = rawData
+    const problems: ProblemAttempt[] = parseProblemHistory(dsaData.content || '')
+    const apps: JobApplication[] = parseJobApplications(jobData.content || '')
+    const sdParsed = parseSystemDesign(sdData.content || '')
+    const concepts: SystemDesignConcept[] = sdParsed.concepts
+
+    const actMap = new Map<string, DayActivity>()
+
+    // DSA
+    for (const p of problems) {
+      if (p.date && p.date !== '—') {
+        const key = p.date
+        const existing = actMap.get(key) || emptyActivity(new Date(key))
+        existing.dsa++
+        existing.dsaEntries.push(p.problem)
+        actMap.set(key, existing)
+      }
+    }
+
+    // Jobs
+    for (const a of apps) {
+      if (a.dateApplied && a.dateApplied !== '—') {
+        const key = a.dateApplied
+        const existing = actMap.get(key) || emptyActivity(new Date(key))
+        existing.jobs++
+        existing.jobEntries.push(`${a.company} — ${a.role}`)
+        actMap.set(key, existing)
+      }
+    }
+
+    // Design
+    for (const c of concepts) {
+      if (c.date && c.date !== '—') {
+        const key = c.date
+        const existing = actMap.get(key) || emptyActivity(new Date(key))
+        existing.design++
+        existing.designEntries.push(c.concept)
+        actMap.set(key, existing)
+      }
+    }
+
+    // Merge progress_events data
+    if (Array.isArray(progressEvents)) {
+      for (const ev of progressEvents) {
+        const dateStr = new Date(ev.occurred_at).toISOString().split('T')[0]
+        const existing = actMap.get(dateStr) || emptyActivity(new Date(dateStr))
+        
+        if (ev.domain === 'dsa') {
           existing.dsa++
-          existing.dsaEntries.push(p.problem)
-          actMap.set(key, existing)
-        }
-      }
-
-      for (const a of apps) {
-        if (a.dateApplied && a.dateApplied !== '—') {
-          const key = a.dateApplied
-          const existing = actMap.get(key) || emptyActivity(new Date(key))
+          existing.dsaEntries.push(ev.payload?.problem || 'Problem')
+        } else if (ev.domain === 'jobs') {
           existing.jobs++
-          existing.jobEntries.push(`${a.company} — ${a.role}`)
-          actMap.set(key, existing)
-        }
-      }
-
-      for (const c of concepts) {
-        if (c.date && c.date !== '—') {
-          const key = c.date
-          const existing = actMap.get(key) || emptyActivity(new Date(key))
+          existing.jobEntries.push(`${ev.payload?.company || ''} — ${ev.payload?.role || 'Application'}`)
+        } else if (ev.domain === 'system-design') {
           existing.design++
-          existing.designEntries.push(c.concept)
-          actMap.set(key, existing)
+          existing.designEntries.push(ev.payload?.concept || 'Concept')
         }
+        
+        actMap.set(dateStr, existing)
       }
+    }
 
-      // Merge progress_events data
-      if (Array.isArray(progressEvents)) {
-        for (const ev of progressEvents) {
-          const dateStr = new Date(ev.occurred_at).toISOString().split('T')[0]
-          const existing = actMap.get(dateStr) || emptyActivity(new Date(dateStr))
-          
-          if (ev.domain === 'dsa') {
-            existing.dsa++
-            existing.dsaEntries.push(ev.payload?.problem || 'Problem')
-          } else if (ev.domain === 'jobs') {
-            existing.jobs++
-            existing.jobEntries.push(`${ev.payload?.company || ''} — ${ev.payload?.role || 'Application'}`)
-          } else if (ev.domain === 'system-design') {
-            existing.design++
-            existing.designEntries.push(ev.payload?.concept || 'Concept')
-          }
-          
-          actMap.set(dateStr, existing)
-        }
-      }
+    return actMap
+  }, [rawData])
 
-      setActivities(actMap)
-
-      // Compute streak
-      const allDates = [...actMap.keys()].sort().reverse()
+  // Derive streak from activities
+  useEffect(() => {
+    if (!activitiesData) return
+    const allDates = [...activitiesData.keys()].sort().reverse()
       let s = 0
       const today = new Date()
       const check = new Date(today)
@@ -141,11 +153,8 @@ export default function CalendarPage() {
           break
         }
       }
-      setStreak(s)
-    }).catch(err => {
-      console.error('Failed to load calendar data', err)
-    })
-  }, [])
+    setStreak(s)
+  }, [activitiesData])
 
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
@@ -162,18 +171,28 @@ export default function CalendarPage() {
         </div>
 
         {/* Streak Counter */}
-        <Card className="bg-streak/10 border border-streak/30">
-          <CardContent className="p-3 flex items-center gap-2">
-            <Flame className="h-5 w-5 text-streak" />
-            <span className={cn(
-              "text-3xl font-display font-bold tabular-nums",
-              streak >= 7 ? "text-streak animate-streak-glow" : "text-foreground"
-            )}>
-              {streak}
-            </span>
-            <span className="text-xs text-muted-foreground">day streak</span>
-          </CardContent>
-        </Card>
+        {activitiesData ? (
+          <Card className="bg-streak/10 border border-streak/30">
+            <CardContent className="p-3 flex items-center gap-2">
+              <Flame className="h-5 w-5 text-streak" />
+              <span className={cn(
+                "text-3xl font-display font-bold tabular-nums",
+                streak >= 7 ? "text-streak animate-streak-glow" : "text-foreground"
+              )}>
+                {streak}
+              </span>
+              <span className="text-xs text-muted-foreground">day streak</span>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="bg-muted/10 border-muted/20 animate-pulse">
+            <CardContent className="p-3 flex items-center gap-2">
+              <div className="h-5 w-5 bg-muted rounded-full" />
+              <div className="h-8 w-8 bg-muted rounded" />
+              <div className="h-4 w-16 bg-muted/60 rounded" />
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Month Navigation */}
@@ -219,46 +238,52 @@ export default function CalendarPage() {
               <div key={`empty-${i}`} className="aspect-square" />
             ))}
 
-            {days.map(day => {
-              const dateKey = format(day, 'yyyy-MM-dd')
-              const activity = activities.get(dateKey)
-              const today = isToday(day)
-              const selected = selectedDay && isSameDay(day, selectedDay.date)
-              const count = activity ? totalActivity(activity) : 0
+            {!activitiesData ? (
+              Array.from({ length: days.length }).map((_, i) => (
+                <div key={`skeleton-${i}`} className="aspect-square rounded-md bg-muted/20 animate-pulse" />
+              ))
+            ) : (
+              days.map(day => {
+                const dateKey = format(day, 'yyyy-MM-dd')
+                const activity = activitiesData.get(dateKey)
+                const today = isToday(day)
+                const selected = selectedDay && isSameDay(day, selectedDay.date)
+                const count = activity ? totalActivity(activity) : 0
 
-              return (
-                <button
-                  key={dateKey}
-                  onClick={() => setSelectedDay(activity || emptyActivity(day))}
-                  className={cn(
-                    'aspect-square rounded-md flex flex-col items-center justify-center gap-0.5 text-xs transition-colors relative',
-                    today ? 'ring-1 ring-streak/50' : '',
-                    selected ? 'bg-elevated' : intensityClass(count),
-                    !selected && 'hover:bg-elevated/50',
-                  )}
-                >
-                  <span className={cn(
-                    'tabular-nums',
-                    today ? 'text-streak font-medium' : 'text-muted-foreground'
-                  )}>
-                    {format(day, 'd')}
-                  </span>
-                  {activity && (
-                    <div className="flex gap-0.5">
-                      {activity.dsa > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-dsa inline-block" />
-                      )}
-                      {activity.jobs > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-jobs inline-block" />
-                      )}
-                      {activity.design > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-design inline-block" />
-                      )}
-                    </div>
-                  )}
-                </button>
-              )
-            })}
+                return (
+                  <button
+                    key={dateKey}
+                    onClick={() => setSelectedDay(activity || emptyActivity(day))}
+                    className={cn(
+                      'aspect-square rounded-md flex flex-col items-center justify-center gap-0.5 text-xs transition-colors relative',
+                      today ? 'ring-1 ring-streak/50' : '',
+                      selected ? 'bg-elevated' : intensityClass(count),
+                      !selected && 'hover:bg-elevated/50',
+                    )}
+                  >
+                    <span className={cn(
+                      'tabular-nums',
+                      today ? 'text-streak font-medium' : 'text-muted-foreground'
+                    )}>
+                      {format(day, 'd')}
+                    </span>
+                    {activity && (
+                      <div className="flex gap-0.5">
+                        {activity.dsa > 0 && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-dsa inline-block" />
+                        )}
+                        {activity.jobs > 0 && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-jobs inline-block" />
+                        )}
+                        {activity.design > 0 && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-design inline-block" />
+                        )}
+                      </div>
+                    )}
+                  </button>
+                )
+              })
+            )}
           </div>
 
           {/* Legend */}

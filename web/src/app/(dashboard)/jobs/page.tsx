@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -171,21 +173,12 @@ function AddApplicationForm({ onSubmit }: { onSubmit: () => void }) {
   )
 }
 
+
+
 export default function JobsPage() {
-  const [applications, setApplications] = useState<JobApplication[]>([])
-
-  const fetchData = useCallback(() => {
-    fetch('/api/memory?file=job-search.md')
-      .then(res => res.json())
-      .then(data => {
-        setApplications(parseJobApplications(data.content || ''))
-      })
-      .catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  const { data, mutate } = useSWR('/api/memory?file=job-search.md', fetcher)
+  
+  const applications = data ? parseJobApplications(data.content || '') : null
 
   const handleStatusChange = async (company: string, role: string, newStatus: string) => {
     await fetch('/api/jobs', {
@@ -193,13 +186,13 @@ export default function JobsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'updateStatus', company, role, newStatus }),
     })
-    fetchData()
+    mutate()
   }
 
   // Group by status for Kanban view
   const columns = STATUSES.map(status => ({
     status,
-    apps: applications.filter(a => a.status === status),
+    apps: applications ? applications.filter(a => a.status === status) : [],
   }))
 
   return (
@@ -208,43 +201,75 @@ export default function JobsPage() {
         <div>
           <h1 className="font-display text-2xl font-bold">Job Search</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {applications.length} application{applications.length !== 1 ? 's' : ''} tracked
+            {applications ? `${applications.length} application${applications.length !== 1 ? 's' : ''} tracked` : 'Loading applications...'}
           </p>
         </div>
-        <AddApplicationForm onSubmit={fetchData} />
+        {applications ? (
+          <AddApplicationForm onSubmit={() => mutate()} />
+        ) : (
+          <div className="h-9 w-36 bg-muted rounded-md animate-pulse" />
+        )}
       </div>
 
       {/* Kanban Board */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {columns.map(col => (
-          <div key={col.status}>
-            <div className="flex items-center gap-2 mb-3">
-              <div className={`w-2 h-2 rounded-full ${
-                col.status === 'Applied' ? 'bg-coach' :
-                col.status === 'PhoneScreen' ? 'bg-jobs' :
-                col.status === 'Onsite' ? 'bg-design' :
-                col.status === 'Offer' ? 'bg-streak' :
-                'bg-border'
-              }`} />
-              <h3 className="text-sm font-medium">{col.status}</h3>
-              <Badge variant="outline" className="text-xs">{col.apps.length}</Badge>
+        {!applications ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="animate-pulse">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-2 h-2 rounded-full bg-muted" />
+                <div className="h-5 w-24 bg-muted/80 rounded" />
+                <div className="h-5 w-8 bg-muted/40 rounded-full ml-auto" />
+              </div>
+              <div className="space-y-2">
+                {Array.from({ length: i === 0 ? 3 : i === 1 ? 2 : 1 }).map((_, j) => (
+                  <Card key={j} className="bg-surface border-border">
+                    <CardContent className="p-3">
+                      <div className="space-y-2">
+                        <div className="h-4 w-32 bg-muted rounded" />
+                        <div className="h-3 w-40 bg-muted/60 rounded" />
+                      </div>
+                      <div className="flex items-center justify-between mt-4">
+                        <div className="h-3 w-16 bg-muted/40 rounded" />
+                        <div className="h-6 w-28 bg-muted rounded" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
-            <div className="space-y-2">
-              {col.apps.map((app, i) => (
-                <ApplicationCard
-                  key={`${app.company}-${app.role}-${i}`}
-                  app={app}
-                  onStatusChange={handleStatusChange}
-                />
-              ))}
-              {col.apps.length === 0 && (
-                <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-dim">
-                  No applications
-                </div>
-              )}
+          ))
+        ) : (
+          columns.map(col => (
+            <div key={col.status}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`w-2 h-2 rounded-full ${
+                  col.status === 'Applied' ? 'bg-coach' :
+                  col.status === 'PhoneScreen' ? 'bg-jobs' :
+                  col.status === 'Onsite' ? 'bg-design' :
+                  col.status === 'Offer' ? 'bg-streak' :
+                  'bg-border'
+                }`} />
+                <h3 className="text-sm font-medium">{col.status}</h3>
+                <Badge variant="outline" className="text-xs">{col.apps.length}</Badge>
+              </div>
+              <div className="space-y-2">
+                {col.apps.map((app, i) => (
+                  <ApplicationCard
+                    key={`${app.company}-${app.role}-${i}`}
+                    app={app}
+                    onStatusChange={handleStatusChange}
+                  />
+                ))}
+                {col.apps.length === 0 && (
+                  <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-dim">
+                    No applications
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   )

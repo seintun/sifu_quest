@@ -25,7 +25,9 @@ import {
   TrendingUp,
   User,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -139,136 +141,31 @@ function MobileFileSwitcher({
 }
 
 export default function MemoryPage() {
-  const [files, setFiles] = useState<string[]>([])
+  const { data: dirData, error: dirError, mutate: mutateDir } = useSWR('/api/memory', fetcher)
+  
+  const files: string[] = useMemo(() => {
+    if (!dirData?.files || !Array.isArray(dirData.files)) return []
+    const incoming: string[] = dirData.files
+    return sortMemoryFiles(incoming.filter((f: string) => f !== 'plan.md'))
+  }, [dirData])
+  
+  const listError = dirError ? toMemoryErrorMessage(dirError, 'Unable to load memory files right now.') : (dirData?.error ? dirData.error : null)
+
   const [selectedFile, setSelectedFile] = useState('')
-  const [content, setContent] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [listError, setListError] = useState<string | null>(null)
-  const [contentError, setContentError] = useState<string | null>(null)
-  const [fileCache, setFileCache] = useState<Record<string, string>>({})
 
-  const fileCacheRef = useRef<Record<string, string>>({})
-  const fileRequestIdRef = useRef(0)
-
-  const updateCache = useCallback((file: string, value: string) => {
-    setFileCache((previous) => {
-      const next = { ...previous, [file]: value }
-      fileCacheRef.current = next
-      return next
-    })
-  }, [])
-
-  const loadFiles = useCallback(async () => {
-    try {
-      const response = await fetch('/api/memory')
-      const data = await response.json()
-
-      if (!response.ok || data.error) {
-        throw new Error(typeof data.error === 'string' ? data.error : 'Unable to load memory files.')
-      }
-
-      const incomingFiles: string[] = Array.isArray(data.files)
-        ? data.files.filter((file: unknown): file is string => typeof file === 'string')
-        : []
-      const filteredFiles = incomingFiles.filter((file) => file !== 'plan.md')
-      const orderedFiles = sortMemoryFiles(filteredFiles)
-
-      setFiles(orderedFiles)
-      setListError(null)
-
-      setFileCache((previous) => {
-        const prunedEntries = orderedFiles
-          .filter((file) => previous[file] !== undefined)
-          .map((file) => [file, previous[file]] as const)
-        const next = Object.fromEntries(prunedEntries)
-        fileCacheRef.current = next
-        return next
-      })
-
-      const preferredFile = typeof window !== 'undefined'
-        ? new URLSearchParams(window.location.search).get('file')
-        : null
-
-      setSelectedFile((current) => {
-        if (current && orderedFiles.includes(current)) {
-          return current
-        }
-
-        return selectInitialFile(orderedFiles, preferredFile)
-      })
-    } catch (error) {
-      setFiles([])
-      setSelectedFile('')
-      setContent('')
-      setListError(toMemoryErrorMessage(error, 'Unable to load memory files right now.'))
-    }
-  }, [])
-
-  const loadFileContent = useCallback(
-    async (file: string, options?: { force?: boolean }) => {
-      if (!file) {
-        return
-      }
-
-      const cached = fileCacheRef.current[file]
-      if (cached !== undefined && !options?.force) {
-        setContent(cached)
-        setLoading(false)
-        setContentError(null)
-        return
-      }
-
-      const requestId = fileRequestIdRef.current + 1
-      fileRequestIdRef.current = requestId
-
-      setLoading(true)
-      setContentError(null)
-
-      try {
-        const response = await fetch(`/api/memory?file=${encodeURIComponent(file)}`)
-        const data = await response.json()
-
-        if (!response.ok || data.error) {
-          throw new Error(typeof data.error === 'string' ? data.error : 'Unable to load this memory file.')
-        }
-
-        const nextContent = typeof data.content === 'string' ? data.content : ''
-
-        if (fileRequestIdRef.current !== requestId) {
-          return
-        }
-
-        setContent(nextContent)
-        updateCache(file, nextContent)
-      } catch (error) {
-        if (fileRequestIdRef.current !== requestId) {
-          return
-        }
-
-        setContent('')
-        setContentError(toMemoryErrorMessage(error, 'Unable to load this memory file.'))
-      } finally {
-        if (fileRequestIdRef.current === requestId) {
-          setLoading(false)
-        }
-      }
-    },
-    [updateCache],
-  )
+  const { data: contentData, error: fetchContentError, isValidating: loading, mutate: mutateContent } = useSWR(selectedFile ? `/api/memory?file=${encodeURIComponent(selectedFile)}` : null, fetcher)
+  
+  const content = typeof contentData?.content === 'string' ? contentData.content : ''
+  const contentError = fetchContentError ? toMemoryErrorMessage(fetchContentError, 'Unable to load this memory file.') : (contentData?.error ? contentData.error : null)
 
   useEffect(() => {
-    void loadFiles()
-  }, [loadFiles])
-
-  useEffect(() => {
-    if (!selectedFile) {
-      setContent('')
-      setContentError(null)
-      return
+    if (files.length > 0 && !selectedFile) {
+      const preferredFile = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('file') : null
+      setSelectedFile(selectInitialFile(files, preferredFile))
     }
+  }, [files, selectedFile])
 
-    void loadFileContent(selectedFile)
-  }, [selectedFile, loadFileContent])
+
 
   useEffect(() => {
     if (!selectedFile || typeof window === 'undefined') {
@@ -304,7 +201,7 @@ export default function MemoryPage() {
 
   const lineCount = content ? content.split('\n').length : 0
   const sectionCount = content ? (content.match(/^## /gm) || []).length : 0
-  const isCurrentFileCached = selectedFile ? fileCache[selectedFile] !== undefined : false
+  const isCurrentFileCached = selectedFile ? !!contentData : false
   const activeError = listError || contentError
   const showError = shouldShowError({
     error: activeError,
@@ -314,23 +211,19 @@ export default function MemoryPage() {
   })
 
   const refreshSelectedFile = useCallback(() => {
-    if (!selectedFile) {
-      return
-    }
-
-    void loadFileContent(selectedFile, { force: true })
-  }, [selectedFile, loadFileContent])
+    if (selectedFile) mutateContent()
+  }, [selectedFile, mutateContent])
 
   const retry = useCallback(() => {
     if (listError) {
-      void loadFiles()
+      void mutateDir()
       return
     }
 
     if (selectedFile) {
-      void loadFileContent(selectedFile, { force: true })
+      void mutateContent()
     }
-  }, [listError, loadFiles, selectedFile, loadFileContent])
+  }, [listError, mutateDir, selectedFile, mutateContent])
 
   const handleSelectFile = useCallback((file: string) => {
     setSelectedFile(file)
@@ -379,14 +272,25 @@ export default function MemoryPage() {
 
       <div className="flex flex-1 min-h-0 gap-4">
         <div className="hidden w-56 shrink-0 overflow-y-auto py-1 md:block">
-          {files.length > 0 ? (
+          {(!files.length && !listError) ? (
+            <p className="text-sm text-muted-foreground">No memory files are available yet.</p>
+          ) : (!files.length && listError) ? (
+            <p className="flex items-center gap-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              {toMemoryErrorMessage(listError, 'Unable to load memory files right now.')}
+            </p>
+          ) : !files.length ? (
+            <div className="space-y-2 animate-pulse">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex h-11 w-full items-center gap-2.5 rounded-xl px-3 py-2.5 bg-muted/20" />
+              ))}
+            </div>
+          ) : (
             <FileList
               files={files}
               selectedFile={selectedFile}
               onSelect={handleSelectFile}
             />
-          ) : (
-            <p className="text-sm text-muted-foreground">No memory files are available yet.</p>
           )}
         </div>
 
@@ -412,12 +316,14 @@ export default function MemoryPage() {
 
           <div data-testid="memory-reader" className="memory-prose flex-1 min-h-0 overflow-y-auto">
             <div className="max-w-none px-3 py-3 sm:px-4 sm:py-4 md:max-w-3xl md:px-5 md:py-5">
-              {loading ? (
-                <div className="space-y-3">
-                  <div className="h-4 w-11/12 animate-pulse rounded bg-elevated/50" />
-                  <div className="h-4 w-10/12 animate-pulse rounded bg-elevated/50" />
-                  <div className="h-4 w-8/12 animate-pulse rounded bg-elevated/50" />
-                  <div className="h-4 w-9/12 animate-pulse rounded bg-elevated/50" />
+              {(loading && !content) ? (
+                <div className="space-y-3 animate-pulse">
+                  <div className="h-8 w-1/3 bg-muted rounded-md mb-6" />
+                  <div className="h-4 w-11/12 rounded bg-muted/40" />
+                  <div className="h-4 w-10/12 rounded bg-muted/40" />
+                  <div className="h-4 w-8/12 rounded bg-muted/40" />
+                  <div className="h-4 w-9/12 rounded bg-muted/40" />
+                  <div className="h-10 w-full mt-6 rounded-md bg-muted/20" />
                 </div>
               ) : showError ? (
                 <div className="rounded-xl border border-danger/40 bg-danger/10 p-4 text-sm">

@@ -33,7 +33,9 @@ import { parseSystemDesign } from '@/lib/parsers/system-design'
 import { DOMAIN_COLORS } from '@/lib/theme'
 import { AlertCircle, BookOpen, CheckCircle2, Lightbulb, Network, Plus, Zap } from 'lucide-react'
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 
 function LogConceptForm({ onSubmit }: { onSubmit: () => void }) {
   const [open, setOpen] = useState(false)
@@ -117,29 +119,18 @@ function LogConceptForm({ onSubmit }: { onSubmit: () => void }) {
   )
 }
 
+
+
 export default function SystemDesignPage() {
-  const [data, setData] = useState<ParsedSystemDesign | null>(null)
-
-  const fetchData = useCallback(() => {
-    fetch('/api/memory?file=system-design.md')
-      .then(res => res.json())
-      .then(d => setData(parseSystemDesign(d.content || '')))
-      .catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
-  if (!data) {
-    return <div className="text-muted-foreground">Loading...</div>
-  }
+  const { data: rawData, mutate } = useSWR('/api/memory?file=system-design.md', fetcher)
+  
+  const data = rawData ? parseSystemDesign(rawData.content || '') : null
 
   // Find next topic to study
-  const coveredTopics = new Set(data.concepts.map(c => c.concept.toLowerCase()))
-  const nextTopic = data.referenceTopics.find(t => !coveredTopics.has(t.toLowerCase()))
-  const coveredCount = data.referenceTopics.filter(t => coveredTopics.has(t.toLowerCase())).length
-  const totalTopics = data.referenceTopics.length
+  const coveredTopics = data ? new Set(data.concepts.map(c => c.concept.toLowerCase())) : new Set()
+  const nextTopic = data ? data.referenceTopics.find(t => !coveredTopics.has(t.toLowerCase())) : null
+  const coveredCount = data ? data.referenceTopics.filter(t => coveredTopics.has(t.toLowerCase())).length : 0
+  const totalTopics = data ? data.referenceTopics.length : 0
   const coveragePct = totalTopics > 0 ? Math.round((coveredCount / totalTopics) * 100) : 0
 
   return (
@@ -149,44 +140,75 @@ export default function SystemDesignPage() {
           <h1 className="font-display text-2xl font-bold">System Design</h1>
           <p className="text-muted-foreground text-sm mt-1">Concepts, discussions, and study plan</p>
         </div>
-        <LogConceptForm onSubmit={fetchData} />
+        {data ? (
+          <LogConceptForm onSubmit={() => mutate()} />
+        ) : (
+          <div className="h-9 w-32 bg-muted rounded-md animate-pulse" />
+        )}
       </div>
 
       {/* Progress Summary */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <Card className={`${DOMAIN_COLORS.design.bg} border ${DOMAIN_COLORS.design.border}`}>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Concepts</p>
-            <p className="text-2xl font-display font-bold text-design mt-1">{data.concepts.length}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">studied</p>
-          </CardContent>
-        </Card>
-        <Card className={`${DOMAIN_COLORS.design.bg} border ${DOMAIN_COLORS.design.border}`}>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Coverage</p>
-            <p className="text-2xl font-display font-bold text-design mt-1">{coveredCount}/{totalTopics}</p>
-            <div className="h-1 rounded-full bg-elevated overflow-hidden mt-2">
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{
-                  width: `${coveragePct}%`,
-                  background: `linear-gradient(to right, ${DOMAIN_COLORS.design.hex}, #6366F1)`,
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={`${DOMAIN_COLORS.design.bg} border ${DOMAIN_COLORS.design.border}`}>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Gaps</p>
-            <p className="text-2xl font-display font-bold text-design mt-1">{data.gaps.length}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">to revisit</p>
-          </CardContent>
-        </Card>
+        {(!data) ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <Card key={`skel-${i}`} className="bg-design/5 border-design/10 animate-pulse">
+              <CardContent className="p-4 space-y-2">
+                <div className="h-3 w-16 bg-muted/60 rounded" />
+                <div className="h-8 w-12 bg-muted rounded" />
+                <div className="h-3 w-20 bg-muted/40 rounded" />
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <>
+            <Card className={`${DOMAIN_COLORS.design.bg} border ${DOMAIN_COLORS.design.border}`}>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Concepts</p>
+                <p className="text-2xl font-display font-bold text-design mt-1">{data.concepts.length}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">studied</p>
+              </CardContent>
+            </Card>
+            <Card className={`${DOMAIN_COLORS.design.bg} border ${DOMAIN_COLORS.design.border}`}>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Coverage</p>
+                <p className="text-2xl font-display font-bold text-design mt-1">{coveredCount}/{totalTopics}</p>
+                <div className="h-1 rounded-full bg-elevated overflow-hidden mt-2">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${coveragePct}%`,
+                      background: `linear-gradient(to right, ${DOMAIN_COLORS.design.hex}, #6366F1)`,
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className={`${DOMAIN_COLORS.design.bg} border ${DOMAIN_COLORS.design.border}`}>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Gaps</p>
+                <p className="text-2xl font-display font-bold text-design mt-1">{data.gaps.length}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">to revisit</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Study Next Card */}
-      {nextTopic && (
+      {!data ? (
+        <Card className="bg-design/5 border border-design/10 animate-pulse">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-5 w-5 rounded-full bg-muted shrink-0" />
+              <div className="space-y-2 w-full">
+                <div className="h-3 w-24 bg-muted/60 rounded" />
+                <div className="h-6 w-48 bg-muted rounded" />
+                <div className="h-3 w-32 bg-muted/40 rounded" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : nextTopic ? (
         <Card className="bg-design/10 border border-design/30">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -201,7 +223,7 @@ export default function SystemDesignPage() {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       {/* Concepts Grid */}
       <Card className="border-border bg-surface">
@@ -209,11 +231,23 @@ export default function SystemDesignPage() {
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Network className="h-4 w-4 text-design" />
             Concepts Covered
-            <Badge variant="outline" className="ml-auto">{data.concepts.length}</Badge>
+            <Badge variant="outline" className="ml-auto">{data?.concepts.length || 0}</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {data.concepts.length === 0 ? (
+          {!data ? (
+            <div className="space-y-4 animate-pulse">
+              <div className="h-8 w-full bg-muted/40 rounded" />
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex gap-4">
+                  <div className="h-4 w-1/4 bg-muted rounded" />
+                  <div className="h-4 w-1/4 bg-muted rounded" />
+                  <div className="h-4 w-24 bg-muted rounded" />
+                  <div className="h-4 w-1/3 bg-muted rounded" />
+                </div>
+              ))}
+            </div>
+          ) : data.concepts.length === 0 ? (
             <p className="text-muted-foreground text-sm py-4 text-center">
               No concepts covered yet. Use the &quot;Log Concept&quot; button or start a session with the coach!
             </p>
@@ -252,7 +286,7 @@ export default function SystemDesignPage() {
       </Card>
 
       {/* Discussions Log */}
-      {data.discussions.length > 0 && (
+      {data && data.discussions.length > 0 && (
         <Card className="border-border bg-surface">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -272,7 +306,7 @@ export default function SystemDesignPage() {
       )}
 
       {/* Patterns & Trade-offs */}
-      {data.gaps.length > 0 && (
+      {data && data.gaps.length > 0 && (
         <Card className="border-border bg-surface">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -305,23 +339,31 @@ export default function SystemDesignPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {data.referenceTopics.map(topic => {
-              const covered = coveredTopics.has(topic.toLowerCase())
-              return (
-                <Badge
-                  key={topic}
-                  variant="outline"
-                  className={covered
-                    ? 'bg-streak/20 text-streak border-streak/30'
-                    : 'text-muted-foreground'
-                  }
-                >
-                  {covered && <CheckCircle2 className="h-3 w-3 mr-1" />}{topic}
-                </Badge>
-              )
-            })}
-          </div>
+          {!data ? (
+            <div className="flex flex-wrap gap-2 animate-pulse">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={`badge-skel-${i}`} className="h-6 w-24 bg-muted/40 rounded-full" />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {data.referenceTopics.map(topic => {
+                const covered = coveredTopics.has(topic.toLowerCase())
+                return (
+                  <Badge
+                    key={topic}
+                    variant="outline"
+                    className={covered
+                      ? 'bg-streak/20 text-streak border-streak/30'
+                      : 'text-muted-foreground'
+                    }
+                  >
+                    {covered && <CheckCircle2 className="h-3 w-3 mr-1" />}{topic}
+                  </Badge>
+                )
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -13,6 +13,8 @@ import { buildSystemMeta, getSystemMessage } from '@/lib/chat-system-messages'
 import { KeyRound, MessageCircle, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 
 const MODE_STARTERS: Record<string, string[]> = {
   dsa: ['Give me a medium array problem', 'Practice dynamic programming', 'Quiz me on graphs', 'Review sliding window'],
@@ -29,6 +31,34 @@ const MODES: ModeOption[] = [
   { value: 'job-search', label: 'Job Search' },
   { value: 'business-ideas', label: 'Business Ideas' },
 ]
+
+function ChatSkeleton() {
+  return (
+    <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex gap-4 max-w-[85%]">
+        <div className="h-8 w-8 rounded-full bg-muted animate-pulse shrink-0" />
+        <div className="space-y-2 flex-1">
+          <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+          <div className="h-20 w-full bg-muted/40 animate-pulse rounded-2xl rounded-tl-none" />
+        </div>
+      </div>
+      <div className="flex gap-4 max-w-[85%] ml-auto flex-row-reverse">
+        <div className="h-8 w-8 rounded-full bg-primary/20 animate-pulse shrink-0" />
+        <div className="space-y-2 flex-1 flex flex-col items-end">
+          <div className="h-4 w-16 bg-muted animate-pulse rounded" />
+          <div className="h-12 w-3/4 bg-primary/10 animate-pulse rounded-2xl rounded-tr-none" />
+        </div>
+      </div>
+      <div className="flex gap-4 max-w-[85%]">
+        <div className="h-8 w-8 rounded-full bg-muted animate-pulse shrink-0" />
+        <div className="space-y-2 flex-1">
+          <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+          <div className="h-32 w-5/6 bg-muted/40 animate-pulse rounded-2xl rounded-tl-none" />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
@@ -61,8 +91,6 @@ export default function CoachPage() {
     formatMicrousd,
   } = useChat(mode)
 
-  const [accountIsGuest, setAccountIsGuest] = useState<boolean | null>(null)
-  const [isAnonymousSession, setIsAnonymousSession] = useState<boolean | null>(null)
   const [dismissedPrompt, setDismissedPrompt] = useState(false)
   const [statusExpanded, setStatusExpanded] = useState(false)
   const [input, setInput] = useState('')
@@ -72,7 +100,11 @@ export default function CoachPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const shouldAutoScrollRef = useRef(true)
 
-  const isGuest = isAnonymousSession === null ? (accountIsGuest ?? Boolean(freeQuota?.isGuest)) : isAnonymousSession
+  const { data: accountStatusResponse } = useSWR('/api/account/status', fetcher)
+  const accountData = accountStatusResponse?.account
+
+  const isGuest = accountData?.isAnonymousSession ?? (accountData?.isGuest ?? Boolean(freeQuota?.isGuest))
+
   const isQuotaBlocked = Boolean(
     freeQuota?.isFreeTier &&
     freeQuota.remaining <= 0 &&
@@ -81,33 +113,7 @@ export default function CoachPage() {
 
   const selectedModeLabel = useMemo(() => MODES.find((entry) => entry.value === mode)?.label ?? mode, [mode])
 
-  useEffect(() => {
-    let cancelled = false
 
-    async function loadAccountStatus() {
-      try {
-        const res = await fetch('/api/account/status')
-        if (!res.ok || cancelled) {
-          return
-        }
-
-        const data = (await res.json()) as { account?: { isGuest?: boolean; isAnonymousSession?: boolean } }
-        if (typeof data.account?.isGuest === 'boolean') {
-          setAccountIsGuest(data.account.isGuest)
-        }
-        if (typeof data.account?.isAnonymousSession === 'boolean') {
-          setIsAnonymousSession(data.account.isAnonymousSession)
-        }
-      } catch {
-        // No-op: fallback to freeQuota.isGuest behavior.
-      }
-    }
-
-    void loadAccountStatus()
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   useEffect(() => {
     if (!isLoaded) return
@@ -264,7 +270,7 @@ export default function CoachPage() {
       <Card className="flex-1 border-border bg-background overflow-hidden flex flex-col min-h-0 py-0 gap-0">
         <CardContent className="p-0 flex-1 flex flex-col min-h-0 relative">
           {!isLoaded ? (
-            <div className="flex-1 grid place-items-center text-sm text-muted-foreground">Loading chat...</div>
+            <ChatSkeleton />
           ) : bootstrapError ? (
             <div className="flex-1 grid place-items-center px-4">
               <div className="max-w-sm text-center space-y-2">

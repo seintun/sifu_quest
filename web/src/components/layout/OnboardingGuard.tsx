@@ -12,11 +12,12 @@ type AccountStatusResponse = {
 export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const [checked, setChecked] = useState(false)
   const isBypassPath =
     pathname === '/login' ||
     pathname === '/onboarding' ||
     pathname.startsWith('/api')
+
+  const [checked, setChecked] = useState(false)
 
   useEffect(() => {
     if (isBypassPath) {
@@ -40,25 +41,17 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
           onboardingStatus === 'enriched_complete'
         if (!complete) {
           router.replace('/onboarding')
-          return
+        } else {
+          setChecked(true)
         }
-        setChecked(true)
       })
       .catch(() => {
         router.replace('/login')
       })
   }, [isBypassPath, router])
 
-  if (isBypassPath) {
-    return <>{children}</>
-  }
-
-  if (!checked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    )
+  if (!isBypassPath && !checked) {
+    return <div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center"><div className="h-8 w-8 animate-pulse rounded-full bg-muted" /></div>
   }
 
   return <>{children}</>

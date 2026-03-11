@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -167,27 +169,17 @@ function LogProblemForm({
   )
 }
 
+
+
 export default function DSAPage() {
-  const [patterns, setPatterns] = useState<DSAPattern[]>([])
-  const [problems, setProblems] = useState<ProblemAttempt[]>([])
+  const { data, mutate } = useSWR('/api/memory?file=dsa-patterns.md', fetcher)
 
-  const fetchData = useCallback(() => {
-    fetch('/api/memory?file=dsa-patterns.md')
-      .then(res => res.json())
-      .then(data => {
-        const content = data.content || ''
-        setPatterns(parseDSAPatterns(content))
-        setProblems(parseProblemHistory(content))
-      })
-      .catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  const content = data?.content || ''
+  const patterns = data ? parseDSAPatterns(content) : null
+  const problems = data ? parseProblemHistory(content) : []
 
   // Find the first pattern needing practice
-  const suggestedPattern = patterns.find(p => p.mastery === '—' || p.mastery === '🔴')
+  const suggestedPattern = patterns?.find(p => p.mastery === '—' || p.mastery === '🔴')
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -196,11 +188,28 @@ export default function DSAPage() {
           <h1 className="font-display text-2xl font-bold">DSA Tracker</h1>
           <p className="text-muted-foreground text-sm mt-1">Pattern mastery & problem history</p>
         </div>
-        <LogProblemForm patterns={patterns} onSubmit={fetchData} />
+        {patterns ? (
+          <LogProblemForm patterns={patterns} onSubmit={() => mutate()} />
+        ) : (
+          <div className="h-9 w-32 bg-muted rounded-md animate-pulse" />
+        )}
       </div>
 
       {/* Problem of the Day */}
-      {suggestedPattern && (
+      {!patterns ? (
+        <Card className="bg-dsa/5 border-dsa/10 animate-pulse">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-5 w-5 rounded-full bg-muted shrink-0" />
+              <div className="space-y-2 w-full">
+                <div className="h-3 w-32 bg-muted/60 rounded" />
+                <div className="h-5 w-48 bg-muted rounded" />
+                <div className="h-3 w-24 bg-muted/60 rounded" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : suggestedPattern ? (
         <Card className="bg-dsa/10 border border-dsa/30">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -213,7 +222,7 @@ export default function DSAPage() {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       {/* Pattern Mastery Table */}
       <Card className="border-border bg-surface">
@@ -224,28 +233,42 @@ export default function DSAPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Pattern</TableHead>
-                <TableHead>Mastery</TableHead>
-                <TableHead className="text-right">Problems</TableHead>
-                <TableHead>Notes</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {patterns.map(pattern => (
-                <TableRow key={pattern.name}>
-                  <TableCell className="font-medium">{pattern.name}</TableCell>
-                  <TableCell>
-                    <MasteryBadge level={pattern.mastery} />
-                  </TableCell>
-                  <TableCell className="text-right">{pattern.problemsSeen}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{pattern.notes}</TableCell>
-                </TableRow>
+          {!patterns ? (
+            <div className="space-y-4 animate-pulse">
+              <div className="h-8 w-full bg-muted/40 rounded" />
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex gap-4">
+                  <div className="h-4 w-1/4 bg-muted rounded" />
+                  <div className="h-4 w-1/4 bg-muted rounded" />
+                  <div className="h-4 w-24 bg-muted rounded" />
+                  <div className="h-4 w-1/3 bg-muted rounded" />
+                </div>
               ))}
-            </TableBody>
-          </Table>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Pattern</TableHead>
+                  <TableHead>Mastery</TableHead>
+                  <TableHead className="text-right">Problems</TableHead>
+                  <TableHead>Notes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {patterns.map(pattern => (
+                  <TableRow key={pattern.name}>
+                    <TableCell className="font-medium">{pattern.name}</TableCell>
+                    <TableCell>
+                      <MasteryBadge level={pattern.mastery} />
+                    </TableCell>
+                    <TableCell className="text-right">{pattern.problemsSeen}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{pattern.notes}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -259,7 +282,19 @@ export default function DSAPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {problems.length === 0 ? (
+          {!patterns ? (
+            <div className="space-y-4 animate-pulse">
+              <div className="h-8 w-full bg-muted/40 rounded" />
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex gap-4">
+                  <div className="h-4 w-1/4 bg-muted rounded" />
+                  <div className="h-4 w-1/4 bg-muted rounded" />
+                  <div className="h-4 w-24 bg-muted rounded" />
+                  <div className="h-4 w-1/3 bg-muted rounded" />
+                </div>
+              ))}
+            </div>
+          ) : problems.length === 0 ? (
             <p className="text-muted-foreground text-sm py-4 text-center">
               No problems logged yet. Use the &quot;Log Problem&quot; button to get started!
             </p>

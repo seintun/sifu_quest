@@ -10,7 +10,9 @@ import type { ParsedPlan, PlanItem } from '@/lib/parsers/plan-parser'
 import { parsePlan } from '@/lib/parsers/plan-parser'
 import { DOMAIN_COLORS } from '@/lib/theme'
 import { AlertTriangle, Calendar, CheckCircle2, RefreshCw } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 import type { Components } from 'react-markdown'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -297,85 +299,39 @@ function hasStructuredContent(plan: ParsedPlan): boolean {
   return plan.months.length > 0 || plan.immediateSteps.length > 0 || (plan.weeklyRhythm?.length ?? 0) > 0
 }
 
+
+
 export default function PlanPage() {
-  const [plan, setPlan] = useState<ParsedPlan | null>(null)
-  const [rawContent, setRawContent] = useState('')
-  const [planStatus, setPlanStatus] = useState<OnboardingPlanStatus | null>(null)
-  const [planErrorCode, setPlanErrorCode] = useState<string | null>(null)
   const [isQueueingPlanRefresh, setIsQueueingPlanRefresh] = useState(false)
+  const [manualErrorCode, setManualErrorCode] = useState<string | null>(null)
 
-  const fetchPlan = useCallback(async () => {
-    try {
-      const res = await fetch('/api/memory?file=plan.md')
-      const data = await res.json().catch(() => ({}))
-      const content = typeof data.content === 'string' ? data.content : ''
-      setRawContent(content)
-      setPlan(parsePlan(content))
-      return content
-    } catch {
-      return ''
+  // SWR automatically handles caching and deduplication
+  const { data: statusData, mutate: mutateStatus } = useSWR('/api/onboarding/status', fetcher, {
+    refreshInterval: (data: any) => {
+      const status = data?.plan?.status
+      return status === 'queued' || status === 'running' ? 15000 : 0
     }
-  }, [])
-
-  const fetchOnboardingStatus = useCallback(async (kick: boolean) => {
-    try {
-      const res = await fetch(kick ? '/api/onboarding/status?kick=true' : '/api/onboarding/status')
-      if (!res.ok) {
-        return null
-      }
-      const data = (await res.json()) as OnboardingStatusResponse
-      setPlanStatus(data.plan.status)
-      setPlanErrorCode(data.plan.lastErrorCode ?? null)
-      return data
-    } catch {
-      return null
+  })
+  
+  const { data: rawData, mutate: mutatePlan } = useSWR('/api/memory?file=plan.md', fetcher, {
+    refreshInterval: (data: any) => {
+      const content = typeof data?.content === 'string' ? data.content : ''
+      const isPlaceholder = content.toLowerCase().includes(PLAN_PLACEHOLDER_MARKER)
+      const status = statusData?.plan?.status
+      return status === 'queued' || status === 'running' || (isPlaceholder && status !== 'failed') ? 15000 : 0
     }
-  }, [])
+  })
 
-  useEffect(() => {
-    void (async () => {
-      await fetchPlan()
-      await fetchOnboardingStatus(true)
-      await fetchPlan()
-    })()
-  }, [fetchPlan, fetchOnboardingStatus])
+  const rawContent = typeof rawData?.content === 'string' ? rawData.content : ''
+  const plan = rawData ? parsePlan(rawContent) : null
 
-  const isPlanPlaceholder = rawContent.toLowerCase().includes(PLAN_PLACEHOLDER_MARKER)
-
-  useEffect(() => {
-    const shouldPoll =
-      planStatus === 'queued' ||
-      planStatus === 'running' ||
-      (isPlanPlaceholder && planStatus !== 'failed')
-
-    if (!shouldPoll) {
-      return
-    }
-
-    let isActive = true
-    const tick = async () => {
-      await fetchOnboardingStatus(true)
-      if (!isActive) {
-        return
-      }
-      await fetchPlan()
-    }
-
-    void tick()
-    const intervalId = window.setInterval(() => {
-      void tick()
-    }, 15000)
-
-    return () => {
-      isActive = false
-      window.clearInterval(intervalId)
-    }
-  }, [fetchOnboardingStatus, fetchPlan, isPlanPlaceholder, planStatus])
+  const planStatus: OnboardingPlanStatus | null = statusData?.plan?.status ?? null
+  const planErrorCode: string | null = manualErrorCode ?? (statusData?.plan?.lastErrorCode ?? null)
 
   const refreshPlanStatus = useCallback(async () => {
-    await fetchOnboardingStatus(true)
-    await fetchPlan()
-  }, [fetchOnboardingStatus, fetchPlan])
+    await mutateStatus()
+    await mutatePlan()
+  }, [mutateStatus, mutatePlan])
 
   const queuePlanRefresh = useCallback(async () => {
     setIsQueueingPlanRefresh(true)
@@ -388,12 +344,12 @@ export default function PlanPage() {
         plan?: { status?: OnboardingPlanStatus }
       }
       if (!res.ok) {
-        setPlanErrorCode(data.error ?? 'plan_refresh_failed')
+        setManualErrorCode(data.error ?? 'plan_refresh_failed')
         return
       }
 
-      setPlanStatus(data.plan?.status ?? 'queued')
-      setPlanErrorCode(null)
+      setManualErrorCode(null)
+      // Trigger immediate revalidation so the latest plan status and errors are reflected after queueing the refresh.
       void refreshPlanStatus()
     } finally {
       setIsQueueingPlanRefresh(false)
@@ -408,19 +364,62 @@ export default function PlanPage() {
         body: JSON.stringify({ itemId, checked }),
       })
       if (res.ok) {
-        fetchPlan()
+        mutatePlan()
       }
     } catch {
       // ignore
     }
   }
 
-  if (!plan) {
-    return <div className="text-muted-foreground">Loading plan...</div>
-  }
-
   const title = extractTitle(rawContent)
   const mobileTitle = getMobileTitle(title)
+
+  if (!plan) {
+    return (
+      <div className="max-w-4xl space-y-4 sm:space-y-6">
+        <div>
+          <div className="flex items-start justify-between gap-3 animate-pulse">
+            <div className="space-y-2">
+              <div className="h-8 w-64 bg-muted rounded-md" />
+              <div className="h-4 w-48 bg-muted/60 rounded-md" />
+            </div>
+            <div className="h-9 w-40 bg-muted/30 rounded-md hidden sm:block" />
+          </div>
+        </div>
+
+        <Card className="border-border bg-surface animate-pulse">
+          <CardHeader className="pb-3 border-b border-border/40">
+            <div className="h-5 w-32 bg-muted rounded" />
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-16 bg-muted/30 rounded-md" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-2 mt-4 animate-pulse">
+          <div className="h-10 w-full max-w-[400px] bg-muted/30 rounded-lg" />
+          <Card className="border-border bg-surface mt-4 h-64">
+            <CardHeader>
+              <div className="h-6 w-48 bg-muted rounded" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="h-2 w-full bg-muted/50 rounded-full" />
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex gap-3">
+                  <div className="h-4 w-4 bg-muted rounded shrink-0" />
+                  <div className="h-4 w-full bg-muted/40 rounded" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
   const firstMonthValue = plan.months[0] ? `month${plan.months[0].month}` : ''
   const canRequestRefresh = planStatus !== null && planStatus !== 'queued' && planStatus !== 'running'
   const showPlanStatusBanner = shouldShowPlanStatusBanner(planStatus)
