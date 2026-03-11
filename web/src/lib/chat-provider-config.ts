@@ -29,9 +29,9 @@ export const OPENROUTER_STATIC_FREE_MODEL_FALLBACKS = [
 ] as const
 
 export const ANTHROPIC_MODEL_CATALOG: ReadonlyArray<{ id: string; label: string }> = [
-  { id: 'claude-opus-4-1', label: 'Claude Opus' },
-  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet' },
-  { id: 'claude-3-5-haiku-latest', label: 'Claude Haiku' },
+  { id: 'claude-3-5-haiku-latest', label: 'Claude Haiku ($)' },
+  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet ($$)' },
+  { id: 'claude-opus-4-1', label: 'Claude Opus ($$$)' },
 ] as const
 
 export function isChatProvider(value: unknown): value is ChatProvider {
@@ -51,7 +51,7 @@ export function isKnownAnthropicModel(modelId: string): boolean {
 }
 
 export function getAnthropicDefaultModel(): string {
-  return ANTHROPIC_MODEL_CATALOG[1]?.id ?? ANTHROPIC_MODEL_CATALOG[0].id
+  return ANTHROPIC_MODEL_CATALOG[0].id
 }
 
 export function getProviderLabel(provider: ChatProvider): string {

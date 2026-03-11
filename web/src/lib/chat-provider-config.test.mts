@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  ANTHROPIC_MODEL_CATALOG,
   getAnthropicDefaultModel,
   isKnownAnthropicModel,
   isOpenRouterFreeModel,
@@ -22,6 +23,14 @@ test('isOpenRouterFreeModel accepts :free and free router aliases', () => {
 test('isKnownAnthropicModel includes the configured default model', () => {
   const defaultModel = getAnthropicDefaultModel()
   assert.equal(isKnownAnthropicModel(defaultModel), true)
+})
+
+test('anthropic defaults to haiku and uses ascending cost labels', () => {
+  assert.equal(getAnthropicDefaultModel(), 'claude-3-5-haiku-latest')
+  assert.deepEqual(
+    ANTHROPIC_MODEL_CATALOG.map((model) => model.label),
+    ['Claude Haiku ($)', 'Claude Sonnet ($$)', 'Claude Opus ($$$)'],
+  )
 })
 
 test('sanitizeModelLabel formats provider/model id for UI display', () => {
