@@ -397,14 +397,14 @@ export default function DashboardPage() {
               <div className="space-y-2">
                 <p className="text-sm font-medium text-plan">Plan generation needs a retry</p>
                 <p className="text-xs text-muted-foreground">
-                  We could not generate your plan yet. Continue using the app and we will retry automatically.
+                  Any new responses you share help personalize your guidance. Open Game Plan and refresh to regenerate a tailored plan.
                 </p>
               </div>
             ) : (
               <div className="space-y-2">
                 <p className="text-sm font-medium text-plan">Your personalized plan is being generated</p>
                 <p className="text-xs text-muted-foreground">
-                  You can keep using the app now. We will publish your full plan once generation completes.
+                  Keep sharing updates and questions. They improve personalization, and you can generate a new Game Plan anytime for refreshed recommendations.
                 </p>
               </div>
             )}
