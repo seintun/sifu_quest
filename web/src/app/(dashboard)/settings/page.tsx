@@ -9,14 +9,6 @@ import { fetcher } from '@/lib/fetcher'
 import { canSaveAnthropicApiKey, shouldShowRemoveApiKey } from '@/lib/account-settings-ui'
 import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
 import { getOnboardingPrefillName } from '@/lib/onboarding-name'
-import {
-  type OnboardingEnrichmentAnswers,
-  LEARNING_STYLE_OPTIONS,
-  STRENGTH_OPTIONS,
-  TARGET_COMPANY_OPTIONS,
-  TECH_STACK_OPTIONS,
-  createEmptyEnrichmentAnswers,
-} from '@/lib/onboarding-v2'
 import { validateFullName } from '@/lib/profile-name'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -62,19 +54,9 @@ type AccountUsage = {
 
 type FlashMessage = { text: string; type: 'success' | 'error' } | null
 
-type EnrichmentPromptKey = 'techStack' | 'targetCompanies' | 'learningStyle' | 'strengths'
-
 type OnboardingStateResponse = {
   onboarding: {
     status: 'not_started' | 'in_progress' | 'core_complete' | 'enriched_complete'
-    nextPromptKey: EnrichmentPromptKey | null
-  }
-  plan: {
-    status: 'not_queued' | 'queued' | 'running' | 'ready' | 'failed'
-    lastErrorCode: string | null
-  }
-  draft: {
-    enrichment?: Partial<OnboardingEnrichmentAnswers>
   }
 }
 
@@ -140,10 +122,6 @@ function SettingsPageContent() {
   const [isRemovingKey, setIsRemovingKey] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const [enrichmentDraft, setEnrichmentDraft] = useState<OnboardingEnrichmentAnswers>(createEmptyEnrichmentAnswers())
-  const [isSavingEnrichment, setIsSavingEnrichment] = useState(false)
-  const [showAllPromptOptions, setShowAllPromptOptions] = useState(false)
-
   const [message, setMessage] = useState<FlashMessage>(null)
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -171,15 +149,6 @@ function SettingsPageContent() {
       setFullName(getOnboardingPrefillName(accountStatus.displayName, accountStatus.prefillName))
     }
   }, [accountData, accountStatus, fullName, router])
-
-  useEffect(() => {
-    if (onboardingState?.draft?.enrichment) {
-      setEnrichmentDraft(prev => ({
-        ...prev,
-        ...onboardingState.draft.enrichment,
-      }))
-    }
-  }, [onboardingState?.draft?.enrichment])
 
   useEffect(() => {
     if (searchParams.get('success') === 'linked') {
@@ -305,120 +274,6 @@ function SettingsPageContent() {
     }
   }
 
-  const enrichmentPromptConfig: Record<
-    EnrichmentPromptKey,
-    {
-      title: string
-      hint: string
-      options: Array<{ value: string; label: string }>
-      valuesField: keyof OnboardingEnrichmentAnswers
-      customField: keyof OnboardingEnrichmentAnswers
-      max: number
-    }
-  > = {
-    techStack: {
-      title: 'Add your primary tech stack',
-      hint: 'Pick up to 8 technologies.',
-      options: TECH_STACK_OPTIONS,
-      valuesField: 'techStack',
-      customField: 'techStackCustom',
-      max: 8,
-    },
-    targetCompanies: {
-      title: 'Add target companies or tiers',
-      hint: 'Pick up to 8 targets.',
-      options: TARGET_COMPANY_OPTIONS,
-      valuesField: 'targetCompanies',
-      customField: 'targetCompaniesCustom',
-      max: 8,
-    },
-    learningStyle: {
-      title: 'Set your learning style preferences',
-      hint: 'Pick up to 3 style preferences.',
-      options: LEARNING_STYLE_OPTIONS,
-      valuesField: 'learningStyle',
-      customField: 'learningStyleCustom',
-      max: 3,
-    },
-    strengths: {
-      title: 'Capture your strongest technical areas',
-      hint: 'Pick up to 3 strengths.',
-      options: STRENGTH_OPTIONS,
-      valuesField: 'strengths',
-      customField: 'strengthsCustom',
-      max: 3,
-    },
-  }
-
-  const nextPromptKey = onboardingState?.onboarding.nextPromptKey ?? null
-  const activePrompt = nextPromptKey ? enrichmentPromptConfig[nextPromptKey] : null
-  const activePromptOptions = activePrompt?.options ?? []
-  const hasMorePromptOptions = activePromptOptions.length > 5
-
-  useEffect(() => {
-    setShowAllPromptOptions(false)
-  }, [nextPromptKey])
-
-  const toggleEnrichmentValue = useCallback(
-    (field: keyof OnboardingEnrichmentAnswers, value: string, maxCount: number) => {
-      setEnrichmentDraft((prev) => {
-        const current = Array.isArray(prev[field]) ? (prev[field] as string[]) : []
-        const next = current.includes(value)
-          ? current.filter((item) => item !== value)
-          : current.length >= maxCount
-            ? current
-            : [...current, value]
-        return {
-          ...prev,
-          [field]: next,
-        }
-      })
-    },
-    [],
-  )
-
-  const saveEnrichment = useCallback(async () => {
-    setIsSavingEnrichment(true)
-    try {
-      const res = await fetch('/api/onboarding/enrichment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enrichment: enrichmentDraft }),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        setMessage({ text: data.error || 'Failed to save onboarding enrichment.', type: 'error' })
-        return
-      }
-      setMessage({ text: 'Onboarding profile enrichment saved.', type: 'success' })
-      const data = await res.json().catch(() => ({})) as {
-        onboarding?: OnboardingStateResponse['onboarding']
-        plan?: { status?: OnboardingStateResponse['plan']['status'] }
-      }
-      if (data.onboarding) {
-        mutateOnboarding((prev: any) => {
-          if (!prev) return prev
-          return {
-            ...prev,
-            onboarding: data.onboarding as OnboardingStateResponse['onboarding'],
-            plan: {
-              status: data.plan?.status ?? prev.plan.status ?? 'queued',
-              lastErrorCode: prev.plan.lastErrorCode ?? null,
-            },
-            draft: {
-              enrichment: enrichmentDraft,
-            },
-          }
-        }, { revalidate: false })
-      }
-      void mutateOnboarding()
-    } catch {
-      setMessage({ text: 'Failed to save onboarding enrichment.', type: 'error' })
-    } finally {
-      setIsSavingEnrichment(false)
-    }
-  }, [enrichmentDraft, mutateOnboarding])
-
   const isGuest = Boolean(accountStatus?.isGuest)
   const showGuestUpgradeSection = isGuest || Boolean(accountStatusError)
 
@@ -474,74 +329,6 @@ function SettingsPageContent() {
             >
               {isAccountStatusLoading ? 'Refreshing...' : 'Retry Status'}
             </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {onboardingState?.onboarding.status === 'core_complete' && activePrompt && (
-        <Card className="border border-border/70 bg-surface">
-          <CardHeader className="border-b border-border/40 px-4 pt-2.5 pb-1.5">
-            <CardTitle className="text-sm font-medium leading-tight">{activePrompt.title}</CardTitle>
-            <CardDescription className="text-xs">{activePrompt.hint}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 px-4 pt-1.5 pb-2.5">
-            <div className="flex flex-wrap gap-2">
-              {activePromptOptions.map((option, index) => {
-                const values = enrichmentDraft[activePrompt.valuesField] as string[]
-                const selected = values.includes(option.value)
-                const hiddenOnMobile = index >= 5 && !showAllPromptOptions
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() =>
-                      toggleEnrichmentValue(activePrompt.valuesField, option.value, activePrompt.max)
-                    }
-                    className={`
-                      inline-flex items-center rounded-full border px-2.5 py-1 text-xs transition-all duration-150 cursor-pointer
-                      ${selected
-                        ? 'bg-primary text-primary-foreground border-primary font-medium'
-                        : 'bg-surface border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'}
-                      ${hiddenOnMobile ? 'hidden sm:inline-flex' : ''}
-                    `}
-                  >
-                    {option.label}
-                  </button>
-                )
-              })}
-              {hasMorePromptOptions && (
-                <button
-                  type="button"
-                  onClick={() => setShowAllPromptOptions((prev) => !prev)}
-                  className={`
-                    inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium transition-all duration-150 cursor-pointer sm:hidden
-                    ${showAllPromptOptions
-                      ? 'bg-streak/20 border-streak/60 text-streak shadow-glow-streak'
-                      : 'bg-plan/20 border-plan/60 text-plan shadow-glow-plan hover:bg-plan/30'}
-                  `}
-                >
-                  {showAllPromptOptions ? 'View less' : 'View more'}
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Input
-                value={String(enrichmentDraft[activePrompt.customField] ?? '')}
-                onChange={(event) =>
-                  setEnrichmentDraft((prev) => ({
-                    ...prev,
-                    [activePrompt.customField]: event.target.value,
-                  }))
-                }
-                placeholder="Optional detail"
-                className="h-8 bg-elevated/50 flex-1"
-              />
-              <div className="flex justify-end">
-                <Button size="sm" onClick={() => void saveEnrichment()} disabled={isSavingEnrichment}>
-                  {isSavingEnrichment ? 'Saving...' : 'Save'}
-                </Button>
-              </div>
-            </div>
           </CardContent>
         </Card>
       )}

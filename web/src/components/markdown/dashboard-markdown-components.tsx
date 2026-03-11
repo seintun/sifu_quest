@@ -50,7 +50,7 @@ export function createDashboardMarkdownComponents({
       </div>
     ),
     p: ({ children }) => (
-      <p className="my-1.5 text-[15px] leading-7 text-foreground/85 sm:text-[14px] sm:leading-6">{children}</p>
+      <p className="my-1.5 first:mt-0 last:mb-0 text-[15px] leading-7 text-foreground/85 sm:text-[14px] sm:leading-6">{children}</p>
     ),
     ul: ({ children }) => <ul className="my-2 ml-1 space-y-1.5">{children}</ul>,
     ol: ({ children }) => <ol className="my-2 ml-1 list-inside list-decimal space-y-1.5">{children}</ol>,
