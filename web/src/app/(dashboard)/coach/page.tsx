@@ -302,7 +302,7 @@ export default function CoachPage() {
             <SelectTrigger className="w-40 bg-surface border-border">
               <SelectValue>{selectedProviderInfo?.label ?? 'Provider'}</SelectValue>
             </SelectTrigger>
-            <SelectContent alignItemWithTrigger={false}>
+            <SelectContent alignItemWithTrigger={false} className="min-w-[18rem]">
               {providers.map((provider) => (
                 <SelectItem
                   key={provider.id}
@@ -311,7 +311,7 @@ export default function CoachPage() {
                 >
                   {provider.availability === 'available'
                     ? provider.label
-                    : `${provider.label} (requires key in Settings)`}
+                    : `${provider.label} (key required)`}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -353,12 +353,12 @@ export default function CoachPage() {
         </div>
       </div>
       {isAnthropicLocked && anthropicProvider?.reason && (
-        <div className="mb-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning flex items-center justify-between gap-3">
-          <span className="inline-flex items-center gap-1.5">
+        <div className="mb-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning flex items-start justify-between gap-3">
+          <span className="inline-flex items-center gap-1.5 flex-1 min-w-0 leading-5">
             <KeyRound className="h-3.5 w-3.5" />
             {anthropicProvider.reason}
           </span>
-          <Link href="/settings" className="underline underline-offset-2 whitespace-nowrap hover:text-warning/90">
+          <Link href="/settings" className="underline underline-offset-2 whitespace-nowrap hover:text-warning/90 shrink-0">
             Open Settings
           </Link>
         </div>
