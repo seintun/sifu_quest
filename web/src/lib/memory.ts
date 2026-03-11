@@ -19,6 +19,8 @@ const ALLOWED_MODE_FILES = [
   'business-ideas.md',
 ]
 
+const modeFileCache = new Map<string, string>()
+
 export class MemoryWriteError extends Error {
   filename: string
   dbCode?: string
@@ -61,9 +63,47 @@ export async function readMemoryFile(userId: string, filename: string): Promise<
   return data.content || ''
 }
 
+export async function readMemoryFiles(
+  userId: string,
+  filenames: string[],
+): Promise<Record<string, string>> {
+  for (const filename of filenames) {
+    validateMemoryFile(filename)
+  }
+
+  if (filenames.length === 0) {
+    return {}
+  }
+
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('memory_files')
+    .select('filename, content')
+    .eq('user_id', userId)
+    .in('filename', filenames)
+
+  if (error || !data) {
+    return Object.fromEntries(filenames.map((filename) => [filename, '']))
+  }
+
+  const byFilename: Record<string, string> = Object.fromEntries(
+    filenames.map((filename) => [filename, '']),
+  )
+
+  for (const row of data) {
+    byFilename[row.filename] = row.content || ''
+  }
+
+  return byFilename
+}
+
 // Mode files are static assets bundled with the app (not user-scoped)
 export async function readModeFile(filename: string): Promise<string> {
   validateModeFile(filename)
+  const cached = modeFileCache.get(filename)
+  if (cached !== undefined) {
+    return cached
+  }
   
   try {
     const { readFile } = await import('fs/promises')
@@ -71,6 +111,7 @@ export async function readModeFile(filename: string): Promise<string> {
     
     const filePath = join(process.cwd(), 'src', 'modes', filename)
     const content = await readFile(filePath, 'utf-8')
+    modeFileCache.set(filename, content)
     return content
   } catch (error) {
     console.warn(`Failed to read mode file matching ${filename}:`, error)

@@ -10,7 +10,7 @@ import {
   type ChatProvider,
 } from '@/lib/chat-provider-config'
 import { getQuotaError, incrementFreeUserMessagesUsed, isUsingFreeTier } from '@/lib/free-quota'
-import { readMemoryFile, readModeFile } from '@/lib/memory'
+import { readMemoryFiles, readModeFile } from '@/lib/memory'
 import { getEncryptedProviderApiKey, hasEncryptedProviderApiKey } from '@/lib/provider-api-keys'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
@@ -114,20 +114,21 @@ async function buildSystemPrompt(
     return systemPrompt
   }
 
-  const modeContent = await readModeFile(modeConfig.mode)
+  const [modeContent, memoryByFile] = await Promise.all([
+    readModeFile(modeConfig.mode),
+    readMemoryFiles(userId, modeConfig.memory),
+  ])
+
   if (modeContent) {
     systemPrompt = modeContent
   }
 
   const memoryParts: string[] = []
-  let profileContent = ''
+  const profileContent = memoryByFile['profile.md'] ?? ''
   for (const memFile of modeConfig.memory) {
-    const content = await readMemoryFile(userId, memFile)
+    const content = memoryByFile[memFile] ?? ''
     if (content) {
       memoryParts.push(`### ${memFile}\n${content}`)
-      if (memFile === 'profile.md') {
-        profileContent = content
-      }
     }
   }
 
@@ -500,8 +501,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const systemPrompt = await buildSystemPrompt(userId, mode, isGreeting)
-
     let assistantResult: StreamResult | null = null
     let streamClosed = false
     const lastUserMessage = messages[messages.length - 1]
@@ -510,6 +509,14 @@ export async function POST(request: NextRequest) {
     const readableStream = new ReadableStream<Uint8Array>({
       async start(controller) {
         try {
+          enqueueSseFrame(
+            controller,
+            encoder,
+            `data: ${JSON.stringify({ type: 'status', status: 'thinking' })}\n\n`,
+          )
+
+          const systemPrompt = await buildSystemPrompt(userId, mode, isGreeting)
+
           if (resolvedProvider === 'anthropic') {
             assistantResult = await streamAnthropic(
               providerApiKey,
