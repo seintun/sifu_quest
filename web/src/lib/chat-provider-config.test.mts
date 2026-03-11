@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   ANTHROPIC_MODEL_CATALOG,
   getAnthropicDefaultModel,
+  getAnthropicModelCostTier,
   isKnownAnthropicModel,
   isOpenRouterFreeModel,
   parseChatProvider,
@@ -29,8 +30,14 @@ test('anthropic defaults to haiku and uses ascending cost labels', () => {
   assert.equal(getAnthropicDefaultModel(), 'claude-3-5-haiku-latest')
   assert.deepEqual(
     ANTHROPIC_MODEL_CATALOG.map((model) => model.label),
-    ['Claude Haiku ($)', 'Claude Sonnet ($$)', 'Claude Opus ($$$)'],
+    ['Claude Haiku', 'Claude Sonnet', 'Claude Opus'],
   )
+  assert.deepEqual(
+    ANTHROPIC_MODEL_CATALOG.map((model) => model.costTier),
+    [1, 2, 3],
+  )
+  assert.equal(getAnthropicModelCostTier('claude-3-5-haiku-latest'), 1)
+  assert.equal(getAnthropicModelCostTier('claude-opus-4-1'), 3)
 })
 
 test('sanitizeModelLabel formats provider/model id for UI display', () => {

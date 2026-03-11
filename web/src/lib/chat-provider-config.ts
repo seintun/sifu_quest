@@ -1,4 +1,5 @@
 export type ChatProvider = 'openrouter' | 'anthropic'
+export type AnthropicModelCostTier = 1 | 2 | 3
 
 export type ModelAvailability = 'available' | 'requires_key' | 'temporarily_unavailable'
 
@@ -28,10 +29,10 @@ export const OPENROUTER_STATIC_FREE_MODEL_FALLBACKS = [
   'meta-llama/llama-3.3-70b-instruct:free',
 ] as const
 
-export const ANTHROPIC_MODEL_CATALOG: ReadonlyArray<{ id: string; label: string }> = [
-  { id: 'claude-3-5-haiku-latest', label: 'Claude Haiku ($)' },
-  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet ($$)' },
-  { id: 'claude-opus-4-1', label: 'Claude Opus ($$$)' },
+export const ANTHROPIC_MODEL_CATALOG: ReadonlyArray<{ id: string; label: string; costTier: AnthropicModelCostTier }> = [
+  { id: 'claude-3-5-haiku-latest', label: 'Claude Haiku', costTier: 1 },
+  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet', costTier: 2 },
+  { id: 'claude-opus-4-1', label: 'Claude Opus', costTier: 3 },
 ] as const
 
 export function isChatProvider(value: unknown): value is ChatProvider {
@@ -52,6 +53,10 @@ export function isKnownAnthropicModel(modelId: string): boolean {
 
 export function getAnthropicDefaultModel(): string {
   return ANTHROPIC_MODEL_CATALOG[0].id
+}
+
+export function getAnthropicModelCostTier(modelId: string): AnthropicModelCostTier | null {
+  return ANTHROPIC_MODEL_CATALOG.find((model) => model.id === modelId)?.costTier ?? null
 }
 
 export function getProviderLabel(provider: ChatProvider): string {

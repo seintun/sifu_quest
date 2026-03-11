@@ -13,8 +13,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { ApiKeyPrompt } from '@/components/ApiKeyPrompt'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { useChat, type ChatMessage } from '@/hooks/useChat'
+import { getAnthropicModelCostTier } from '@/lib/chat-provider-config'
 import 'highlight.js/styles/github-dark.css'
-import { KeyRound, MessageCircle, Send, Square, Trash2, Sparkles } from 'lucide-react'
+import { Coins, KeyRound, MessageCircle, Send, Square, Trash2, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, type ComponentType, type HTMLAttributes } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -45,6 +46,16 @@ const MODES = [
 
 type CodeBlockProps = HTMLAttributes<HTMLElement> & {
   node?: unknown
+}
+
+function CostTierIcons({ tier }: { tier: 1 | 2 | 3 }) {
+  return (
+    <span className="inline-flex items-center gap-0.5 text-warning">
+      {Array.from({ length: tier }).map((_, index) => (
+        <Coins key={index} className="h-3 w-3" />
+      ))}
+    </span>
+  )
 }
 
 function CodeBlock({ className, children, node: _node, ...props }: CodeBlockProps) {
@@ -288,6 +299,10 @@ export default function CoachPage() {
     (streamPhase === 'thinking' || (streamPhase === 'typing' && (!lastMessage || lastMessage.role === 'user')))
   const anthropicProvider = providers.find((provider) => provider.id === 'anthropic') ?? null
   const isAnthropicLocked = Boolean(anthropicProvider && anthropicProvider.availability !== 'available')
+  const selectedModelOption = availableModelsForSelectedProvider.find((model) => model.id === selectedModel)
+  const selectedModelCostTier = selectedModelOption?.provider === 'anthropic'
+    ? getAnthropicModelCostTier(selectedModelOption.id)
+    : null
 
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 3rem)' }}>
@@ -318,18 +333,34 @@ export default function CoachPage() {
           </Select>
           <Select value={selectedModel} onValueChange={v => v && updateModelSelection(v)}>
             <SelectTrigger className="w-64 bg-surface border-border">
-              <SelectValue>{availableModelsForSelectedProvider.find((model) => model.id === selectedModel)?.label ?? 'Model'}</SelectValue>
+              <SelectValue>
+                {selectedModelOption ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span>{selectedModelOption.label}</span>
+                    {selectedModelCostTier && <CostTierIcons tier={selectedModelCostTier} />}
+                  </span>
+                ) : 'Model'}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent alignItemWithTrigger={false}>
-              {availableModelsForSelectedProvider.map((model) => (
-                <SelectItem
-                  key={model.id}
-                  value={model.id}
-                  disabled={model.availability !== 'available'}
-                >
-                  {model.label}
-                </SelectItem>
-              ))}
+              {availableModelsForSelectedProvider.map((model) => {
+                const modelCostTier = model.provider === 'anthropic'
+                  ? getAnthropicModelCostTier(model.id)
+                  : null
+
+                return (
+                  <SelectItem
+                    key={model.id}
+                    value={model.id}
+                    disabled={model.availability !== 'available'}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <span>{model.label}</span>
+                      {modelCostTier && <CostTierIcons tier={modelCostTier} />}
+                    </span>
+                  </SelectItem>
+                )
+              })}
             </SelectContent>
           </Select>
           <Select value={mode} onValueChange={v => v && setMode(v)}>
