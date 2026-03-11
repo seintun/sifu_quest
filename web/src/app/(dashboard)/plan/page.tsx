@@ -126,7 +126,6 @@ export default function PlanPage() {
   const [rawContent, setRawContent] = useState('')
   const [planStatus, setPlanStatus] = useState<OnboardingPlanStatus>('not_queued')
   const [planErrorCode, setPlanErrorCode] = useState<string | null>(null)
-  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false)
   const [isQueueingPlanRefresh, setIsQueueingPlanRefresh] = useState(false)
 
   const fetchPlan = useCallback(async () => {
@@ -143,7 +142,6 @@ export default function PlanPage() {
   }, [])
 
   const fetchOnboardingStatus = useCallback(async (kick: boolean) => {
-    setIsRefreshingStatus(true)
     try {
       const res = await fetch(kick ? '/api/onboarding/status?kick=true' : '/api/onboarding/status')
       if (!res.ok) {
@@ -155,8 +153,6 @@ export default function PlanPage() {
       return data
     } catch {
       return null
-    } finally {
-      setIsRefreshingStatus(false)
     }
   }, [])
 
@@ -282,14 +278,6 @@ export default function PlanPage() {
             >
               {isQueueingPlanRefresh ? 'Queueing refresh...' : 'Refresh Game Plan'}
             </button>
-            <button
-              type="button"
-              onClick={() => void refreshPlanStatus()}
-              disabled={isRefreshingStatus}
-              className="rounded-md border border-border bg-elevated px-3 py-1.5 text-xs text-foreground hover:bg-elevated/70 disabled:opacity-50"
-            >
-              {isRefreshingStatus ? 'Checking...' : 'Check generation status'}
-            </button>
           </div>
         )}
         {rawContent ? (
@@ -341,14 +329,6 @@ export default function PlanPage() {
           className="rounded-md border border-streak/40 bg-streak/10 px-3 py-1.5 text-xs font-medium text-streak hover:bg-streak/20 disabled:opacity-50"
         >
           {isQueueingPlanRefresh ? 'Queueing refresh...' : 'Refresh Game Plan'}
-        </button>
-        <button
-          type="button"
-          onClick={() => void refreshPlanStatus()}
-          disabled={isRefreshingStatus}
-          className="rounded-md border border-border bg-elevated px-3 py-1.5 text-xs text-foreground hover:bg-elevated/70 disabled:opacity-50"
-        >
-          {isRefreshingStatus ? 'Checking...' : 'Check status'}
         </button>
       </div>
 
