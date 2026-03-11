@@ -1,32 +1,18 @@
 'use client'
 
+import { ApiKeyPrompt } from '@/components/ApiKeyPrompt'
+import { ComposerBar } from '@/components/chat/ComposerBar'
+import { ConversationList } from '@/components/chat/ConversationList'
+import { DesktopChatControls, ResponsiveChatControls, type ModeOption } from '@/components/chat/ChatControls'
+import { StatusStrip } from '@/components/chat/StatusStrip'
+import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
-import { ApiKeyPrompt } from '@/components/ApiKeyPrompt'
-import { UpgradePrompt } from '@/components/UpgradePrompt'
-import { useChat, type ChatMessage } from '@/hooks/useChat'
-import { getAnthropicModelCostTier } from '@/lib/chat-provider-config'
-import 'highlight.js/styles/github-dark.css'
-import { Coins, KeyRound, MessageCircle, Send, Square, Trash2, Sparkles } from 'lucide-react'
+import { useChat } from '@/hooks/useChat'
+import { buildSystemMeta, getSystemMessage } from '@/lib/chat-system-messages'
+import { KeyRound, MessageCircle, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
-import { useCallback, useEffect, useRef, useState, type ComponentType, type HTMLAttributes } from 'react'
-import ReactMarkdown from 'react-markdown'
-import rehypeHighlight from 'rehype-highlight'
-import remarkGfm from 'remark-gfm'
-
-const FREE_TIER_EXHAUSTED_MESSAGE =
-  'You have exhausted your free messages. To continue your mastery journey, go to **Settings** and add your own Anthropic API key. Your key is encrypted with AES-256-CBC before storage and used only for your Claude requests.'
-
-const GUEST_LIMIT_REACHED_MESSAGE =
-  'You have reached the guest limit. Please sign up to continue. After creating your account, add your own Anthropic API key in **Settings** to keep chatting securely.'
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const MODE_STARTERS: Record<string, string[]> = {
   dsa: ['Give me a medium array problem', 'Practice dynamic programming', 'Quiz me on graphs', 'Review sliding window'],
@@ -36,7 +22,7 @@ const MODE_STARTERS: Record<string, string[]> = {
   'business-ideas': ['Explore an idea I have', 'Validate a startup concept', 'Stress-test an idea', 'Find a niche problem'],
 }
 
-const MODES = [
+const MODES: ModeOption[] = [
   { value: 'dsa', label: 'DSA Coach' },
   { value: 'system-design', label: 'System Design' },
   { value: 'interview-prep', label: 'Interview Prep' },
@@ -44,116 +30,15 @@ const MODES = [
   { value: 'business-ideas', label: 'Business Ideas' },
 ]
 
-type CodeBlockProps = HTMLAttributes<HTMLElement> & {
-  node?: unknown
-}
-
-function CostTierIcons({ tier }: { tier: 1 | 2 | 3 }) {
-  return (
-    <span className="inline-flex items-center gap-1 text-warning">
-      <Coins className="h-3 w-3" />
-      <span className="text-[11px] leading-none font-medium">x{tier}</span>
-    </span>
-  )
-}
-
-function CodeBlock({ className, children, node: _node, ...props }: CodeBlockProps) {
-  void _node
-  const match = /language-(\w+)/.exec(className || '')
-  const lang = match ? match[1] : null
-  
-  // ReactMarkdown v10 removed the `inline` prop. Un-languaged code blocks
-  // don't have a className. If it contains newlines, treat it as a block.
-  const contentStr = String(children || '')
-  const isInline = !className && !contentStr.includes('\n')
-
-  if (isInline) {
-    return (
-      <code
-        className="text-coach bg-elevated/80 px-1.5 py-0.5 rounded text-[13px] font-mono"
-        {...props}
-      >
-        {children}
-      </code>
-    )
-  }
-
-  return (
-    <div className="relative my-3 w-full rounded-lg overflow-hidden border border-border/60 bg-[#0d1117]">
-      {lang && (
-        <div className="flex items-center justify-between px-4 py-1.5 bg-elevated/50 border-b border-border/40">
-          <span className="text-[11px] uppercase tracking-wider text-dim font-mono">{lang}</span>
-        </div>
-      )}
-      <pre className="!m-0 !rounded-none !border-0 !bg-transparent overflow-x-auto">
-        <code className={`${className || ''} font-mono !bg-transparent text-[13px] leading-relaxed block p-4`} {...props}>
-          {children}
-        </code>
-      </pre>
-    </div>
-  )
-}
-
-function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreaming?: boolean }) {
-  if (message.role === 'user') {
-    return (
-      <div className="flex justify-end">
-        <div className="bg-elevated rounded-xl p-3.5 text-sm max-w-[80%] whitespace-pre-wrap text-foreground/90">
-          {message.content}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex justify-start">
-      <div className="bg-surface border border-coach/15 rounded-xl p-4 text-sm max-w-[85%] shadow-sm overflow-x-auto">
-        <div className="chat-prose prose prose-invert prose-sm max-w-none whitespace-pre-wrap
-          prose-headings:font-display prose-headings:text-foreground
-          prose-h2:text-base prose-h2:font-semibold prose-h2:mt-5 prose-h2:mb-2 prose-h2:pb-1 prose-h2:border-b prose-h2:border-border/40
-          prose-h3:text-sm prose-h3:font-semibold prose-h3:mt-4 prose-h3:mb-1.5
-          prose-h4:text-sm prose-h4:font-medium prose-h4:mt-3 prose-h4:mb-1
-          prose-p:text-foreground/85 prose-p:my-1.5 prose-p:leading-relaxed
-          prose-a:text-coach prose-a:no-underline hover:prose-a:underline
-          prose-li:text-foreground/85 prose-li:my-0.5 prose-li:leading-relaxed
-          prose-strong:text-foreground prose-strong:font-semibold
-          prose-ol:my-2 prose-ul:my-2
-          prose-hr:border-border/40 prose-hr:my-4
-          prose-blockquote:border-coach/40 prose-blockquote:bg-coach/5 prose-blockquote:rounded-r-lg prose-blockquote:py-0.5 prose-blockquote:px-3 prose-blockquote:not-italic
-          [&_table]:w-full [&_table]:my-3 [&_table]:text-sm [&_table]:border-collapse
-          [&_thead]:border-b [&_thead]:border-border/50
-          [&_th]:text-left [&_th]:text-foreground/70 [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider [&_th]:font-medium [&_th]:py-2 [&_th]:px-3 [&_th]:bg-elevated/40
-          [&_td]:py-1.5 [&_td]:px-3 [&_td]:text-foreground/80 [&_td]:border-b [&_td]:border-border/20
-          [&_tbody_tr:last-child_td]:border-0
-          [&_tbody_tr:hover]:bg-elevated/30
-        ">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight]}
-            components={{
-              code: CodeBlock as ComponentType<HTMLAttributes<HTMLElement>>,
-              pre: ({ children }) => <>{children}</>,
-            }}
-          >
-            {message.content}
-          </ReactMarkdown>
-        </div>
-        {isStreaming && (
-          <span className="inline-block w-0.5 h-4 bg-coach animate-pulse-cursor ml-0.5 mt-1" />
-        )}
-      </div>
-    </div>
-  )
-}
-
 export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
-  const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
   const {
     messages,
     setMessages,
     isStreaming,
     isLoaded,
+    bootstrapError,
+    reload,
     upgradeRequired,
     freeQuota,
     sendMessage,
@@ -168,27 +53,33 @@ export default function CoachPage() {
     sessionMetrics,
     hasAnthropicKey,
     streamPhase,
+    hasOlderMessages,
+    isLoadingOlder,
+    loadOlderMessages,
     updateProviderSelection,
     updateModelSelection,
     formatMicrousd,
   } = useChat(mode)
+
   const [accountIsGuest, setAccountIsGuest] = useState<boolean | null>(null)
   const [isAnonymousSession, setIsAnonymousSession] = useState<boolean | null>(null)
-  const isGuest = isAnonymousSession === null ? (accountIsGuest ?? Boolean(freeQuota?.isGuest)) : isAnonymousSession
-  const hasGreetedRef = useRef<string | null>(null)
   const [dismissedPrompt, setDismissedPrompt] = useState(false)
+  const [statusExpanded, setStatusExpanded] = useState(false)
   const [input, setInput] = useState('')
+
+  const hasGreetedRef = useRef<string | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const shouldAutoScrollRef = useRef(true)
+
+  const isGuest = isAnonymousSession === null ? (accountIsGuest ?? Boolean(freeQuota?.isGuest)) : isAnonymousSession
   const isQuotaBlocked = Boolean(
     freeQuota?.isFreeTier &&
     freeQuota.remaining <= 0 &&
     !(selectedProvider === 'anthropic' && hasAnthropicKey),
   )
 
-  useEffect(() => {
-    setDismissedPrompt(false)
-  }, [mode])
+  const selectedModeLabel = useMemo(() => MODES.find((entry) => entry.value === mode)?.label ?? mode, [mode])
 
   useEffect(() => {
     let cancelled = false
@@ -218,17 +109,19 @@ export default function CoachPage() {
     }
   }, [])
 
-  // Auto-greet only after encrypted history has been loaded — prevents a spurious
-  // greeting from firing against the empty initial state before async decrypt completes
   useEffect(() => {
     if (!isLoaded) return
+
     if (messages.length === 0 && hasGreetedRef.current !== mode && !upgradeRequired) {
       if (isQuotaBlocked) {
         hasGreetedRef.current = mode
-        setMessages([{
-          role: 'assistant',
-          content: isGuest ? GUEST_LIMIT_REACHED_MESSAGE : FREE_TIER_EXHAUSTED_MESSAGE
-        }])
+        setMessages([
+          {
+            role: 'assistant',
+            content: getSystemMessage(isGuest ? 'guest_limit_reached' : 'free_tier_exhausted'),
+            meta: buildSystemMeta(isGuest ? 'guest_limit_reached' : 'free_tier_exhausted'),
+          },
+        ])
         return
       }
       hasGreetedRef.current = mode
@@ -236,7 +129,6 @@ export default function CoachPage() {
     }
   }, [mode, messages.length, greet, isLoaded, upgradeRequired, isQuotaBlocked, setMessages, isGuest])
 
-  // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight
@@ -244,44 +136,55 @@ export default function CoachPage() {
   }, [])
 
   useEffect(() => {
-    scrollToBottom()
+    if (shouldAutoScrollRef.current) {
+      scrollToBottom()
+    }
   }, [messages, scrollToBottom])
 
-  // Auto-focus input when assistant finishes streaming
   useEffect(() => {
     if (!isStreaming && textareaRef.current && !isQuotaBlocked) {
       textareaRef.current.focus()
     }
   }, [isStreaming, isQuotaBlocked])
 
-  // Automatically trigger the end-of-quota experience once the free-tier limit is reached.
   useEffect(() => {
     if (!isStreaming && isQuotaBlocked && messages.length > 0) {
       const lastMessage = messages[messages.length - 1]
-      // Only append if we haven't already appended it
-      const hasLimitMessage =
-        lastMessage?.content.includes('exhausted your free messages') ||
-        lastMessage?.content.includes('reached the guest limit')
+      const isLimitMessage =
+        lastMessage?.meta?.kind === 'system' &&
+        (lastMessage.meta.code === 'free_tier_exhausted' || lastMessage.meta.code === 'guest_limit_reached')
 
-      if (lastMessage && lastMessage.role === 'assistant' && !hasLimitMessage) {
+      if (lastMessage && lastMessage.role === 'assistant' && !isLimitMessage) {
         setMessages((prev) => [
           ...prev,
           {
             role: 'assistant',
-            content: isGuest
-              ? GUEST_LIMIT_REACHED_MESSAGE
-              : 'You have exhausted your free messages. To continue your mastery journey, go to **Settings** and add your own Anthropic API key. Your key is encrypted with AES-256-CBC before storage, and your past conversation remains accessible here.'
-          }
+            content: getSystemMessage(isGuest ? 'guest_limit_reached' : 'free_tier_exhausted'),
+            meta: buildSystemMeta(isGuest ? 'guest_limit_reached' : 'free_tier_exhausted'),
+          },
         ])
-        // Reveal the popup overlay after the stream finishes
         queueMicrotask(() => setDismissedPrompt(false))
       }
     }
   }, [isStreaming, isQuotaBlocked, messages, setMessages, isGuest])
 
+  const handleScroll = useCallback(() => {
+    if (!scrollContainerRef.current) return
+
+    const container = scrollContainerRef.current
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+    shouldAutoScrollRef.current = distanceFromBottom < 80
+  }, [])
+
   const handleClearHistory = () => {
     hasGreetedRef.current = null
     clearHistory()
+  }
+
+  const handleModeChange = (nextMode: string) => {
+    setMode(nextMode)
+    setDismissedPrompt(false)
+    setStatusExpanded(false)
   }
 
   const handleSend = () => {
@@ -291,9 +194,9 @@ export default function CoachPage() {
     sendMessage(text)
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
       handleSend()
     }
   }
@@ -302,94 +205,51 @@ export default function CoachPage() {
   const showThinkingIndicator =
     isStreaming &&
     (streamPhase === 'thinking' || (streamPhase === 'typing' && (!lastMessage || lastMessage.role === 'user')))
+
   const anthropicProvider = providers.find((provider) => provider.id === 'anthropic') ?? null
   const isAnthropicLocked = Boolean(anthropicProvider && anthropicProvider.availability !== 'available')
-  const selectedModelOption = availableModelsForSelectedProvider.find((model) => model.id === selectedModel)
-  const selectedModelCostTier = selectedModelOption?.provider === 'anthropic'
-    ? getAnthropicModelCostTier(selectedModelOption.id)
-    : null
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 3rem)' }}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <MessageCircle className="h-5 w-5 text-coach" />
-          <h1 className="font-display text-2xl font-bold">Coach Chat</h1>
+    <div data-testid="coach-shell" className="flex flex-col h-[calc(100dvh-6.5rem)] md:h-[calc(100dvh-3rem)] overflow-hidden">
+      <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <MessageCircle className="h-5 w-5 text-coach shrink-0" />
+          <div className="min-w-0">
+            <h1 className="font-display text-xl md:text-2xl font-bold truncate">Coach Chat</h1>
+            <p className="text-xs text-muted-foreground truncate">{selectedModeLabel}</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Select value={selectedProvider} onValueChange={v => updateProviderSelection(v as 'openrouter' | 'anthropic')}>
-            <SelectTrigger className="w-40 bg-surface border-border">
-              <SelectValue>{selectedProviderInfo?.label ?? 'Provider'}</SelectValue>
-            </SelectTrigger>
-            <SelectContent alignItemWithTrigger={false} className="min-w-[18rem]">
-              {providers.map((provider) => (
-                <SelectItem
-                  key={provider.id}
-                  value={provider.id}
-                  disabled={provider.availability !== 'available'}
-                >
-                  {provider.availability === 'available'
-                    ? provider.label
-                    : `${provider.label} (key required)`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={selectedModel} onValueChange={v => v && updateModelSelection(v)}>
-            <SelectTrigger className="w-64 bg-surface border-border">
-              <SelectValue>
-                {selectedModelOption ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <span>{selectedModelOption.label}</span>
-                    {selectedModelCostTier && <CostTierIcons tier={selectedModelCostTier} />}
-                  </span>
-                ) : 'Model'}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent alignItemWithTrigger={false}>
-              {availableModelsForSelectedProvider.map((model) => {
-                const modelCostTier = model.provider === 'anthropic'
-                  ? getAnthropicModelCostTier(model.id)
-                  : null
 
-                return (
-                  <SelectItem
-                    key={model.id}
-                    value={model.id}
-                    disabled={model.availability !== 'available'}
-                  >
-                    <span className="inline-flex items-center gap-1.5">
-                      <span>{model.label}</span>
-                      {modelCostTier && <CostTierIcons tier={modelCostTier} />}
-                    </span>
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
-          <Select value={mode} onValueChange={v => v && setMode(v)}>
-            <SelectTrigger className="w-44 bg-surface border-border">
-              <SelectValue>{selectedModeLabel}</SelectValue>
-            </SelectTrigger>
-            <SelectContent alignItemWithTrigger={false}>
-              {MODES.map(m => (
-                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClearHistory}
-            className="text-muted-foreground hover:text-danger"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-2">
+          <DesktopChatControls
+            providers={providers}
+            selectedProvider={selectedProvider}
+            onProviderChange={updateProviderSelection}
+            models={availableModelsForSelectedProvider}
+            selectedModel={selectedModel}
+            onModelChange={updateModelSelection}
+            modes={MODES}
+            selectedMode={mode}
+            onModeChange={handleModeChange}
+            onClear={handleClearHistory}
+          />
+          <ResponsiveChatControls
+            providers={providers}
+            selectedProvider={selectedProvider}
+            onProviderChange={updateProviderSelection}
+            models={availableModelsForSelectedProvider}
+            selectedModel={selectedModel}
+            onModelChange={updateModelSelection}
+            modes={MODES}
+            selectedMode={mode}
+            onModeChange={handleModeChange}
+            onClear={handleClearHistory}
+          />
         </div>
       </div>
+
       {isAnthropicLocked && anthropicProvider?.reason && (
-        <div className="mb-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning flex items-start justify-between gap-3">
+        <div className="mb-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning flex items-start justify-between gap-3 shrink-0">
           <span className="inline-flex items-center gap-1.5 flex-1 min-w-0 leading-5">
             <KeyRound className="h-3.5 w-3.5" />
             {anthropicProvider.reason}
@@ -400,17 +260,28 @@ export default function CoachPage() {
         </div>
       )}
 
-      {/* Chat Area */}
       <Card className="flex-1 border-border bg-background overflow-hidden flex flex-col min-h-0">
-        <CardContent className="p-0 flex-1 flex flex-col min-h-0">
-          {upgradeRequired && !dismissedPrompt ? (
-             <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-center min-h-0">
-                 {upgradeRequired === 'missing_api_key' || upgradeRequired === 'provider_key_required' || (!isGuest && upgradeRequired === 'guest_limit_reached') ? (
-                   <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />
-                 ) : (
-                   <UpgradePrompt onClose={() => setDismissedPrompt(true)} />
-                 )}
-             </div>
+        <CardContent className="p-0 flex-1 flex flex-col min-h-0 relative">
+          {!isLoaded ? (
+            <div className="flex-1 grid place-items-center text-sm text-muted-foreground">Loading chat...</div>
+          ) : bootstrapError ? (
+            <div className="flex-1 grid place-items-center px-4">
+              <div className="max-w-sm text-center space-y-2">
+                <p className="text-sm text-muted-foreground">{bootstrapError}</p>
+                <Button type="button" variant="outline" onClick={reload}>
+                  <RotateCcw className="h-4 w-4" />
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : upgradeRequired && !dismissedPrompt ? (
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-center min-h-0">
+              {upgradeRequired === 'missing_api_key' || upgradeRequired === 'provider_key_required' || (!isGuest && upgradeRequired === 'guest_limit_reached') ? (
+                <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />
+              ) : (
+                <UpgradePrompt onClose={() => setDismissedPrompt(true)} />
+              )}
+            </div>
           ) : (
             <>
               {isQuotaBlocked && !isStreaming && !dismissedPrompt && (
@@ -418,127 +289,52 @@ export default function CoachPage() {
                   {isGuest ? <UpgradePrompt onClose={() => setDismissedPrompt(true)} /> : <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />}
                 </div>
               )}
-              {/* Scrollable messages */}
+
               <div
                 ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto p-4 min-h-0"
-          >
-            <div className="space-y-4">
-              {messages.map((msg, i) => (
-                <ChatBubble
-                  key={i}
-                  message={msg}
-                  isStreaming={isStreaming && i === messages.length - 1 && msg.role === 'assistant'}
+                onScroll={handleScroll}
+                data-testid="conversation-scroll"
+                className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-3 md:p-4"
+              >
+                <ConversationList
+                  messages={messages}
+                  isStreaming={isStreaming}
+                  streamPhase={streamPhase}
+                  showThinkingIndicator={showThinkingIndicator}
+                  modeStarters={MODE_STARTERS[mode] ?? []}
+                  onStarterClick={sendMessage}
+                  hasOlderMessages={hasOlderMessages}
+                  isLoadingOlder={isLoadingOlder}
+                  onLoadOlder={loadOlderMessages}
                 />
-              ))}
-              {showThinkingIndicator && (
-                <div className="flex justify-start">
-                  <div className="bg-surface border border-coach/15 rounded-xl px-4 py-3 text-xs text-muted-foreground inline-flex items-center gap-2">
-                    <span>{streamPhase === 'thinking' ? 'Sifu is thinking' : 'Sifu is typing'}</span>
-                    <span className="inline-flex gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-coach/70 animate-pulse" />
-                      <span className="w-1.5 h-1.5 rounded-full bg-coach/70 animate-pulse [animation-delay:120ms]" />
-                      <span className="w-1.5 h-1.5 rounded-full bg-coach/70 animate-pulse [animation-delay:240ms]" />
-                    </span>
-                  </div>
-                </div>
-              )}
-              {!isStreaming && messages.length === 1 && messages[0].role === 'assistant' && (
-                <div className="flex flex-wrap gap-2 mt-2 px-1">
-                  {(MODE_STARTERS[mode] ?? []).map(chip => (
-                    <button
-                      key={chip}
-                      onClick={() => sendMessage(chip)}
-                      className="text-xs px-3 py-1.5 rounded-full border border-coach/30 text-coach/80 hover:bg-coach/10 hover:border-coach/60 transition-colors cursor-pointer"
-                    >
-                      {chip}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+              </div>
 
-          {/* Input */}
-          <div className="border-t border-border p-3 shrink-0">
-            {freeQuota?.isFreeTier && selectedProvider === 'openrouter' && (
-              <div className="mb-2 rounded-md border border-border/60 bg-elevated/40 px-3 py-2 animate-in fade-in slide-in-from-bottom-1 duration-300">
-                <div className="flex items-center justify-between gap-2 text-xs font-medium text-foreground/80">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-primary" />
-                    Free tier usage
-                  </span>
-                  <span>{freeQuota.remaining} / {freeQuota.total} remaining</span>
-                </div>
-                <div className="mt-1.5 h-1.5 rounded-full bg-border/50 overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all"
-                    style={{ width: `${Math.max(0, Math.min(100, (freeQuota.remaining / freeQuota.total) * 100))}%` }}
-                  />
-                </div>
-              </div>
-            )}
-            {selectedProviderInfo?.availability !== 'available' && selectedProviderInfo?.reason && (
-              <div className="mb-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-                {selectedProviderInfo.reason}
-              </div>
-            )}
-            {sessionMetrics && (
-              <div className="mb-2 rounded-md border border-border/60 bg-elevated/30 px-3 py-2 text-xs text-foreground/80">
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  <span>Turns: {sessionMetrics.userTurns}</span>
-                  <span>Input tokens: {sessionMetrics.inputTokens}</span>
-                  <span>Output tokens: {sessionMetrics.outputTokens}</span>
-                  <span>Total tokens: {sessionMetrics.totalTokens}</span>
-                  <span>Est. cost: {formatMicrousd(sessionMetrics.estimatedCostMicrousd)}</span>
-                </div>
-              </div>
-            )}
-            <div className="flex items-end gap-2">
-              <Textarea
-                ref={textareaRef}
-                value={input}
-                onChange={e => setInput(e.target.value)}
+              <StatusStrip
+                freeQuota={freeQuota}
+                selectedProvider={selectedProvider}
+                selectedProviderInfo={selectedProviderInfo}
+                sessionMetrics={sessionMetrics}
+                formatMicrousd={formatMicrousd}
+                isExpanded={statusExpanded}
+                onToggle={() => setStatusExpanded((prev) => !prev)}
+              />
+
+              <ComposerBar
+                input={input}
+                onInputChange={setInput}
                 onKeyDown={handleKeyDown}
+                onSend={handleSend}
+                isStreaming={isStreaming}
+                onStop={stopStreaming}
+                isDisabled={isQuotaBlocked || selectedProviderInfo?.availability !== 'available'}
                 placeholder={
                   isQuotaBlocked
                     ? (isGuest ? 'Guest limit reached' : 'Free limit reached')
                     : 'Type a message...'
                 }
-                className="bg-elevated border-border resize-none min-h-[2.5rem] max-h-32"
-                rows={1}
-                disabled={
-                  isStreaming ||
-                  isQuotaBlocked ||
-                  selectedProviderInfo?.availability !== 'available'
-                }
+                textareaRef={textareaRef}
               />
-              {isStreaming ? (
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={stopStreaming}
-                  className="h-10 w-10 shrink-0"
-                >
-                  <Square className="h-4 w-4" />
-                </Button>
-              ) : (
-                <Button
-                  size="icon"
-                  onClick={handleSend}
-                  disabled={
-                    !input.trim() ||
-                    isQuotaBlocked ||
-                    selectedProviderInfo?.availability !== 'available'
-                  }
-                  className="h-10 w-10 shrink-0"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          </div>
-          </>
+            </>
           )}
         </CardContent>
       </Card>
