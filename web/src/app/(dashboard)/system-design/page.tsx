@@ -33,7 +33,9 @@ import { parseSystemDesign } from '@/lib/parsers/system-design'
 import { DOMAIN_COLORS } from '@/lib/theme'
 import { AlertCircle, BookOpen, CheckCircle2, Lightbulb, Network, Plus, Zap } from 'lucide-react'
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 
 function LogConceptForm({ onSubmit }: { onSubmit: () => void }) {
   const [open, setOpen] = useState(false)
@@ -120,18 +122,9 @@ function LogConceptForm({ onSubmit }: { onSubmit: () => void }) {
 
 
 export default function SystemDesignPage() {
-  const [data, setData] = useState<ParsedSystemDesign | null>(null)
-
-  const fetchData = useCallback(() => {
-    fetch('/api/memory?file=system-design.md')
-      .then(res => res.json())
-      .then(d => setData(parseSystemDesign(d.content || '')))
-      .catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  const { data: rawData, mutate } = useSWR('/api/memory?file=system-design.md', fetcher)
+  
+  const data = rawData ? parseSystemDesign(rawData.content || '') : null
 
   // Find next topic to study
   const coveredTopics = data ? new Set(data.concepts.map(c => c.concept.toLowerCase())) : new Set()
@@ -148,7 +141,7 @@ export default function SystemDesignPage() {
           <p className="text-muted-foreground text-sm mt-1">Concepts, discussions, and study plan</p>
         </div>
         {data ? (
-          <LogConceptForm onSubmit={fetchData} />
+          <LogConceptForm onSubmit={() => mutate()} />
         ) : (
           <div className="h-9 w-32 bg-muted rounded-md animate-pulse" />
         )}

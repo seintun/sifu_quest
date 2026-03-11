@@ -10,7 +10,9 @@ import type { ParsedPlan, PlanItem } from '@/lib/parsers/plan-parser'
 import { parsePlan } from '@/lib/parsers/plan-parser'
 import { DOMAIN_COLORS } from '@/lib/theme'
 import { AlertTriangle, Calendar, CheckCircle2, RefreshCw } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 import type { Components } from 'react-markdown'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -300,84 +302,36 @@ function hasStructuredContent(plan: ParsedPlan): boolean {
 
 
 export default function PlanPage() {
-  const [plan, setPlan] = useState<ParsedPlan | null>(null)
-  const [rawContent, setRawContent] = useState('')
-  const [planStatus, setPlanStatus] = useState<OnboardingPlanStatus | null>(null)
-  const [planErrorCode, setPlanErrorCode] = useState<string | null>(null)
   const [isQueueingPlanRefresh, setIsQueueingPlanRefresh] = useState(false)
+  const [manualErrorCode, setManualErrorCode] = useState<string | null>(null)
 
-  const fetchPlan = useCallback(async () => {
-    try {
-      const res = await fetch('/api/memory?file=plan.md')
-      const data = await res.json().catch(() => ({}))
-      const content = typeof data.content === 'string' ? data.content : ''
-      setRawContent(content)
-      setPlan(parsePlan(content))
-      return content
-    } catch {
-      return ''
-    }
-  }, [])
+  // SWR automatically handles caching and deduplication
+  const { data: rawData, mutate: mutatePlan } = useSWR('/api/memory?file=plan.md', fetcher)
+  const { data: statusData, mutate: mutateStatus } = useSWR('/api/onboarding/status', fetcher)
 
-  const fetchOnboardingStatus = useCallback(async (kick: boolean) => {
-    try {
-      const res = await fetch(kick ? '/api/onboarding/status?kick=true' : '/api/onboarding/status')
-      if (!res.ok) {
-        return null
-      }
-      const data = (await res.json()) as OnboardingStatusResponse
-      setPlanStatus(data.plan.status)
-      setPlanErrorCode(data.plan.lastErrorCode ?? null)
-      return data
-    } catch {
-      return null
-    }
-  }, [])
+  const rawContent = typeof rawData?.content === 'string' ? rawData.content : ''
+  const plan = rawData ? parsePlan(rawContent) : null
 
-  useEffect(() => {
-    void (async () => {
-      await fetchPlan()
-      await fetchOnboardingStatus(true)
-      await fetchPlan()
-    })()
-  }, [fetchPlan, fetchOnboardingStatus])
+  const planStatus: OnboardingPlanStatus | null = statusData?.plan?.status ?? null
+  const planErrorCode: string | null = manualErrorCode ?? (statusData?.plan?.lastErrorCode ?? null)
 
   const isPlanPlaceholder = rawContent.toLowerCase().includes(PLAN_PLACEHOLDER_MARKER)
 
-  useEffect(() => {
-    const shouldPoll =
-      planStatus === 'queued' ||
-      planStatus === 'running' ||
-      (isPlanPlaceholder && planStatus !== 'failed')
+  // Configure dynamic polling
+  const shouldPoll =
+    planStatus === 'queued' ||
+    planStatus === 'running' ||
+    (isPlanPlaceholder && planStatus !== 'failed')
 
-    if (!shouldPoll) {
-      return
-    }
+  const pollingInterval = shouldPoll ? 15000 : 0
 
-    let isActive = true
-    const tick = async () => {
-      await fetchOnboardingStatus(true)
-      if (!isActive) {
-        return
-      }
-      await fetchPlan()
-    }
-
-    void tick()
-    const intervalId = window.setInterval(() => {
-      void tick()
-    }, 15000)
-
-    return () => {
-      isActive = false
-      window.clearInterval(intervalId)
-    }
-  }, [fetchOnboardingStatus, fetchPlan, isPlanPlaceholder, planStatus])
+  useSWR('/api/memory?file=plan.md', fetcher, { refreshInterval: pollingInterval })
+  useSWR('/api/onboarding/status', fetcher, { refreshInterval: pollingInterval })
 
   const refreshPlanStatus = useCallback(async () => {
-    await fetchOnboardingStatus(true)
-    await fetchPlan()
-  }, [fetchOnboardingStatus, fetchPlan])
+    await mutateStatus()
+    await mutatePlan()
+  }, [mutateStatus, mutatePlan])
 
   const queuePlanRefresh = useCallback(async () => {
     setIsQueueingPlanRefresh(true)
@@ -390,12 +344,15 @@ export default function PlanPage() {
         plan?: { status?: OnboardingPlanStatus }
       }
       if (!res.ok) {
-        setPlanErrorCode(data.error ?? 'plan_refresh_failed')
+        setManualErrorCode(data.error ?? 'plan_refresh_failed')
         return
       }
 
-      setPlanStatus(data.plan?.status ?? 'queued')
-      setPlanErrorCode(null)
+      setManualErrorCode(null)
+      // Fake local state updates for instant UI, SWR will revalidate in background automatically because of the mutate call.
+      // But actually, we don't need to fake if we just clear the error code. Wait, we can't mutate planErrorCode manually since it's derived.
+      // However mutate() triggers revalidation.
+      // Doing `mutateStatus` immediately.
       void refreshPlanStatus()
     } finally {
       setIsQueueingPlanRefresh(false)
@@ -410,7 +367,7 @@ export default function PlanPage() {
         body: JSON.stringify({ itemId, checked }),
       })
       if (res.ok) {
-        fetchPlan()
+        mutatePlan()
       }
     } catch {
       // ignore

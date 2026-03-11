@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -170,23 +172,11 @@ function LogProblemForm({
 
 
 export default function DSAPage() {
-  const [patterns, setPatterns] = useState<DSAPattern[] | null>(null)
-  const [problems, setProblems] = useState<ProblemAttempt[]>([])
+  const { data, mutate } = useSWR('/api/memory?file=dsa-patterns.md', fetcher)
 
-  const fetchData = useCallback(() => {
-    fetch('/api/memory?file=dsa-patterns.md')
-      .then(res => res.json())
-      .then(data => {
-        const content = data.content || ''
-        setPatterns(parseDSAPatterns(content))
-        setProblems(parseProblemHistory(content))
-      })
-      .catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  const content = data?.content || ''
+  const patterns = data ? parseDSAPatterns(content) : null
+  const problems = data ? parseProblemHistory(content) : []
 
   // Find the first pattern needing practice
   const suggestedPattern = patterns?.find(p => p.mastery === '—' || p.mastery === '🔴')
@@ -199,7 +189,7 @@ export default function DSAPage() {
           <p className="text-muted-foreground text-sm mt-1">Pattern mastery & problem history</p>
         </div>
         {patterns ? (
-          <LogProblemForm patterns={patterns} onSubmit={fetchData} />
+          <LogProblemForm patterns={patterns} onSubmit={() => mutate()} />
         ) : (
           <div className="h-9 w-32 bg-muted rounded-md animate-pulse" />
         )}

@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/fetcher'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -174,20 +176,9 @@ function AddApplicationForm({ onSubmit }: { onSubmit: () => void }) {
 
 
 export default function JobsPage() {
-  const [applications, setApplications] = useState<JobApplication[] | null>(null)
-
-  const fetchData = useCallback(() => {
-    fetch('/api/memory?file=job-search.md')
-      .then(res => res.json())
-      .then(data => {
-        setApplications(parseJobApplications(data.content || ''))
-      })
-      .catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  const { data, mutate } = useSWR('/api/memory?file=job-search.md', fetcher)
+  
+  const applications = data ? parseJobApplications(data.content || '') : null
 
   const handleStatusChange = async (company: string, role: string, newStatus: string) => {
     await fetch('/api/jobs', {
@@ -195,7 +186,7 @@ export default function JobsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'updateStatus', company, role, newStatus }),
     })
-    fetchData()
+    mutate()
   }
 
   // Group by status for Kanban view
@@ -214,7 +205,7 @@ export default function JobsPage() {
           </p>
         </div>
         {applications ? (
-          <AddApplicationForm onSubmit={fetchData} />
+          <AddApplicationForm onSubmit={() => mutate()} />
         ) : (
           <div className="h-9 w-36 bg-muted rounded-md animate-pulse" />
         )}
