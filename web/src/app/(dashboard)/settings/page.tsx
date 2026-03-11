@@ -342,9 +342,6 @@ export default function SettingsPage() {
 
   const nextPromptKey = onboardingState?.onboarding.nextPromptKey ?? null
   const activePrompt = nextPromptKey ? enrichmentPromptConfig[nextPromptKey] : null
-  const activePromptSelectedCount = activePrompt
-    ? (enrichmentDraft[activePrompt.valuesField] as string[]).length
-    : 0
   const activePromptOptions = activePrompt?.options ?? []
   const hasMorePromptOptions = activePromptOptions.length > 5
   const visiblePromptOptions = showAllPromptOptions ? activePromptOptions : activePromptOptions.slice(0, 5)
@@ -455,7 +452,6 @@ export default function SettingsPage() {
           <CardHeader className="border-b border-border/40 px-4 py-3">
             <CardTitle className="text-sm font-medium leading-tight">{activePrompt.title}</CardTitle>
             <CardDescription className="text-xs">{activePrompt.hint}</CardDescription>
-            <CardDescription className="text-[11px]">{activePromptSelectedCount}/{activePrompt.max} selected</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2.5 px-4 py-3">
             <div className="flex flex-wrap gap-2">

@@ -278,9 +278,6 @@ export default function DashboardPage() {
   }
 
   const activePrompt = nextPromptKey ? enrichmentPromptConfig[nextPromptKey] : null
-  const activePromptSelectedCount = activePrompt
-    ? (enrichmentDraft[activePrompt.valuesField] as string[]).length
-    : 0
   const activePromptOptions = activePrompt?.options ?? []
   const hasMorePromptOptions = activePromptOptions.length > 5
   const visiblePromptOptions = showAllPromptOptions ? activePromptOptions : activePromptOptions.slice(0, 5)
@@ -396,9 +393,6 @@ export default function DashboardPage() {
           <CardHeader className="border-b border-border/40 px-4 py-3">
             <CardTitle className="text-sm font-medium leading-tight">{activePrompt.title}</CardTitle>
             <p className="text-xs text-muted-foreground">{activePrompt.hint}</p>
-            <p className="text-[11px] text-muted-foreground">
-              {activePromptSelectedCount}/{activePrompt.max} selected
-            </p>
           </CardHeader>
           <CardContent className="space-y-2.5 px-4 py-3">
             <div className="flex flex-wrap gap-1.5">
