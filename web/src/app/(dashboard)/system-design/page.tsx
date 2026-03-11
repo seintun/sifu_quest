@@ -79,8 +79,9 @@ function LogConceptForm({ onSubmit }: { onSubmit: () => void }) {
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label>Concept Name</Label>
+            <Label htmlFor="sd-concept">Concept Name</Label>
             <Input
+              id="sd-concept"
               value={form.concept}
               onChange={e => setForm({ ...form, concept: e.target.value })}
               placeholder="e.g., Rate Limiter"
@@ -102,8 +103,9 @@ function LogConceptForm({ onSubmit }: { onSubmit: () => void }) {
             </Select>
           </div>
           <div>
-            <Label>Notes (optional)</Label>
+            <Label htmlFor="sd-notes">Notes (optional)</Label>
             <Input
+              id="sd-notes"
               value={form.notes}
               onChange={e => setForm({ ...form, notes: e.target.value })}
               placeholder="Key takeaway..."

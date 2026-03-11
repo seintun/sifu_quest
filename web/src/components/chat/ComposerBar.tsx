@@ -47,21 +47,25 @@ export function ComposerBar({
         />
         {isStreaming ? (
           <Button
+            data-testid="composer-stop-button"
             type="button"
             size="icon"
             variant="outline"
             onClick={onStop}
             className="h-9 w-9 shrink-0"
+            aria-label="Stop generating response"
           >
             <Square className="h-3.5 w-3.5" />
           </Button>
         ) : (
           <Button
+            data-testid="composer-send-button"
             type="button"
             size="icon"
             onClick={onSend}
             disabled={!input.trim() || isDisabled}
             className="h-9 w-9 shrink-0"
+            aria-label="Send message"
           >
             <Send className="h-3.5 w-3.5" />
           </Button>

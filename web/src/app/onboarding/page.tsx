@@ -111,6 +111,7 @@ function Chip({
 }) {
   return (
     <button
+      data-testid={`chip-${label.toLowerCase().replace(/\s+/g, '-')}`}
       type="button"
       onClick={onClick}
       className={cn(
@@ -351,11 +352,13 @@ export default function OnboardingPage() {
           <Progress value={progress} className="mt-3 h-1.5" />
         </div>
 
-        <div className="animate-fade-in space-y-5">
+        <div className="animate-fade-in space-y-5" data-testid={`onboarding-step-${currentStep}`}>
           {currentStep === 'name' && (
             <div className="space-y-3">
-              <label className="block text-lg font-medium">What should we call you?</label>
+              <label htmlFor="name-input" className="block text-lg font-medium">What should we call you?</label>
               <Input
+                id="name-input"
+                data-testid="onboarding-name-input"
                 value={core.name}
                 onChange={(event) => setCore((prev) => ({ ...prev, name: event.target.value }))}
                 onBlur={() => setCore((prev) => ({ ...prev, name: toTitleCase(prev.name) }))}
@@ -435,6 +438,7 @@ export default function OnboardingPage() {
               </div>
 
               <Input
+                aria-label="Optional context for your situation"
                 value={core.contextNote}
                 onChange={(event) => setCore((prev) => ({ ...prev, contextNote: event.target.value }))}
                 placeholder="Optional context (company, role scope, constraints)"
@@ -463,6 +467,7 @@ export default function OnboardingPage() {
                   ))}
                 </div>
                 <Input
+                  aria-label="Custom timeline"
                   value={core.timelineCustom}
                   onChange={(event) =>
                     setCore((prev) => ({
@@ -489,6 +494,7 @@ export default function OnboardingPage() {
                   ))}
                 </div>
                 <Input
+                  aria-label="Custom hours per week"
                   value={core.hoursPerWeekCustom}
                   onChange={(event) =>
                     setCore((prev) => ({
@@ -526,6 +532,7 @@ export default function OnboardingPage() {
                 ))}
               </div>
               <Input
+                aria-label="Custom role"
                 value={core.targetRolesCustom}
                 onChange={(event) => setCore((prev) => ({ ...prev, targetRolesCustom: event.target.value }))}
                 placeholder="Or add a custom role"
@@ -557,6 +564,7 @@ export default function OnboardingPage() {
                 ))}
               </div>
               <Input
+                aria-label="Custom interview language"
                 value={core.interviewLanguageCustom}
                 onChange={(event) =>
                   setCore((prev) => ({
@@ -593,6 +601,7 @@ export default function OnboardingPage() {
                 ))}
               </div>
               <Input
+                aria-label="Custom growth area"
                 value={core.weaknessesCustom}
                 onChange={(event) => setCore((prev) => ({ ...prev, weaknessesCustom: event.target.value }))}
                 placeholder="Optional custom growth area"
@@ -604,6 +613,7 @@ export default function OnboardingPage() {
 
         <div className="flex justify-between mt-8">
           <Button
+            data-testid="onboarding-back-button"
             variant="ghost"
             onClick={() => setStepIndex((prev) => Math.max(prev - 1, 0))}
             disabled={stepIndex === 0}
@@ -611,6 +621,7 @@ export default function OnboardingPage() {
             Back
           </Button>
           <Button
+            data-testid="onboarding-next-button"
             onClick={() => {
               if (stepIndex === steps.length - 1) {
                 void handleSubmitCore()

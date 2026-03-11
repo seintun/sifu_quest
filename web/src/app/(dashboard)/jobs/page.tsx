@@ -125,8 +125,9 @@ function AddApplicationForm({ onSubmit }: { onSubmit: () => void }) {
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label>Company</Label>
+            <Label htmlFor="job-company">Company</Label>
             <Input
+              id="job-company"
               value={form.company}
               onChange={e => setForm({ ...form, company: e.target.value })}
               placeholder="e.g., Google"
@@ -134,8 +135,9 @@ function AddApplicationForm({ onSubmit }: { onSubmit: () => void }) {
             />
           </div>
           <div>
-            <Label>Role</Label>
+            <Label htmlFor="job-role">Role</Label>
             <Input
+              id="job-role"
               value={form.role}
               onChange={e => setForm({ ...form, role: e.target.value })}
               placeholder="e.g., Senior Software Engineer"
@@ -156,8 +158,9 @@ function AddApplicationForm({ onSubmit }: { onSubmit: () => void }) {
             </Select>
           </div>
           <div>
-            <Label>Notes (optional)</Label>
+            <Label htmlFor="job-notes">Notes (optional)</Label>
             <Input
+              id="job-notes"
               value={form.notes}
               onChange={e => setForm({ ...form, notes: e.target.value })}
               placeholder="Referral from..."
