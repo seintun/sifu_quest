@@ -31,7 +31,7 @@ export function ComposerBar({
   return (
     <div
       data-testid="composer-bar"
-      className="border-t border-border px-2.5 pt-1.5 pb-[max(0.15rem,calc(env(safe-area-inset-bottom,0px)*0.28))] md:px-3 md:pt-2 md:pb-2.5 shrink-0 bg-background/95 supports-backdrop-filter:backdrop-blur"
+      className="border-t border-border px-2.5 pt-1 pb-[max(0.1rem,calc(env(safe-area-inset-bottom,0px)*0.08))] md:px-3 md:pt-2 md:pb-2.5 shrink-0 bg-background/95 supports-backdrop-filter:backdrop-blur"
     >
       <div className="flex items-end gap-1.5 md:gap-2">
         <Textarea

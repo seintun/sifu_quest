@@ -261,7 +261,7 @@ export default function CoachPage() {
         </div>
       )}
 
-      <Card className="flex-1 border-border bg-background overflow-hidden flex flex-col min-h-0">
+      <Card className="flex-1 border-border bg-background overflow-hidden flex flex-col min-h-0 py-0 gap-0">
         <CardContent className="p-0 flex-1 flex flex-col min-h-0 relative">
           {!isLoaded ? (
             <div className="flex-1 grid place-items-center text-sm text-muted-foreground">Loading chat...</div>
