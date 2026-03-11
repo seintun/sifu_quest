@@ -393,8 +393,8 @@ export default function PlanPage() {
           />
         )}
         {fallbackMarkdownContent ? (
-          <Card className="border-border bg-surface">
-            <CardContent className="px-4 py-4 sm:px-6 sm:py-5">
+          <Card className="border-border bg-surface pt-0">
+            <CardContent className="px-4 pt-1 pb-4 sm:px-6 sm:pt-1 sm:pb-5 [&>*:first-child]:!mt-0">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
                 {fallbackMarkdownContent}
               </ReactMarkdown>
