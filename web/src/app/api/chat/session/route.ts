@@ -13,7 +13,44 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 const CHAT_SESSION_UNAVAILABLE_MESSAGE = 'We could not load your chat right now. Please refresh and try again.'
-const CHAT_SCHEMA_REQUIRED_MESSAGE = 'Database schema is out of date. Apply migration 20260310224500_chat_provider_model_telemetry.sql and retry.'
+
+const SESSION_SELECT_WITH_TELEMETRY = 'id, title, created_at, message_count, provider, model, user_turns_count, input_tokens_total, output_tokens_total, total_tokens_total, estimated_cost_microusd_total'
+const SESSION_SELECT_LEGACY = 'id, title, created_at, message_count'
+const MESSAGE_SELECT_WITH_TELEMETRY = 'role, content, created_at, provider, model, input_tokens, output_tokens, total_tokens, estimated_cost_microusd, latency_ms'
+const MESSAGE_SELECT_LEGACY = 'role, content, created_at, tokens_used'
+
+type SessionRow = {
+  id: string
+  title: string | null
+  created_at: string
+  message_count: number | null
+  provider?: string | null
+  model?: string | null
+  user_turns_count?: number | null
+  input_tokens_total?: number | null
+  output_tokens_total?: number | null
+  total_tokens_total?: number | null
+  estimated_cost_microusd_total?: number | null
+}
+
+type MessageRow = {
+  role: string
+  content: string
+  created_at: string
+  provider?: string | null
+  model?: string | null
+  input_tokens?: number | null
+  output_tokens?: number | null
+  total_tokens?: number | null
+  estimated_cost_microusd?: number | null
+  latency_ms?: number | null
+  tokens_used?: number | null
+}
+
+function estimateLegacyUserTurns(messageCount: number | null | undefined): number {
+  const totalMessages = messageCount ?? 0
+  return totalMessages > 0 ? Math.floor(totalMessages / 2) : 0
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,9 +72,12 @@ export async function GET(request: NextRequest) {
     const hasAnthropicKey = await hasEncryptedProviderApiKey(userId, 'anthropic')
     const freeQuota = computeFreeQuota(userProfile)
 
-    const { data: chatSession, error: sessionError } = await supabase
+    let chatSession: SessionRow | null = null
+    let sessionTelemetryAvailable = true
+
+    const modernSessionQuery = await supabase
       .from('chat_sessions')
-      .select('id, title, created_at, message_count, provider, model, user_turns_count, input_tokens_total, output_tokens_total, total_tokens_total, estimated_cost_microusd_total')
+      .select(SESSION_SELECT_WITH_TELEMETRY)
       .eq('user_id', userId)
       .eq('mode', mode)
       .eq('is_archived', false)
@@ -45,14 +85,31 @@ export async function GET(request: NextRequest) {
       .limit(1)
       .single()
 
-    if (sessionError && sessionError.code !== 'PGRST116') {
-      if (isMissingSessionTelemetryColumnError(sessionError)) {
+    if (!modernSessionQuery.error || modernSessionQuery.error.code === 'PGRST116') {
+      chatSession = (modernSessionQuery.data as SessionRow | null) ?? null
+    } else if (isMissingSessionTelemetryColumnError(modernSessionQuery.error)) {
+      sessionTelemetryAvailable = false
+      const legacySessionQuery = await supabase
+        .from('chat_sessions')
+        .select(SESSION_SELECT_LEGACY)
+        .eq('user_id', userId)
+        .eq('mode', mode)
+        .eq('is_archived', false)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (legacySessionQuery.error && legacySessionQuery.error.code !== 'PGRST116') {
+        console.error(legacySessionQuery.error)
         return NextResponse.json(
-          { error: 'db_migration_required', message: CHAT_SCHEMA_REQUIRED_MESSAGE },
-          { status: 503 },
+          { error: 'chat_session_unavailable', message: CHAT_SESSION_UNAVAILABLE_MESSAGE },
+          { status: 500 },
         )
       }
-      console.error(sessionError)
+
+      chatSession = (legacySessionQuery.data as SessionRow | null) ?? null
+    } else {
+      console.error(modernSessionQuery.error)
       return NextResponse.json(
         { error: 'chat_session_unavailable', message: CHAT_SESSION_UNAVAILABLE_MESSAGE },
         { status: 500 },
@@ -85,8 +142,8 @@ export async function GET(request: NextRequest) {
 
     const selectionFromSession = await resolveProviderSelection(
       {
-        preferredProvider: chatSession.provider,
-        preferredModel: chatSession.model,
+        preferredProvider: chatSession.provider ?? null,
+        preferredModel: chatSession.model ?? null,
         hasAnthropicKey,
       },
     )
@@ -95,26 +152,51 @@ export async function GET(request: NextRequest) {
       ? selectionFromSession.selection
       : fallbackSelection
 
-    const { data: messages, error: messagesError } = await supabase
+    let messages: MessageRow[] = []
+    let messageTelemetryAvailable = true
+
+    const modernMessagesQuery = await supabase
       .from('chat_messages')
-      .select('role, content, created_at, provider, model, input_tokens, output_tokens, total_tokens, estimated_cost_microusd, latency_ms')
+      .select(MESSAGE_SELECT_WITH_TELEMETRY)
       .eq('session_id', chatSession.id)
       .eq('user_id', userId)
       .order('created_at', { ascending: true })
 
-    if (messagesError) {
-      if (isMissingMessageTelemetryColumnError(messagesError)) {
+    if (!modernMessagesQuery.error) {
+      messages = (modernMessagesQuery.data as MessageRow[] | null) ?? []
+    } else if (isMissingMessageTelemetryColumnError(modernMessagesQuery.error)) {
+      messageTelemetryAvailable = false
+      const legacyMessagesQuery = await supabase
+        .from('chat_messages')
+        .select(MESSAGE_SELECT_LEGACY)
+        .eq('session_id', chatSession.id)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true })
+
+      if (legacyMessagesQuery.error) {
+        console.error(legacyMessagesQuery.error)
         return NextResponse.json(
-          { error: 'db_migration_required', message: CHAT_SCHEMA_REQUIRED_MESSAGE },
-          { status: 503 },
+          { error: 'chat_session_unavailable', message: CHAT_SESSION_UNAVAILABLE_MESSAGE },
+          { status: 500 },
         )
       }
-      console.error(messagesError)
+
+      messages = (legacyMessagesQuery.data as MessageRow[] | null) ?? []
+    } else {
+      console.error(modernMessagesQuery.error)
       return NextResponse.json(
         { error: 'chat_session_unavailable', message: CHAT_SESSION_UNAVAILABLE_MESSAGE },
         { status: 500 },
       )
     }
+
+    const legacyTotalTokens = messageTelemetryAvailable
+      ? 0
+      : messages.reduce((sum, message) => sum + (message.role === 'assistant' ? (message.tokens_used ?? 0) : 0), 0)
+
+    const userTurns = sessionTelemetryAvailable
+      ? (chatSession.user_turns_count ?? estimateLegacyUserTurns(chatSession.message_count))
+      : estimateLegacyUserTurns(chatSession.message_count)
 
     return NextResponse.json({
       session: {
@@ -129,11 +211,11 @@ export async function GET(request: NextRequest) {
       freeQuota,
       selection: effectiveSelection,
       metrics: {
-        userTurns: chatSession.user_turns_count ?? 0,
-        inputTokens: chatSession.input_tokens_total ?? 0,
-        outputTokens: chatSession.output_tokens_total ?? 0,
-        totalTokens: chatSession.total_tokens_total ?? 0,
-        estimatedCostMicrousd: chatSession.estimated_cost_microusd_total ?? 0,
+        userTurns,
+        inputTokens: sessionTelemetryAvailable ? (chatSession.input_tokens_total ?? 0) : 0,
+        outputTokens: sessionTelemetryAvailable ? (chatSession.output_tokens_total ?? 0) : 0,
+        totalTokens: sessionTelemetryAvailable ? (chatSession.total_tokens_total ?? legacyTotalTokens) : legacyTotalTokens,
+        estimatedCostMicrousd: sessionTelemetryAvailable ? (chatSession.estimated_cost_microusd_total ?? 0) : 0,
       },
     })
   } catch (error) {
@@ -186,7 +268,10 @@ export async function POST(request: NextRequest) {
       .eq('mode', mode)
       .eq('is_archived', false)
 
-    const { data: newSession, error } = await supabase
+    let newSession: SessionRow | null = null
+    let sessionTelemetryAvailable = true
+
+    const modernInsert = await supabase
       .from('chat_sessions')
       .insert({
         user_id: userId,
@@ -195,20 +280,38 @@ export async function POST(request: NextRequest) {
         provider: selection.selection.provider,
         model: selection.selection.model,
       })
-      .select('id, title, created_at, message_count, provider, model, user_turns_count, input_tokens_total, output_tokens_total, total_tokens_total, estimated_cost_microusd_total')
+      .select(SESSION_SELECT_WITH_TELEMETRY)
       .single()
 
-    const freeQuota = computeFreeQuota(userProfile)
+    if (!modernInsert.error) {
+      newSession = modernInsert.data as SessionRow
+    } else if (isMissingSessionTelemetryColumnError(modernInsert.error)) {
+      sessionTelemetryAvailable = false
+      const legacyInsert = await supabase
+        .from('chat_sessions')
+        .insert({
+          user_id: userId,
+          mode,
+          title: title || `Chat - ${mode}`,
+        })
+        .select(SESSION_SELECT_LEGACY)
+        .single()
 
-    if (error) {
-      if (isMissingSessionTelemetryColumnError(error)) {
-        return NextResponse.json(
-          { error: 'db_migration_required', message: CHAT_SCHEMA_REQUIRED_MESSAGE },
-          { status: 503 },
-        )
+      if (legacyInsert.error) {
+        console.error(legacyInsert.error)
+        if (legacyInsert.error.code === '23503') {
+          return NextResponse.json(
+            { error: 'Unable to create chat session for this account. Please sign out and sign in again.' },
+            { status: 409 },
+          )
+        }
+        return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
       }
-      console.error(error)
-      if (error.code === '23503') {
+
+      newSession = legacyInsert.data as SessionRow
+    } else {
+      console.error(modernInsert.error)
+      if (modernInsert.error.code === '23503') {
         return NextResponse.json(
           { error: 'Unable to create chat session for this account. Please sign out and sign in again.' },
           { status: 409 },
@@ -217,8 +320,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
     }
 
+    const freeQuota = computeFreeQuota(userProfile)
+
     // Persist account-level defaults for future sessions.
-    await supabase
+    const { error: profileUpdateError } = await supabase
       .from('user_profiles')
       .update({
         default_provider: selection.selection.provider,
@@ -226,16 +331,28 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', userId)
 
+    if (profileUpdateError) {
+      console.warn('Unable to persist default provider/model on profile', profileUpdateError)
+    }
+
+    const userTurns = sessionTelemetryAvailable
+      ? (newSession?.user_turns_count ?? 0)
+      : estimateLegacyUserTurns(newSession?.message_count)
+
     return NextResponse.json({
-      session: newSession,
+      session: {
+        ...newSession,
+        provider: selection.selection.provider,
+        model: selection.selection.model,
+      },
       freeQuota,
       selection: selection.selection,
       metrics: {
-        userTurns: newSession.user_turns_count ?? 0,
-        inputTokens: newSession.input_tokens_total ?? 0,
-        outputTokens: newSession.output_tokens_total ?? 0,
-        totalTokens: newSession.total_tokens_total ?? 0,
-        estimatedCostMicrousd: newSession.estimated_cost_microusd_total ?? 0,
+        userTurns,
+        inputTokens: sessionTelemetryAvailable ? (newSession?.input_tokens_total ?? 0) : 0,
+        outputTokens: sessionTelemetryAvailable ? (newSession?.output_tokens_total ?? 0) : 0,
+        totalTokens: sessionTelemetryAvailable ? (newSession?.total_tokens_total ?? 0) : 0,
+        estimatedCostMicrousd: sessionTelemetryAvailable ? (newSession?.estimated_cost_microusd_total ?? 0) : 0,
       },
     })
   } catch (error) {

@@ -5,7 +5,6 @@ import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
-const CHAT_SCHEMA_REQUIRED_MESSAGE = 'Database schema is out of date. Apply migration 20260310224500_chat_provider_model_telemetry.sql and retry.'
 
 type UsageAccumulator = {
   userTurns: number
@@ -14,6 +13,18 @@ type UsageAccumulator = {
   outputTokens: number
   totalTokens: number
   estimatedCostMicrousd: number
+}
+
+type UsageRow = {
+  role: string
+  provider?: string | null
+  model?: string | null
+  created_at: string
+  input_tokens?: number | null
+  output_tokens?: number | null
+  total_tokens?: number | null
+  estimated_cost_microusd?: number | null
+  tokens_used?: number | null
 }
 
 function createAccumulator(): UsageAccumulator {
@@ -47,20 +58,32 @@ export async function GET() {
     const supabase = createAdminClient()
     const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
-    const { data: allMessages, error: messagesError } = await supabase
+    const modernMessages = await supabase
       .from('chat_messages')
       .select('role, provider, model, created_at, input_tokens, output_tokens, total_tokens, estimated_cost_microusd')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
 
-    if (messagesError) {
-      if (isMissingMessageTelemetryColumnError(messagesError)) {
-        return NextResponse.json(
-          { error: 'db_migration_required', message: CHAT_SCHEMA_REQUIRED_MESSAGE },
-          { status: 503 },
-        )
+    let allMessages: UsageRow[] = []
+    let telemetryColumnsAvailable = true
+
+    if (!modernMessages.error) {
+      allMessages = (modernMessages.data as UsageRow[] | null) ?? []
+    } else if (isMissingMessageTelemetryColumnError(modernMessages.error)) {
+      telemetryColumnsAvailable = false
+      const legacyMessages = await supabase
+        .from('chat_messages')
+        .select('role, created_at, tokens_used')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+
+      if (legacyMessages.error) {
+        throw new Error(legacyMessages.error.message)
       }
-      throw new Error(messagesError.message)
+
+      allMessages = (legacyMessages.data as UsageRow[] | null) ?? []
+    } else {
+      throw new Error(modernMessages.error.message)
     }
 
     const lifetime = createAccumulator()
@@ -77,10 +100,10 @@ export async function GET() {
         ? { userTurns: 1 }
         : {
             assistantTurns: 1,
-            inputTokens: row.input_tokens ?? 0,
-            outputTokens: row.output_tokens ?? 0,
-            totalTokens: row.total_tokens ?? 0,
-            estimatedCostMicrousd: row.estimated_cost_microusd ?? 0,
+            inputTokens: telemetryColumnsAvailable ? (row.input_tokens ?? 0) : 0,
+            outputTokens: telemetryColumnsAvailable ? (row.output_tokens ?? 0) : 0,
+            totalTokens: telemetryColumnsAvailable ? (row.total_tokens ?? 0) : (row.tokens_used ?? 0),
+            estimatedCostMicrousd: telemetryColumnsAvailable ? (row.estimated_cost_microusd ?? 0) : 0,
           }
 
       addToAccumulator(lifetime, delta)
@@ -89,8 +112,10 @@ export async function GET() {
       }
 
       if (!isUserTurn) {
-        const providerKey = row.provider || 'unknown'
-        const modelKey = `${providerKey}::${row.model || 'unknown'}`
+        const providerKey = telemetryColumnsAvailable ? (row.provider || 'unknown') : 'legacy'
+        const modelKey = telemetryColumnsAvailable
+          ? `${providerKey}::${row.model || 'unknown'}`
+          : 'legacy::legacy'
 
         if (!providerBreakdown.has(providerKey)) {
           providerBreakdown.set(providerKey, createAccumulator())

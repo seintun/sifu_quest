@@ -20,7 +20,6 @@ import { NextRequest } from 'next/server'
 export const runtime = 'nodejs'
 const CHAT_UNAVAILABLE_MESSAGE = 'We hit a temporary issue loading your workspace. Please try again in a moment.'
 const CHAT_STREAM_ERROR_MESSAGE = 'We hit a temporary issue generating a response. Please try again.'
-const CHAT_SCHEMA_REQUIRED_MESSAGE = 'Database schema is out of date. Apply migration 20260310224500_chat_provider_model_telemetry.sql and retry.'
 
 const MODE_TO_FILES: Record<string, { mode: string; memory: string[] }> = {
   dsa: { mode: 'dsa.md', memory: ['profile.md', 'dsa-patterns.md', 'progress.md'] },
@@ -357,25 +356,37 @@ export async function POST(request: NextRequest) {
 
       if (ownedSessionError) {
         if (isMissingSessionTelemetryColumnError(ownedSessionError)) {
+          const { data: legacyOwnedSession, error: legacyOwnedSessionError } = await supabase
+            .from('chat_sessions')
+            .select('id')
+            .eq('id', sessionId)
+            .eq('user_id', userId)
+            .maybeSingle()
+
+          if (legacyOwnedSessionError) {
+            return new Response(JSON.stringify({
+              error: 'chat_unavailable',
+              message: CHAT_UNAVAILABLE_MESSAGE,
+            }), {
+              status: 500,
+              headers: { 'Content-Type': 'application/json' },
+            })
+          }
+
+          if (legacyOwnedSession) {
+            sessionPreferenceProvider = null
+            sessionPreferenceModel = null
+          }
+        } else {
           return new Response(JSON.stringify({
-            error: 'db_migration_required',
-            message: CHAT_SCHEMA_REQUIRED_MESSAGE,
+            error: 'chat_unavailable',
+            message: CHAT_UNAVAILABLE_MESSAGE,
           }), {
-            status: 503,
+            status: 500,
             headers: { 'Content-Type': 'application/json' },
           })
         }
-
-        return new Response(JSON.stringify({
-          error: 'chat_unavailable',
-          message: CHAT_UNAVAILABLE_MESSAGE,
-        }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      }
-
-      if (ownedSession) {
+      } else if (ownedSession) {
         sessionPreferenceProvider = ownedSession.provider
         sessionPreferenceModel = ownedSession.model
       }
