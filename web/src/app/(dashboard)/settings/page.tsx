@@ -84,6 +84,47 @@ export default function SettingsPage() {
   )
 }
 
+function SettingsSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Card className="border-border bg-surface/80 backdrop-blur-sm animate-pulse">
+        <CardHeader>
+          <div className="h-5 w-32 bg-muted rounded mb-2" />
+          <div className="h-4 w-64 bg-muted/60 rounded" />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="h-4 w-24 bg-muted rounded" />
+          <div className="h-10 w-full bg-muted/40 rounded" />
+          <div className="h-9 w-32 bg-muted rounded mt-2" />
+        </CardContent>
+      </Card>
+      <Card className="border-border bg-surface/80 backdrop-blur-sm animate-pulse">
+        <CardHeader>
+          <div className="h-5 w-40 bg-muted rounded mb-2" />
+          <div className="h-4 w-72 bg-muted/60 rounded" />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="h-4 w-24 bg-muted rounded" />
+          <div className="h-10 w-full bg-muted/40 rounded" />
+          <div className="h-9 w-32 bg-muted rounded mt-2" />
+        </CardContent>
+      </Card>
+      <Card className="border-border bg-surface/80 backdrop-blur-sm animate-pulse">
+        <CardHeader>
+          <div className="h-5 w-40 bg-muted rounded mb-2" />
+          <div className="h-4 w-64 bg-muted/60 rounded" />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="h-32 bg-muted/40 rounded" />
+            <div className="h-32 bg-muted/40 rounded" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 function SettingsPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -426,8 +467,6 @@ function SettingsPageContent() {
 
   const formatMicrousd = useCallback((microusd: number) => `$${(microusd / 1_000_000).toFixed(4)}`, [])
 
-  if (!isAccountStatusInitialized) return <div className="p-8 text-muted-foreground">Loading settings...</div>
-
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
@@ -435,17 +474,21 @@ function SettingsPageContent() {
         <p className="text-muted-foreground text-sm mt-1">Manage profile info, API access, and account safety controls.</p>
       </div>
 
-      {message && (
-        <div
-          className={`rounded-lg border px-4 py-3 text-sm ${
-            message.type === 'success'
-              ? 'border-success/30 bg-success/10 text-success'
-              : 'border-danger/30 bg-danger/10 text-danger'
-          }`}
-        >
-          {message.text}
-        </div>
-      )}
+      {!isAccountStatusInitialized ? (
+        <SettingsSkeleton />
+      ) : (
+        <>
+          {message && (
+            <div
+              className={`rounded-lg border px-4 py-3 text-sm ${
+                message.type === 'success'
+                  ? 'border-success/30 bg-success/10 text-success'
+                  : 'border-danger/30 bg-danger/10 text-danger'
+              }`}
+            >
+              {message.text}
+            </div>
+          )}
 
       {showGuestUpgradeSection && (
         <Card className="border-streak/30 bg-streak/5 shadow-glow-streak">
@@ -743,6 +786,8 @@ function SettingsPageContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </>
+      )}
     </div>
   )
 }

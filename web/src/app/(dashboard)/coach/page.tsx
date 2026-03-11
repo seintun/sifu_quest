@@ -30,6 +30,34 @@ const MODES: ModeOption[] = [
   { value: 'business-ideas', label: 'Business Ideas' },
 ]
 
+function ChatSkeleton() {
+  return (
+    <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex gap-4 max-w-[85%]">
+        <div className="h-8 w-8 rounded-full bg-muted animate-pulse shrink-0" />
+        <div className="space-y-2 flex-1">
+          <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+          <div className="h-20 w-full bg-muted/40 animate-pulse rounded-2xl rounded-tl-none" />
+        </div>
+      </div>
+      <div className="flex gap-4 max-w-[85%] ml-auto flex-row-reverse">
+        <div className="h-8 w-8 rounded-full bg-primary/20 animate-pulse shrink-0" />
+        <div className="space-y-2 flex-1 flex flex-col items-end">
+          <div className="h-4 w-16 bg-muted animate-pulse rounded" />
+          <div className="h-12 w-3/4 bg-primary/10 animate-pulse rounded-2xl rounded-tr-none" />
+        </div>
+      </div>
+      <div className="flex gap-4 max-w-[85%]">
+        <div className="h-8 w-8 rounded-full bg-muted animate-pulse shrink-0" />
+        <div className="space-y-2 flex-1">
+          <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+          <div className="h-32 w-5/6 bg-muted/40 animate-pulse rounded-2xl rounded-tl-none" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
   const {
@@ -264,7 +292,7 @@ export default function CoachPage() {
       <Card className="flex-1 border-border bg-background overflow-hidden flex flex-col min-h-0 py-0 gap-0">
         <CardContent className="p-0 flex-1 flex flex-col min-h-0 relative">
           {!isLoaded ? (
-            <div className="flex-1 grid place-items-center text-sm text-muted-foreground">Loading chat...</div>
+            <ChatSkeleton />
           ) : bootstrapError ? (
             <div className="flex-1 grid place-items-center px-4">
               <div className="max-w-sm text-center space-y-2">
