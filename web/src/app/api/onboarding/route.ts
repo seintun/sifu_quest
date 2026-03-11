@@ -1,8 +1,8 @@
 import { auth } from '@/auth'
+import { createApiErrorResponse, createRequestId } from '@/lib/api-error-response'
 import { getPersistableOnboardingDisplayName } from '@/lib/onboarding-name'
 import {
   markCoreOnboardingComplete,
-  OnboardingMigrationRequiredError,
   persistCoreOnboardingFiles,
   queueOnboardingPlanJob,
 } from '@/lib/onboarding-service'
@@ -18,13 +18,19 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
+  const requestId = createRequestId()
+  let userId: string | null = null
+
   try {
     const session = await auth()
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json(
+        { error: 'Unauthorized', code: 'unauthorized', requestId },
+        { status: 401 },
+      )
     }
 
-    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
+    userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const legacyPayload = await request.json()
     const draft = fromLegacyOnboardingPayload(legacyPayload)
 
@@ -43,12 +49,20 @@ export async function POST(request: NextRequest) {
       if (profileUpdateError) {
         if ((profileUpdateError as { code?: string }).code === '23503') {
           return NextResponse.json(
-            { error: 'User profile does not exist for onboarding user.' },
+            {
+              error: 'User profile does not exist for onboarding user.',
+              code: 'user_profile_missing',
+              requestId,
+            },
             { status: 404 },
           )
         }
         return NextResponse.json(
-          { error: 'Failed to update user profile during onboarding.' },
+          {
+            error: 'Failed to update user profile during onboarding.',
+            code: 'profile_update_failed',
+            requestId,
+          },
           { status: 500 },
         )
       }
@@ -64,13 +78,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, planStatus: 'queued' })
   } catch (error) {
-    if (error instanceof OnboardingMigrationRequiredError) {
-      return NextResponse.json({ error: error.message }, { status: 503 })
-    }
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json(
-      { error: message || 'We could not process onboarding right now. Please try again.' },
-      { status: 500 },
-    )
+    return createApiErrorResponse(error, {
+      route: '/api/onboarding',
+      requestId,
+      userId,
+      action: 'submit-legacy-onboarding',
+      fallbackMessage: 'We could not process onboarding right now. Please try again.',
+    })
   }
 }

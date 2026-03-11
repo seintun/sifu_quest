@@ -92,6 +92,12 @@ function toOnboardingStateWriteError(action: string, error: DbErrorLike | null |
   return new Error(`Failed to ${action}: ${detail}`)
 }
 
+function toDatabaseOperationError(action: string, error: DbErrorLike | null | undefined): Error {
+  const code = error?.code ? ` [${error.code}]` : ''
+  const detail = error?.message ?? 'Unknown database error'
+  return new Error(`Failed to ${action}${code}: ${detail}`)
+}
+
 function toErrorCode(error: unknown): string {
   if (error instanceof MemoryWriteError && error.dbCode === '23503') {
     return 'identity_mismatch'
@@ -355,7 +361,7 @@ export async function queueOnboardingPlanJob(
     )
 
   if (queueError) {
-    throw new Error(`Failed to queue onboarding plan job: ${queueError.message}`)
+    throw toDatabaseOperationError('queue onboarding plan job', queueError)
   }
 }
 
@@ -536,7 +542,7 @@ async function markPlanJobSuccess(userId: string, attemptCount: number): Promise
     .maybeSingle()
 
   if (jobError) {
-    throw new Error(`Failed to mark plan job successful: ${jobError.message}`)
+    throw toDatabaseOperationError('mark plan job successful', jobError)
   }
 
   // If no rows were updated, this run is stale (job was re-queued); don't finalize.
@@ -609,7 +615,7 @@ async function markPlanJobFailure(
     .maybeSingle()
 
   if (jobError) {
-    throw new Error(`Failed to mark plan job failure: ${jobError.message}`)
+    throw toDatabaseOperationError('mark plan job failure', jobError)
   }
 
   // If no rows were updated, this run is stale (job was re-queued); don't finalize.
@@ -649,7 +655,7 @@ async function runPlanJobForUser(userId: string): Promise<boolean> {
     .maybeSingle()
 
   if (jobError) {
-    throw new Error(`Failed to fetch onboarding plan job: ${jobError.message}`)
+    throw toDatabaseOperationError('fetch onboarding plan job', jobError)
   }
   if (!initialJob) {
     return false
@@ -679,7 +685,7 @@ async function runPlanJobForUser(userId: string): Promise<boolean> {
       .maybeSingle()
 
     if (requeueError) {
-      throw new Error(`Failed to requeue stale onboarding plan job: ${requeueError.message}`)
+      throw toDatabaseOperationError('requeue stale onboarding plan job', requeueError)
     }
 
     if (!requeuedJob) {
@@ -726,7 +732,7 @@ async function runPlanJobForUser(userId: string): Promise<boolean> {
     .maybeSingle()
 
   if (claimError) {
-    throw new Error(`Failed to claim onboarding plan job: ${claimError.message}`)
+    throw toDatabaseOperationError('claim onboarding plan job', claimError)
   }
   if (!claimedJob) {
     return false
@@ -766,7 +772,7 @@ export async function runOnboardingPlanJobs(limit: number = 5): Promise<{ proces
     .limit(limit)
 
   if (error) {
-    throw new Error(`Failed to load queued onboarding jobs: ${error.message}`)
+    throw toDatabaseOperationError('load queued onboarding jobs', error)
   }
 
   let processed = 0

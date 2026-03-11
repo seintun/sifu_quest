@@ -24,12 +24,17 @@ const modeFileCache = new Map<string, string>()
 export class MemoryWriteError extends Error {
   filename: string
   dbCode?: string
+  dbMessage?: string
 
-  constructor(filename: string, dbCode?: string) {
-    super(`Failed to save ${filename}`)
+  constructor(filename: string, dbCode?: string, dbMessage?: string) {
+    const suffix = [dbCode ? `code=${dbCode}` : null, dbMessage ? `message=${dbMessage}` : null]
+      .filter(Boolean)
+      .join(' ')
+    super(suffix ? `Failed to save ${filename} (${suffix})` : `Failed to save ${filename}`)
     this.name = 'MemoryWriteError'
     this.filename = filename
     this.dbCode = dbCode
+    this.dbMessage = dbMessage
   }
 }
 
@@ -161,7 +166,7 @@ export async function writeMemoryFile(
 
   if (error) {
     console.error(`Error writing memory file ${filename}:`, error)
-    throw new MemoryWriteError(filename, error.code)
+    throw new MemoryWriteError(filename, error.code, error.message)
   }
 
   // The database trigger 'snapshot_memory_version' will automatically record 
@@ -221,7 +226,7 @@ export async function writeMemoryFilesBatch(
     return
   }
 
-  throw new MemoryWriteError('batch', error.code)
+  throw new MemoryWriteError('batch', error.code, error.message)
 }
 
 export function getAllowedMemoryFiles(): string[] {

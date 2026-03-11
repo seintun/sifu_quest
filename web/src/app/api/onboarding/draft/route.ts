@@ -1,7 +1,7 @@
 import { auth } from '@/auth'
+import { createApiErrorResponse, createRequestId } from '@/lib/api-error-response'
 import {
   loadOnboardingState,
-  OnboardingMigrationRequiredError,
   updateOnboardingDraft,
 } from '@/lib/onboarding-service'
 import {
@@ -37,13 +37,19 @@ function hasAnyCoreAnswer(core: ReturnType<typeof normalizeCoreAnswers>): boolea
 }
 
 export async function PATCH(request: NextRequest) {
+  const requestId = createRequestId()
+  let userId: string | null = null
+
   try {
     const session = await auth()
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json(
+        { error: 'Unauthorized', code: 'unauthorized', requestId },
+        { status: 401 },
+      )
     }
 
-    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
+    userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const body = await request.json()
     const empty = createEmptyOnboardingDraftPayload()
 
@@ -73,10 +79,12 @@ export async function PATCH(request: NextRequest) {
     const refreshed = await loadOnboardingState(userId)
     return NextResponse.json(refreshed)
   } catch (error) {
-    if (error instanceof OnboardingMigrationRequiredError) {
-      return NextResponse.json({ error: error.message }, { status: 503 })
-    }
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return createApiErrorResponse(error, {
+      route: '/api/onboarding/draft',
+      requestId,
+      userId,
+      action: 'save-onboarding-draft',
+      fallbackMessage: 'Failed to save onboarding draft.',
+    })
   }
 }

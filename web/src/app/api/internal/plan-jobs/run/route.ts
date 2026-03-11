@@ -1,3 +1,4 @@
+import { createApiErrorResponse, createRequestId } from '@/lib/api-error-response'
 import { runOnboardingPlanJobs } from '@/lib/onboarding-service'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -13,18 +14,27 @@ function getWorkerSecret(): string | null {
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = createRequestId()
+
   try {
     const secret = getWorkerSecret()
     if (!secret) {
       return NextResponse.json(
-        { error: 'Worker secret is not configured.' },
+        {
+          error: 'Worker secret is not configured.',
+          code: 'worker_secret_missing',
+          requestId,
+        },
         { status: 503 },
       )
     }
 
     const incomingSecret = request.headers.get('x-onboarding-worker-secret')
     if (incomingSecret !== secret) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json(
+        { error: 'Unauthorized', code: 'unauthorized', requestId },
+        { status: 401 },
+      )
     }
 
     const body = await request.json().catch(() => ({}))
@@ -34,7 +44,11 @@ export async function POST(request: NextRequest) {
     const result = await runOnboardingPlanJobs(limit)
     return NextResponse.json({ success: true, ...result })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return createApiErrorResponse(error, {
+      route: '/api/internal/plan-jobs/run',
+      requestId,
+      action: 'run-onboarding-plan-jobs',
+      fallbackMessage: 'Failed to run onboarding plan worker.',
+    })
   }
 }

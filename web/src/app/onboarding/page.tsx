@@ -41,6 +41,24 @@ type AccountStatusResponse = {
   }
 }
 
+type ApiErrorPayload = {
+  error?: string
+  code?: string
+  requestId?: string
+}
+
+function formatApiError(payload: ApiErrorPayload | null | undefined, fallback: string): string {
+  if (!payload) {
+    return fallback
+  }
+  const parts = [
+    payload.error?.trim() || fallback,
+    payload.code ? `code: ${payload.code}` : null,
+    payload.requestId ? `requestId: ${payload.requestId}` : null,
+  ].filter(Boolean)
+  return parts.join(' | ')
+}
+
 function toTitleCase(str: string): string {
   return str
     .trim()
@@ -178,8 +196,10 @@ export default function OnboardingPage() {
           }
           return
         }
-        const data = await response.json().catch(() => ({ error: 'Unable to complete onboarding.' }))
-        toast.error('Onboarding Failed', { description: data.error || 'Please review your answers and try again.' })
+        const data = (await response.json().catch(() => null)) as ApiErrorPayload | null
+        toast.error('Onboarding Failed', {
+          description: formatApiError(data, 'Please review your answers and try again.'),
+        })
         return
       }
 
@@ -225,6 +245,11 @@ export default function OnboardingPage() {
             setCore((prev) => (prev.name.trim() ? prev : { ...prev, name: toTitleCase(namePrefill) }))
           }
         }
+      } catch (error) {
+        console.error('[onboarding/bootstrap] failed to load onboarding context', error)
+        toast.error('Setup Error', {
+          description: 'Unable to initialize onboarding context. Refresh and try again.',
+        })
       } finally {
         setBooting(false)
         setHydrated(true)
@@ -264,7 +289,7 @@ export default function OnboardingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(draft),
       }).catch(() => {
-        // Best effort. Local draft remains authoritative for resume.
+        console.warn('[onboarding/draft] autosave failed; local draft preserved')
       })
     }, 400)
 

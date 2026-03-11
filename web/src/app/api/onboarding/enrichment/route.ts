@@ -1,8 +1,8 @@
 import { auth } from '@/auth'
+import { createApiErrorResponse, createRequestId } from '@/lib/api-error-response'
 import {
   loadOnboardingState,
   markEnrichmentUpdated,
-  OnboardingMigrationRequiredError,
   persistProfileOnboardingFile,
 } from '@/lib/onboarding-service'
 import {
@@ -16,19 +16,29 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
+  const requestId = createRequestId()
+  let userId: string | null = null
+
   try {
     const session = await auth()
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json(
+        { error: 'Unauthorized', code: 'unauthorized', requestId },
+        { status: 401 },
+      )
     }
 
-    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
+    userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const body = await request.json()
     const state = await loadOnboardingState(userId)
 
     if (state.onboarding.status === 'not_started' || state.onboarding.status === 'in_progress') {
       return NextResponse.json(
-        { error: 'Complete core onboarding before enrichment updates.' },
+        {
+          error: 'Complete core onboarding before enrichment updates.',
+          code: 'onboarding_core_incomplete',
+          requestId,
+        },
         { status: 409 },
       )
     }
@@ -64,10 +74,12 @@ export async function POST(request: NextRequest) {
       plan: { status: 'not_queued' },
     })
   } catch (error) {
-    if (error instanceof OnboardingMigrationRequiredError) {
-      return NextResponse.json({ error: error.message }, { status: 503 })
-    }
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return createApiErrorResponse(error, {
+      route: '/api/onboarding/enrichment',
+      requestId,
+      userId,
+      action: 'save-onboarding-enrichment',
+      fallbackMessage: 'Failed to save enrichment answers.',
+    })
   }
 }
