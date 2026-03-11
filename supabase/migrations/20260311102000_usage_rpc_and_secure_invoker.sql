@@ -53,7 +53,7 @@ lifetime AS (
     COALESCE(SUM(estimated_cost_microusd) FILTER (WHERE role = 'assistant'), 0)::BIGINT AS estimated_cost_microusd
   FROM base
 ),
-trailing AS (
+trailing_window AS (
   SELECT
     COALESCE(COUNT(*) FILTER (WHERE role = 'user' AND created_at >= cutoff_param), 0)::INT AS user_turns,
     COALESCE(COUNT(*) FILTER (WHERE role = 'assistant' AND created_at >= cutoff_param), 0)::INT AS assistant_turns,
@@ -100,12 +100,12 @@ SELECT jsonb_build_object(
   ),
   'trailing30Days',
   jsonb_build_object(
-    'userTurns', trailing.user_turns,
-    'assistantTurns', trailing.assistant_turns,
-    'inputTokens', trailing.input_tokens,
-    'outputTokens', trailing.output_tokens,
-    'totalTokens', trailing.total_tokens,
-    'estimatedCostMicrousd', trailing.estimated_cost_microusd
+    'userTurns', trailing_window.user_turns,
+    'assistantTurns', trailing_window.assistant_turns,
+    'inputTokens', trailing_window.input_tokens,
+    'outputTokens', trailing_window.output_tokens,
+    'totalTokens', trailing_window.total_tokens,
+    'estimatedCostMicrousd', trailing_window.estimated_cost_microusd
   ),
   'providerBreakdown',
   COALESCE((
@@ -141,5 +141,5 @@ SELECT jsonb_build_object(
     FROM model_breakdown
   ), '[]'::jsonb)
 )
-FROM lifetime, trailing;
+FROM lifetime, trailing_window;
 $$ LANGUAGE sql SECURITY INVOKER SET search_path = public;
