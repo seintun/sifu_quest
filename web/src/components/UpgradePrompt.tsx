@@ -40,7 +40,7 @@ export function UpgradePrompt({ onClose }: UpgradePromptProps = {}) {
           </div>
           <CardTitle className="text-xl">You&apos;ve Reached the Guest Limit</CardTitle>
           <CardDescription className="text-foreground/80">
-            Guest sessions provide a 30-minute test flight with 5 free messages using our API key. 
+            Guest sessions provide a 30-minute test flight with 10 free messages on shared OpenRouter free models.
             To continue this session securely, please create a free account and bring your own Anthropic API key.
           </CardDescription>
         </CardHeader>

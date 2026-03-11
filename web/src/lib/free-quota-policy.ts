@@ -4,11 +4,13 @@ import {
   getQuotaErrorForLimit,
   shouldMarkQuotaExhaustedForLimit,
   isUsingFreeTier,
+  shouldEnforceProviderQuota,
   type FreeQuotaView,
   type QuotaProfile,
+  type QuotaProvider,
 } from './free-quota-policy-core'
 
-export { isUsingFreeTier, type FreeQuotaView, type QuotaProfile }
+export { isUsingFreeTier, shouldEnforceProviderQuota, type FreeQuotaView, type QuotaProfile, type QuotaProvider }
 
 export function computeFreeQuota(profile: QuotaProfile): FreeQuotaView {
   return computeFreeQuotaForLimit(profile, FREE_TIER_MAX_USER_MESSAGES)

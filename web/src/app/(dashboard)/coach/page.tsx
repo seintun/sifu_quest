@@ -13,8 +13,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { ApiKeyPrompt } from '@/components/ApiKeyPrompt'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { useChat, type ChatMessage } from '@/hooks/useChat'
+import { getAnthropicModelCostTier } from '@/lib/chat-provider-config'
 import 'highlight.js/styles/github-dark.css'
-import { MessageCircle, Send, Square, Trash2, Sparkles } from 'lucide-react'
+import { Coins, KeyRound, MessageCircle, Send, Square, Trash2, Sparkles } from 'lucide-react'
+import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, type ComponentType, type HTMLAttributes } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
@@ -44,6 +46,15 @@ const MODES = [
 
 type CodeBlockProps = HTMLAttributes<HTMLElement> & {
   node?: unknown
+}
+
+function CostTierIcons({ tier }: { tier: 1 | 2 | 3 }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-warning">
+      <Coins className="h-3 w-3" />
+      <span className="text-[11px] leading-none font-medium">x{tier}</span>
+    </span>
+  )
 }
 
 function CodeBlock({ className, children, node: _node, ...props }: CodeBlockProps) {
@@ -138,7 +149,29 @@ function ChatBubble({ message, isStreaming }: { message: ChatMessage; isStreamin
 export default function CoachPage() {
   const [mode, setMode] = useState('dsa')
   const selectedModeLabel = MODES.find(m => m.value === mode)?.label ?? mode
-  const { messages, setMessages, isStreaming, isLoaded, upgradeRequired, freeQuota, sendMessage, greet, clearHistory, stopStreaming } = useChat(mode)
+  const {
+    messages,
+    setMessages,
+    isStreaming,
+    isLoaded,
+    upgradeRequired,
+    freeQuota,
+    sendMessage,
+    greet,
+    clearHistory,
+    stopStreaming,
+    providers,
+    selectedProvider,
+    selectedModel,
+    selectedProviderInfo,
+    availableModelsForSelectedProvider,
+    sessionMetrics,
+    hasAnthropicKey,
+    streamPhase,
+    updateProviderSelection,
+    updateModelSelection,
+    formatMicrousd,
+  } = useChat(mode)
   const [accountIsGuest, setAccountIsGuest] = useState<boolean | null>(null)
   const [isAnonymousSession, setIsAnonymousSession] = useState<boolean | null>(null)
   const isGuest = isAnonymousSession === null ? (accountIsGuest ?? Boolean(freeQuota?.isGuest)) : isAnonymousSession
@@ -147,6 +180,11 @@ export default function CoachPage() {
   const [input, setInput] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const isQuotaBlocked = Boolean(
+    freeQuota?.isFreeTier &&
+    freeQuota.remaining <= 0 &&
+    !(selectedProvider === 'anthropic' && hasAnthropicKey),
+  )
 
   useEffect(() => {
     setDismissedPrompt(false)
@@ -185,7 +223,7 @@ export default function CoachPage() {
   useEffect(() => {
     if (!isLoaded) return
     if (messages.length === 0 && hasGreetedRef.current !== mode && !upgradeRequired) {
-      if (freeQuota?.isFreeTier && freeQuota.remaining <= 0) {
+      if (isQuotaBlocked) {
         hasGreetedRef.current = mode
         setMessages([{
           role: 'assistant',
@@ -196,7 +234,7 @@ export default function CoachPage() {
       hasGreetedRef.current = mode
       greet()
     }
-  }, [mode, messages.length, greet, isLoaded, upgradeRequired, freeQuota, setMessages, isGuest])
+  }, [mode, messages.length, greet, isLoaded, upgradeRequired, isQuotaBlocked, setMessages, isGuest])
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
@@ -211,14 +249,14 @@ export default function CoachPage() {
 
   // Auto-focus input when assistant finishes streaming
   useEffect(() => {
-    if (!isStreaming && textareaRef.current && !(freeQuota?.isFreeTier && freeQuota.remaining <= 0)) {
+    if (!isStreaming && textareaRef.current && !isQuotaBlocked) {
       textareaRef.current.focus()
     }
-  }, [isStreaming, freeQuota])
+  }, [isStreaming, isQuotaBlocked])
 
-  // Automatically trigger the end-of-quota experience once the 5th message finishes streaming
+  // Automatically trigger the end-of-quota experience once the free-tier limit is reached.
   useEffect(() => {
-    if (!isStreaming && freeQuota?.isFreeTier && freeQuota.remaining <= 0 && messages.length > 0) {
+    if (!isStreaming && isQuotaBlocked && messages.length > 0) {
       const lastMessage = messages[messages.length - 1]
       // Only append if we haven't already appended it
       const hasLimitMessage =
@@ -239,7 +277,7 @@ export default function CoachPage() {
         queueMicrotask(() => setDismissedPrompt(false))
       }
     }
-  }, [isStreaming, freeQuota, messages, setMessages, isGuest])
+  }, [isStreaming, isQuotaBlocked, messages, setMessages, isGuest])
 
   const handleClearHistory = () => {
     hasGreetedRef.current = null
@@ -260,6 +298,17 @@ export default function CoachPage() {
     }
   }
 
+  const lastMessage = messages[messages.length - 1]
+  const showThinkingIndicator =
+    isStreaming &&
+    (streamPhase === 'thinking' || (streamPhase === 'typing' && (!lastMessage || lastMessage.role === 'user')))
+  const anthropicProvider = providers.find((provider) => provider.id === 'anthropic') ?? null
+  const isAnthropicLocked = Boolean(anthropicProvider && anthropicProvider.availability !== 'available')
+  const selectedModelOption = availableModelsForSelectedProvider.find((model) => model.id === selectedModel)
+  const selectedModelCostTier = selectedModelOption?.provider === 'anthropic'
+    ? getAnthropicModelCostTier(selectedModelOption.id)
+    : null
+
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 3rem)' }}>
       {/* Header */}
@@ -269,6 +318,56 @@ export default function CoachPage() {
           <h1 className="font-display text-2xl font-bold">Coach Chat</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Select value={selectedProvider} onValueChange={v => updateProviderSelection(v as 'openrouter' | 'anthropic')}>
+            <SelectTrigger className="w-40 bg-surface border-border">
+              <SelectValue>{selectedProviderInfo?.label ?? 'Provider'}</SelectValue>
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false} className="min-w-[18rem]">
+              {providers.map((provider) => (
+                <SelectItem
+                  key={provider.id}
+                  value={provider.id}
+                  disabled={provider.availability !== 'available'}
+                >
+                  {provider.availability === 'available'
+                    ? provider.label
+                    : `${provider.label} (key required)`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedModel} onValueChange={v => v && updateModelSelection(v)}>
+            <SelectTrigger className="w-64 bg-surface border-border">
+              <SelectValue>
+                {selectedModelOption ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span>{selectedModelOption.label}</span>
+                    {selectedModelCostTier && <CostTierIcons tier={selectedModelCostTier} />}
+                  </span>
+                ) : 'Model'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false}>
+              {availableModelsForSelectedProvider.map((model) => {
+                const modelCostTier = model.provider === 'anthropic'
+                  ? getAnthropicModelCostTier(model.id)
+                  : null
+
+                return (
+                  <SelectItem
+                    key={model.id}
+                    value={model.id}
+                    disabled={model.availability !== 'available'}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <span>{model.label}</span>
+                      {modelCostTier && <CostTierIcons tier={modelCostTier} />}
+                    </span>
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
           <Select value={mode} onValueChange={v => v && setMode(v)}>
             <SelectTrigger className="w-44 bg-surface border-border">
               <SelectValue>{selectedModeLabel}</SelectValue>
@@ -289,13 +388,24 @@ export default function CoachPage() {
           </Button>
         </div>
       </div>
+      {isAnthropicLocked && anthropicProvider?.reason && (
+        <div className="mb-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning flex items-start justify-between gap-3">
+          <span className="inline-flex items-center gap-1.5 flex-1 min-w-0 leading-5">
+            <KeyRound className="h-3.5 w-3.5" />
+            {anthropicProvider.reason}
+          </span>
+          <Link href="/settings" className="underline underline-offset-2 whitespace-nowrap hover:text-warning/90 shrink-0">
+            Open Settings
+          </Link>
+        </div>
+      )}
 
       {/* Chat Area */}
       <Card className="flex-1 border-border bg-background overflow-hidden flex flex-col min-h-0">
         <CardContent className="p-0 flex-1 flex flex-col min-h-0">
           {upgradeRequired && !dismissedPrompt ? (
              <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-center min-h-0">
-                 {upgradeRequired === 'missing_api_key' || (!isGuest && upgradeRequired === 'guest_limit_reached') ? (
+                 {upgradeRequired === 'missing_api_key' || upgradeRequired === 'provider_key_required' || (!isGuest && upgradeRequired === 'guest_limit_reached') ? (
                    <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />
                  ) : (
                    <UpgradePrompt onClose={() => setDismissedPrompt(true)} />
@@ -303,7 +413,7 @@ export default function CoachPage() {
              </div>
           ) : (
             <>
-              {freeQuota?.isFreeTier && freeQuota.remaining <= 0 && !isStreaming && !dismissedPrompt && (
+              {isQuotaBlocked && !isStreaming && !dismissedPrompt && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
                   {isGuest ? <UpgradePrompt onClose={() => setDismissedPrompt(true)} /> : <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />}
                 </div>
@@ -321,6 +431,18 @@ export default function CoachPage() {
                   isStreaming={isStreaming && i === messages.length - 1 && msg.role === 'assistant'}
                 />
               ))}
+              {showThinkingIndicator && (
+                <div className="flex justify-start">
+                  <div className="bg-surface border border-coach/15 rounded-xl px-4 py-3 text-xs text-muted-foreground inline-flex items-center gap-2">
+                    <span>{streamPhase === 'thinking' ? 'Sifu is thinking' : 'Sifu is typing'}</span>
+                    <span className="inline-flex gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-coach/70 animate-pulse" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-coach/70 animate-pulse [animation-delay:120ms]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-coach/70 animate-pulse [animation-delay:240ms]" />
+                    </span>
+                  </div>
+                </div>
+              )}
               {!isStreaming && messages.length === 1 && messages[0].role === 'assistant' && (
                 <div className="flex flex-wrap gap-2 mt-2 px-1">
                   {(MODE_STARTERS[mode] ?? []).map(chip => (
@@ -339,7 +461,7 @@ export default function CoachPage() {
 
           {/* Input */}
           <div className="border-t border-border p-3 shrink-0">
-            {freeQuota?.isFreeTier && (
+            {freeQuota?.isFreeTier && selectedProvider === 'openrouter' && (
               <div className="mb-2 rounded-md border border-border/60 bg-elevated/40 px-3 py-2 animate-in fade-in slide-in-from-bottom-1 duration-300">
                 <div className="flex items-center justify-between gap-2 text-xs font-medium text-foreground/80">
                   <span className="inline-flex items-center gap-1.5">
@@ -356,36 +478,60 @@ export default function CoachPage() {
                 </div>
               </div>
             )}
-            <div className="flex gap-2">
+            {selectedProviderInfo?.availability !== 'available' && selectedProviderInfo?.reason && (
+              <div className="mb-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                {selectedProviderInfo.reason}
+              </div>
+            )}
+            {sessionMetrics && (
+              <div className="mb-2 rounded-md border border-border/60 bg-elevated/30 px-3 py-2 text-xs text-foreground/80">
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <span>Turns: {sessionMetrics.userTurns}</span>
+                  <span>Input tokens: {sessionMetrics.inputTokens}</span>
+                  <span>Output tokens: {sessionMetrics.outputTokens}</span>
+                  <span>Total tokens: {sessionMetrics.totalTokens}</span>
+                  <span>Est. cost: {formatMicrousd(sessionMetrics.estimatedCostMicrousd)}</span>
+                </div>
+              </div>
+            )}
+            <div className="flex items-end gap-2">
               <Textarea
                 ref={textareaRef}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={
-                  freeQuota?.isFreeTier && freeQuota.remaining <= 0
+                  isQuotaBlocked
                     ? (isGuest ? 'Guest limit reached' : 'Free limit reached')
                     : 'Type a message...'
                 }
                 className="bg-elevated border-border resize-none min-h-[2.5rem] max-h-32"
                 rows={1}
-                disabled={isStreaming || (freeQuota?.isFreeTier && freeQuota.remaining <= 0)}
+                disabled={
+                  isStreaming ||
+                  isQuotaBlocked ||
+                  selectedProviderInfo?.availability !== 'available'
+                }
               />
               {isStreaming ? (
                 <Button
-                  size="sm"
+                  size="icon"
                   variant="outline"
                   onClick={stopStreaming}
-                  className="shrink-0 self-end"
+                  className="h-10 w-10 shrink-0"
                 >
                   <Square className="h-4 w-4" />
                 </Button>
               ) : (
                 <Button
-                  size="sm"
+                  size="icon"
                   onClick={handleSend}
-                  disabled={!input.trim() || (freeQuota?.isFreeTier && freeQuota.remaining <= 0)}
-                  className="shrink-0 self-end"
+                  disabled={
+                    !input.trim() ||
+                    isQuotaBlocked ||
+                    selectedProviderInfo?.availability !== 'available'
+                  }
+                  className="h-10 w-10 shrink-0"
                 >
                   <Send className="h-4 w-4" />
                 </Button>

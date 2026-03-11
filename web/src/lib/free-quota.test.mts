@@ -1,7 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { computeFreeQuotaForLimit, getQuotaErrorForLimit, isUsingFreeTier } from './free-quota-policy-core.ts'
+import {
+  computeFreeQuotaForLimit,
+  getQuotaErrorForLimit,
+  isUsingFreeTier,
+  shouldEnforceProviderQuota,
+} from './free-quota-policy-core.ts'
 
 test('computeFreeQuota returns unlimited when user has BYOK and is not guest', () => {
   const quota = computeFreeQuotaForLimit({
@@ -60,4 +65,48 @@ test('isUsingFreeTier is true for guest and no-key users', () => {
   assert.equal(isUsingFreeTier({ is_guest: true, api_key_enc: 'x', free_quota_exhausted: false, free_user_messages_used: 0 }), true)
   assert.equal(isUsingFreeTier({ is_guest: false, api_key_enc: null, free_quota_exhausted: false, free_user_messages_used: 0 }), true)
   assert.equal(isUsingFreeTier({ is_guest: false, api_key_enc: 'x', free_quota_exhausted: false, free_user_messages_used: 0 }), false)
+})
+
+test('shouldEnforceProviderQuota enforces guest no-key on OpenRouter', () => {
+  const enforced = shouldEnforceProviderQuota({
+    is_guest: true,
+    api_key_enc: null,
+    free_quota_exhausted: false,
+    free_user_messages_used: 0,
+  }, 'openrouter', false)
+
+  assert.equal(enforced, true)
+})
+
+test('shouldEnforceProviderQuota enforces guest with key on OpenRouter', () => {
+  const enforced = shouldEnforceProviderQuota({
+    is_guest: true,
+    api_key_enc: 'encrypted-key',
+    free_quota_exhausted: false,
+    free_user_messages_used: 0,
+  }, 'openrouter', true)
+
+  assert.equal(enforced, true)
+})
+
+test('shouldEnforceProviderQuota bypasses guest with key on Anthropic', () => {
+  const enforced = shouldEnforceProviderQuota({
+    is_guest: true,
+    api_key_enc: 'encrypted-key',
+    free_quota_exhausted: true,
+    free_user_messages_used: 10,
+  }, 'anthropic', true)
+
+  assert.equal(enforced, false)
+})
+
+test('shouldEnforceProviderQuota bypasses signed-in with key on Anthropic', () => {
+  const enforced = shouldEnforceProviderQuota({
+    is_guest: false,
+    api_key_enc: 'encrypted-key',
+    free_quota_exhausted: false,
+    free_user_messages_used: 0,
+  }, 'anthropic', true)
+
+  assert.equal(enforced, false)
 })

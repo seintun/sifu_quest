@@ -109,9 +109,9 @@ Google OAuth enables users to sign in with their Google account.
 
 ---
 
-### 3. Anthropic
+### 3. Provider Keys
 
-The Anthropic API key powers the Claude LLM for the coaching chat.
+OpenRouter powers shared free-tier chat. Anthropic is optional for server-side Anthropic features and user BYOK validation.
 
 1. Go to [console.anthropic.com](https://console.anthropic.com/).
 2. Sign in or create an account.
@@ -121,9 +121,10 @@ The Anthropic API key powers the Claude LLM for the coaching chat.
 
 | Console Field | Environment Variable |
 | ------------- | -------------------- |
-| **API Key**   | `ANTHROPIC_API_KEY`  |
+| **OpenRouter API Key** | `OPENROUTER_API_KEY` |
+| **Anthropic API Key** *(optional for local dev)* | `ANTHROPIC_API_KEY` |
 
-> 💡 **Note:** This key powers trial mode for users without a personal key (guest or signed-in). Trial is capped at **5 user messages within 30 minutes**. Users can add a personal key in Settings to unlock unlimited usage.
+> 💡 **Note:** `OPENROUTER_API_KEY` powers shared free-tier chat for guests and signed-in free users (current rollout limit: **10 user messages**). Users can add a personal Anthropic key in Settings to use Anthropic models.
 
 ---
 
@@ -215,7 +216,8 @@ NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=<paste-local-anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<paste-local-service-role-key>
 
-# ── Anthropic (for guest sessions) ──
+# ── LLM Provider Keys ──
+OPENROUTER_API_KEY=sk-or-v1-...
 ANTHROPIC_API_KEY=sk-ant-api03-...
 
 # ── App Secrets ──
@@ -240,7 +242,7 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000). You should be able to:
 - Log in with Google or start an anonymous guest session
 - Complete onboarding
-- Chat in trial mode using `ANTHROPIC_API_KEY` until a personal key is added
+- Chat in free-tier mode using `OPENROUTER_API_KEY` until quota is exhausted or a personal Anthropic key is added
 - View your dashboard and calendar
 
 ### Verify the build compiles cleanly
@@ -258,6 +260,7 @@ npm run build
 | `NEXT_PUBLIC_SUPABASE_URL`              | ✅       | ✅          | Supabase Dashboard    |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`  | ✅       | ✅          | Supabase Dashboard    |
 | `SUPABASE_SERVICE_ROLE_KEY`             | ✅       | ❌          | Supabase Dashboard    |
+| `OPENROUTER_API_KEY`                    | ✅       | ❌          | OpenRouter Keys       |
 | `ANTHROPIC_API_KEY`                     | ✅       | ❌          | Anthropic Console     |
 | `API_KEY_ENCRYPTION_SECRET`             | ✅       | ❌          | `openssl rand -hex 32`|
 | `NEXTAUTH_SECRET`                       | ✅       | ❌          | `openssl rand -base64 32` |

@@ -6,12 +6,23 @@ import {
   computeFreeQuota,
   getQuotaError,
   isUsingFreeTier,
+  shouldEnforceProviderQuota,
   shouldMarkQuotaExhausted,
   type FreeQuotaView,
+  type QuotaProvider,
   type QuotaProfile,
 } from './free-quota-policy'
 
-export { computeFreeQuota, getQuotaError, isUsingFreeTier, shouldMarkQuotaExhausted, type FreeQuotaView, type QuotaProfile }
+export {
+  computeFreeQuota,
+  getQuotaError,
+  isUsingFreeTier,
+  shouldEnforceProviderQuota,
+  shouldMarkQuotaExhausted,
+  type FreeQuotaView,
+  type QuotaProvider,
+  type QuotaProfile,
+}
 
 function isMissingFunctionError(error: { code?: string; message?: string } | null | undefined): boolean {
   if (!error) {

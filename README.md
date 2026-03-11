@@ -39,9 +39,9 @@ A visual dashboard shows your current streak, DSA patterns mastered, system desi
 | **Business Ideas** | Brainstorming and validation for side projects |
 
 ### 🔒 Your Data, Your Keys
-- **Trial mode** uses the server key for users without a personal key (guest or signed-in): **5 user messages in 30 minutes**
-- **Personal key unlock** — add your Anthropic API key in **Settings** to remove trial limits
-- **Infrastructure secrets** (`Supabase`, `Google OAuth`, shared `ANTHROPIC_API_KEY`) are env-only (`.env.local` or Vercel env vars)
+- **Free mode** uses a shared server OpenRouter key for users without a personal key (guest or signed-in): **10 user messages**
+- **Anthropic BYOK** — add your Anthropic API key in **Settings** to use Anthropic models
+- **Infrastructure secrets** (`Supabase`, `Google OAuth`, shared `OPENROUTER_API_KEY`) are env-only (`.env.local` or Vercel env vars)
 - **Personal Anthropic keys** are encrypted before storage per user in Supabase, plaintext keys are never stored or logged
 - **Server-side encryption secret** (`API_KEY_ENCRYPTION_SECRET`) is managed by app operators only; end users never provide it
 - **GDPR compliant** — delete your account and all data with one click
@@ -65,7 +65,7 @@ Sifu Quest was designed from day one with data privacy and security as non-negot
 | **API Key Storage** | Users provide only `sk-ant-...`. Keys are encrypted server-side with **AES-256-CBC** and a unique random IV before storage. Plaintext keys are **never stored, logged, or shared**. |
 | **Data Isolation** | Every database table uses Supabase **Row Level Security (RLS)**, guaranteeing that User A can never access User B's data — even through direct database queries. |
 | **Authentication** | Google OAuth 2.0 via NextAuth.js with JWT-based sessions. Tokens carry only the user's UUID — no sensitive data in the session payload. |
-| **Trial Guardrails** | Accounts without personal keys are sandboxed to **5 user messages in 30 minutes**, enforced server-side in chat entitlement checks. |
+| **Free-tier Guardrails** | Accounts without personal Anthropic keys are sandboxed to **10 user messages** on shared OpenRouter free models, enforced server-side in chat entitlement checks. |
 | **GDPR Compliance** | One-click account deletion wipes **all** user data across every table (profile, chat history, memory files, progress, audit logs) and removes the authentication record entirely. |
 | **Audit Trail** | Sensitive operations — API key changes, account deletions, plan generation — are logged to a tamper-evident `audit_log` table for full traceability. |
 | **Error Monitoring** | Sentry captures errors across client, server, and edge runtimes with configurable sampling rates, providing observability without exposing user data. |
@@ -82,12 +82,12 @@ You ←→ Sifu Quest (Next.js on Vercel) ←→ Claude AI (Anthropic)
            Your profile, progress, chat history
 ```
 
-1. **Sign in** with Google or try as a Guest (trial mode starts without personal key)
+1. **Sign in** with Google or try as a Guest (free mode starts without personal key)
 2. **Complete onboarding** — Sifu asks a few questions and builds your personalized coaching profile
 3. **Pick a mode** (DSA, System Design, Interview, Job Search, or Business Ideas)
 4. **Start learning** — Sifu reads your Supabase memory files to give context-aware coaching
 5. **Track progress** — your dashboard updates automatically as you log problems, toggle plan items, and chat
-6. **Unlock unlimited usage** by saving your personal Anthropic key in Settings
+6. **Use Anthropic models** by saving your personal Anthropic key in Settings
 
 Everything is saved in the cloud. Close your laptop, come back tomorrow, and Sifu picks up right where you left off.
 
