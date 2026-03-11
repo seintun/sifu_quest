@@ -1,8 +1,13 @@
 import { auth } from '@/auth'
 import { decryptKey } from '@/lib/apikey'
 import { ensureUserProfile, touchUserLastActiveAt } from '@/lib/account-state'
+import { sanitizeIncomingChatMessages } from '@/lib/chat-message-sanitizer'
 import { estimateCostMicrousd, normalizeTokenUsage, type TokenUsage } from '@/lib/chat-usage'
-import { isMissingSessionTelemetryColumnError } from '@/lib/chat-schema-compat'
+import {
+  isMissingMessageTelemetryColumnError,
+  isMissingSessionTelemetryColumnError,
+  isMissingSessionUsageRpcError,
+} from '@/lib/chat-schema-compat'
 import { resolveProviderSelection } from '@/lib/chat-selection'
 import {
   OPENROUTER_FREE_ROUTER_MODEL,
@@ -366,9 +371,9 @@ export async function POST(request: NextRequest) {
 
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const payload = (await request.json().catch(() => ({}))) as ChatRequestPayload
-    const { messages, mode, isGreeting, sessionId } = payload
-
-    if (!messages || !Array.isArray(messages)) {
+    const { mode, isGreeting, sessionId } = payload
+    const sanitizedMessages = sanitizeIncomingChatMessages(payload.messages)
+    if (sanitizedMessages.length === 0) {
       return new Response(JSON.stringify({ error: 'Messages required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
@@ -503,7 +508,7 @@ export async function POST(request: NextRequest) {
 
     let assistantResult: StreamResult | null = null
     let streamClosed = false
-    const lastUserMessage = messages[messages.length - 1]
+    const lastUserMessage = [...sanitizedMessages].reverse().find((message) => message.role === 'user') ?? null
     const encoder = new TextEncoder()
 
     const readableStream = new ReadableStream<Uint8Array>({
@@ -522,7 +527,7 @@ export async function POST(request: NextRequest) {
               providerApiKey,
               resolvedModel,
               systemPrompt,
-              messages,
+              sanitizedMessages,
               controller,
               encoder,
             )
@@ -531,7 +536,7 @@ export async function POST(request: NextRequest) {
               providerApiKey,
               resolvedModel,
               systemPrompt,
-              messages,
+              sanitizedMessages,
               controller,
               encoder,
             )
@@ -573,7 +578,7 @@ export async function POST(request: NextRequest) {
               return
             }
 
-            await supabase.from('chat_messages').insert({
+            const { error: userInsertError } = await supabase.from('chat_messages').insert({
               session_id: sessionId,
               user_id: userId,
               role: 'user',
@@ -581,8 +586,14 @@ export async function POST(request: NextRequest) {
               provider: resolvedProvider,
               model: assistantResult.modelUsed,
             })
+            if (userInsertError) {
+              if (!isMissingMessageTelemetryColumnError(userInsertError)) {
+                console.error('Failed to persist user chat message', userInsertError)
+              }
+              return
+            }
 
-            await supabase.from('chat_messages').insert({
+            const { error: assistantInsertError } = await supabase.from('chat_messages').insert({
               session_id: sessionId,
               user_id: userId,
               role: 'assistant',
@@ -597,13 +608,22 @@ export async function POST(request: NextRequest) {
               estimated_cost_microusd: estimatedCostForPersistence,
               request_id: assistantResult.requestId,
             })
+            if (assistantInsertError) {
+              if (!isMissingMessageTelemetryColumnError(assistantInsertError)) {
+                console.error('Failed to persist assistant chat message', assistantInsertError)
+              }
+              return
+            }
 
-            await supabase.rpc('increment_session_messages', {
+            const { error: incrementSessionMessagesError } = await supabase.rpc('increment_session_messages', {
               session_id_param: sessionId,
               increment_by: 2,
             })
+            if (incrementSessionMessagesError && !isMissingSessionTelemetryColumnError(incrementSessionMessagesError)) {
+              console.error('Failed to increment session messages via RPC', incrementSessionMessagesError)
+            }
 
-            await supabase.rpc('increment_chat_session_usage', {
+            const { error: incrementChatSessionUsageError } = await supabase.rpc('increment_chat_session_usage', {
               session_id_param: sessionId,
               provider_param: resolvedProvider,
               model_param: assistantResult.modelUsed,
@@ -613,14 +633,20 @@ export async function POST(request: NextRequest) {
               total_tokens_increment: usageForPersistence.totalTokens ?? 0,
               cost_increment: estimatedCostForPersistence ?? 0,
             })
+            if (incrementChatSessionUsageError && !isMissingSessionUsageRpcError(incrementChatSessionUsageError)) {
+              console.error('Failed to increment chat session usage via RPC', incrementChatSessionUsageError)
+            }
 
-            await supabase
+            const { error: profileUpdateError } = await supabase
               .from('user_profiles')
               .update({
                 default_provider: resolvedProvider,
                 default_model: assistantResult.modelUsed,
               })
               .eq('id', userId)
+            if (profileUpdateError) {
+              console.warn('Unable to persist default provider/model on profile', profileUpdateError)
+            }
 
             if (enforceQuota) {
               try {

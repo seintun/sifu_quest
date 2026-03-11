@@ -39,7 +39,7 @@ export const ANTHROPIC_MODEL_CATALOG: ReadonlyArray<{
 }> = [
   { id: "claude-haiku-4-5", label: "Claude Haiku", costTier: 1 },
   { id: "claude-sonnet-4-6", label: "Claude Sonnet", costTier: 2 },
-  { id: "6", label: "Claude Opus", costTier: 3 },
+  { id: "claude-opus-4-6", label: "Claude Opus", costTier: 3 },
 ] as const;
 
 export function isChatProvider(value: unknown): value is ChatProvider {

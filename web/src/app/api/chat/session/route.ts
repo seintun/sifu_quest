@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { ensureUserProfile } from '@/lib/account-state'
+import { DEFAULT_OPENROUTER_MODEL } from '@/lib/chat-provider-config'
 import {
   isMissingMessageTelemetryColumnError,
   isMissingSessionTelemetryColumnError,
@@ -128,7 +129,7 @@ export async function GET(request: NextRequest) {
       ? defaultSelection.selection
       : {
           provider: 'openrouter' as const,
-          model: 'openai/gpt-oss-20b:free',
+          model: DEFAULT_OPENROUTER_MODEL,
         }
 
     if (!chatSession) {

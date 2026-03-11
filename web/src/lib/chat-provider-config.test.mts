@@ -27,7 +27,7 @@ test('isKnownAnthropicModel includes the configured default model', () => {
 })
 
 test('anthropic defaults to haiku and uses ascending cost labels', () => {
-  assert.equal(getAnthropicDefaultModel(), 'claude-3-5-haiku-latest')
+  assert.equal(getAnthropicDefaultModel(), 'claude-haiku-4-5')
   assert.deepEqual(
     ANTHROPIC_MODEL_CATALOG.map((model) => model.label),
     ['Claude Haiku', 'Claude Sonnet', 'Claude Opus'],
@@ -36,7 +36,7 @@ test('anthropic defaults to haiku and uses ascending cost labels', () => {
     ANTHROPIC_MODEL_CATALOG.map((model) => model.costTier),
     [1, 2, 3],
   )
-  assert.equal(getAnthropicModelCostTier('claude-3-5-haiku-latest'), 1)
+  assert.equal(getAnthropicModelCostTier('claude-haiku-4-5'), 1)
   assert.equal(getAnthropicModelCostTier('claude-opus-4-6'), 3)
 })
 

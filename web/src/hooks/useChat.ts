@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChatProvider, ModelAvailability } from '@/lib/chat-provider-config'
+import { applyQuotaOnChatError } from '@/lib/chat-quota-ui'
 
 export interface FreeQuota {
   isFreeTier: boolean
@@ -255,7 +256,6 @@ export function useChat(mode: string) {
       })
 
       if (!res.ok) {
-        setFreeQuota(previousQuota)
         let errorMessage = 'Unknown error'
         let errorCode: string | null = null
         try {
@@ -267,6 +267,7 @@ export function useChat(mode: string) {
         }
 
         if (res.status === 403) {
+          setFreeQuota(applyQuotaOnChatError(previousQuota, errorCode))
           const normalizedUpgradeCode =
             errorCode === 'invalid_api_key'
               ? 'provider_key_required'
@@ -289,6 +290,7 @@ export function useChat(mode: string) {
           return
         }
 
+        setFreeQuota(previousQuota)
         const safeMessage = res.status >= 500 ? CHAT_TEMPORARY_ERROR_MESSAGE : errorMessage
         setMessages([...newMessages, { role: 'assistant', content: safeMessage }])
         setIsStreaming(false)
@@ -464,6 +466,7 @@ export function useChat(mode: string) {
 
       const decoder = new TextDecoder()
       let assistantContent = ''
+      let streamError: string | null = null
 
       while (true) {
         const { done, value } = await reader.read()
@@ -475,6 +478,7 @@ export function useChat(mode: string) {
           try {
             const parsed = JSON.parse(data) as {
               text?: string
+              error?: string
               type?: string
               status?: StreamPhase
               provider?: ChatProvider
@@ -508,10 +512,24 @@ export function useChat(mode: string) {
                 estimatedCostMicrousd: prev?.estimatedCostMicrousd ?? 0,
               }))
             }
+            if (parsed.error) {
+              streamError = parsed.error
+              break
+            }
           } catch {
             // Ignore malformed JSON payloads.
           }
         }
+        if (streamError) {
+          break
+        }
+      }
+
+      if (streamError) {
+        assistantContent += `\n\nError: ${streamError}`
+        setMessages([{ role: 'assistant', content: assistantContent }])
+        setIsStreaming(false)
+        return
       }
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
