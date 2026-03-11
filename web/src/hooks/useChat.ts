@@ -39,6 +39,8 @@ export interface SessionUsageMetrics {
   estimatedCostMicrousd: number
 }
 
+export type StreamPhase = 'idle' | 'thinking' | 'typing'
+
 const FREE_TIER_EXHAUSTED_MESSAGE =
   'You have exhausted your free messages. To continue your mastery journey, please navigate to **Settings** and provide your own Anthropic API key. Your key is encrypted with AES-256-CBC before storage, and your past conversation remains accessible here.'
 
@@ -78,6 +80,7 @@ export function useChat(mode: string) {
   const [selectedProvider, setSelectedProvider] = useState<ChatProvider>('openrouter')
   const [selectedModel, setSelectedModel] = useState('')
   const [sessionMetrics, setSessionMetrics] = useState<SessionUsageMetrics | null>(null)
+  const [streamPhase, setStreamPhase] = useState<StreamPhase>('idle')
   const abortRef = useRef<AbortController | null>(null)
 
   const applySelection = useCallback((provider: ChatProvider, model: string) => {
@@ -98,18 +101,28 @@ export function useChat(mode: string) {
     setMessages([])
     setFreeQuota(null)
     setSessionMetrics(null)
+    setStreamPhase('idle')
 
     const load = async () => {
       try {
-        const providersRes = await fetch('/api/chat/providers', { signal: controller.signal })
+        const [providersRes, sessionRes] = await Promise.all([
+          fetch('/api/chat/providers', { signal: controller.signal }),
+          fetch(`/api/chat/session?mode=${mode}`, { signal: controller.signal }),
+        ])
+
         const providerData = await providersRes.json().catch(() => ({})) as {
           providers?: ChatProviderOption[]
           modelsByProvider?: Record<ChatProvider, ChatModelOption[]>
           defaults?: { provider: ChatProvider; model: string }
         }
+        const sessionData = await sessionRes.json().catch(() => ({})) as ChatSessionResponse & { error?: string }
 
         if (!providersRes.ok) {
           throw new Error('Failed to load providers')
+        }
+
+        if (!sessionRes.ok) {
+          throw new Error(sessionData.error || 'Failed to load chat session')
         }
 
         if (cancelled) return
@@ -120,15 +133,6 @@ export function useChat(mode: string) {
         if (providerData.defaults) {
           applySelection(providerData.defaults.provider, providerData.defaults.model)
         }
-
-        const sessionRes = await fetch(`/api/chat/session?mode=${mode}`, { signal: controller.signal })
-        const sessionData = await sessionRes.json().catch(() => ({})) as ChatSessionResponse & { error?: string }
-
-        if (!sessionRes.ok) {
-          throw new Error(sessionData.error || 'Failed to load chat session')
-        }
-
-        if (cancelled) return
 
         if (sessionData.session) {
           setSessionId(sessionData.session.id)
@@ -208,6 +212,7 @@ export function useChat(mode: string) {
     ]
     setMessages(newMessages)
     setIsStreaming(true)
+    setStreamPhase('thinking')
 
     const previousQuota = freeQuota
 
@@ -280,7 +285,6 @@ export function useChat(mode: string) {
       const decoder = new TextDecoder()
       let assistantContent = ''
       let usageApplied = false
-      setMessages([...newMessages, { role: 'assistant', content: '' }])
 
       while (true) {
         const { done, value } = await reader.read()
@@ -294,6 +298,7 @@ export function useChat(mode: string) {
               text?: string
               error?: string
               type?: string
+              status?: StreamPhase
               provider?: ChatProvider
               model?: string
               inputTokens?: number | null
@@ -303,10 +308,15 @@ export function useChat(mode: string) {
             }
 
             if (parsed.text) {
+              setStreamPhase('typing')
               assistantContent += parsed.text
               setMessages((prev) => {
                 const updated = [...prev]
-                updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
+                if (updated.length === 0 || updated[updated.length - 1].role !== 'assistant') {
+                  updated.push({ role: 'assistant', content: assistantContent })
+                } else {
+                  updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
+                }
                 return updated
               })
             }
@@ -325,11 +335,19 @@ export function useChat(mode: string) {
               }))
             }
 
+            if (parsed.type === 'status' && parsed.status) {
+              setStreamPhase(parsed.status)
+            }
+
             if (parsed.error) {
               assistantContent += `\n\nError: ${parsed.error}`
               setMessages((prev) => {
                 const updated = [...prev]
-                updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
+                if (updated.length === 0 || updated[updated.length - 1].role !== 'assistant') {
+                  updated.push({ role: 'assistant', content: assistantContent })
+                } else {
+                  updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
+                }
                 return updated
               })
             }
@@ -359,6 +377,7 @@ export function useChat(mode: string) {
     } finally {
       if (abortRef.current === controller) {
         setIsStreaming(false)
+        setStreamPhase('idle')
         abortRef.current = null
       }
     }
@@ -367,6 +386,7 @@ export function useChat(mode: string) {
   const greet = useCallback(async () => {
     if (isStreaming) return
     setIsStreaming(true)
+    setStreamPhase('thinking')
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -419,7 +439,6 @@ export function useChat(mode: string) {
 
       const decoder = new TextDecoder()
       let assistantContent = ''
-      setMessages([{ role: 'assistant', content: '' }])
 
       while (true) {
         const { done, value } = await reader.read()
@@ -429,10 +448,28 @@ export function useChat(mode: string) {
           const data = line.slice(6).trim()
           if (data === '[DONE]') continue
           try {
-            const parsed = JSON.parse(data) as { text?: string; type?: string; provider?: ChatProvider; model?: string }
+            const parsed = JSON.parse(data) as {
+              text?: string
+              type?: string
+              status?: StreamPhase
+              provider?: ChatProvider
+              model?: string
+            }
             if (parsed.text) {
+              setStreamPhase('typing')
               assistantContent += parsed.text
-              setMessages([{ role: 'assistant', content: assistantContent }])
+              setMessages((prev) => {
+                const updated = [...prev]
+                if (updated.length === 0 || updated[updated.length - 1].role !== 'assistant') {
+                  updated.push({ role: 'assistant', content: assistantContent })
+                } else {
+                  updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
+                }
+                return updated
+              })
+            }
+            if (parsed.type === 'status' && parsed.status) {
+              setStreamPhase(parsed.status)
             }
             if (parsed.type === 'usage') {
               if (parsed.provider && parsed.model) {
@@ -458,6 +495,7 @@ export function useChat(mode: string) {
     } finally {
       if (abortRef.current === controller) {
         setIsStreaming(false)
+        setStreamPhase('idle')
         abortRef.current = null
       }
     }
@@ -518,6 +556,7 @@ export function useChat(mode: string) {
     selectedProviderInfo,
     availableModelsForSelectedProvider,
     sessionMetrics,
+    streamPhase,
     updateProviderSelection,
     updateModelSelection,
     formatMicrousd: toMicrousdDisplay,

@@ -155,6 +155,7 @@ export default function CoachPage() {
     selectedProviderInfo,
     availableModelsForSelectedProvider,
     sessionMetrics,
+    streamPhase,
     updateProviderSelection,
     updateModelSelection,
     formatMicrousd,
@@ -280,6 +281,11 @@ export default function CoachPage() {
     }
   }
 
+  const lastMessage = messages[messages.length - 1]
+  const showThinkingIndicator =
+    isStreaming &&
+    (streamPhase === 'thinking' || (streamPhase === 'typing' && (!lastMessage || lastMessage.role === 'user')))
+
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 3rem)' }}>
       {/* Header */}
@@ -373,6 +379,18 @@ export default function CoachPage() {
                   isStreaming={isStreaming && i === messages.length - 1 && msg.role === 'assistant'}
                 />
               ))}
+              {showThinkingIndicator && (
+                <div className="flex justify-start">
+                  <div className="bg-surface border border-coach/15 rounded-xl px-4 py-3 text-xs text-muted-foreground inline-flex items-center gap-2">
+                    <span>{streamPhase === 'thinking' ? 'Sifu is thinking' : 'Sifu is typing'}</span>
+                    <span className="inline-flex gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-coach/70 animate-pulse" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-coach/70 animate-pulse [animation-delay:120ms]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-coach/70 animate-pulse [animation-delay:240ms]" />
+                    </span>
+                  </div>
+                </div>
+              )}
               {!isStreaming && messages.length === 1 && messages[0].role === 'assistant' && (
                 <div className="flex flex-wrap gap-2 mt-2 px-1">
                   {(MODE_STARTERS[mode] ?? []).map(chip => (
