@@ -45,7 +45,7 @@ export function StatusStrip({
 
   const showAnything = Boolean(
     (freeQuota?.isFreeTier && selectedProvider === 'openrouter') ||
-    selectedProviderInfo?.availability !== 'available' ||
+    (selectedProviderInfo && selectedProviderInfo.availability !== 'available') ||
     sessionMetrics,
   )
 

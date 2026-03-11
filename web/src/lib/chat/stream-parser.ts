@@ -41,6 +41,9 @@ export async function consumeChatStream(
     }
   }
 
+  // Flush any trailing decoder buffer to avoid dropping split multi-byte characters.
+  buffered += decoder.decode()
+
   if (buffered.length > 0) {
     const line = buffered.trim()
     if (line.startsWith('data:')) {

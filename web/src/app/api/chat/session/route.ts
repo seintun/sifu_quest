@@ -35,7 +35,7 @@ type SessionRow = {
 }
 
 type MessageRow = {
-  id: number
+  id: number | string
   role: string
   content: string
   created_at: string
@@ -246,7 +246,7 @@ export async function GET(request: NextRequest) {
         model: effectiveSelection.model,
       },
       messages: normalizedMessages.map((m) => ({
-        id: m.id,
+        id: String(m.id),
         role: m.role,
         content: m.content,
         createdAt: m.created_at,

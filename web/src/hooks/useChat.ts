@@ -114,6 +114,7 @@ export function useChat(mode: string) {
   const [isLoadingOlder, setIsLoadingOlder] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const bootstrapAbortRef = useRef<AbortController | null>(null)
+  const olderAbortRef = useRef<AbortController | null>(null)
 
   const applySelection = useCallback((provider: ChatProvider, model: string) => {
     setSelectedProvider(provider)
@@ -195,6 +196,7 @@ export function useChat(mode: string) {
   useEffect(() => {
     abortRef.current?.abort()
     bootstrapAbortRef.current?.abort()
+    olderAbortRef.current?.abort()
     setIsStreaming(false)
     setSessionId(null)
     setUpgradeRequired(null)
@@ -205,12 +207,14 @@ export function useChat(mode: string) {
     setStreamPhase('idle')
     setHasOlderMessages(false)
     setNextBefore(null)
+    setIsLoadingOlder(false)
 
     void loadBootstrap()
 
     return () => {
       abortRef.current?.abort()
       bootstrapAbortRef.current?.abort()
+      olderAbortRef.current?.abort()
     }
   }, [mode, loadBootstrap])
 
@@ -266,12 +270,19 @@ export function useChat(mode: string) {
   const loadOlderMessages = useCallback(async () => {
     if (!nextBefore || isLoadingOlder) return
 
+    olderAbortRef.current?.abort()
+    const controller = new AbortController()
+    olderAbortRef.current = controller
+
     setIsLoadingOlder(true)
     try {
       const res = await fetch(
         `/api/chat/session?mode=${encodeURIComponent(mode)}&limit=${PAGE_SIZE}&before=${encodeURIComponent(nextBefore)}`,
+        { signal: controller.signal },
       )
       const data = await res.json().catch(() => ({})) as ChatSessionResponse
+      if (olderAbortRef.current !== controller) return
+
       if (!res.ok) {
         return
       }
@@ -279,8 +290,15 @@ export function useChat(mode: string) {
       const olderMessages = Array.isArray(data.messages) ? data.messages : []
       setMessages((prev) => prependOlderMessages(prev, olderMessages))
       applyPaging(data.paging)
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return
+      }
     } finally {
-      setIsLoadingOlder(false)
+      if (olderAbortRef.current === controller) {
+        olderAbortRef.current = null
+        setIsLoadingOlder(false)
+      }
     }
   }, [nextBefore, isLoadingOlder, mode, applyPaging])
 
