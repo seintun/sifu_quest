@@ -51,7 +51,8 @@ This creates trust issues (no control over your session) and misses a key conver
 
 The mockup below shows (left to right): sidebar with Sign Out button, Session card state, and the guest logout dialog.
 
-![Logout & Guest Conversion UX Mockup](/Users/seintun/.gemini/antigravity/brain/27849493-82f8-4b33-a0c4-6b4f227c2f85/logout_ux_mockup_1773266774921.png)
+<!-- UX mockup: see `GuestLogoutDialog` and `LogoutConfirmDialog` components for the implemented design. -->
+
 
 **Key UX rationale (product strategist perspective):**
 

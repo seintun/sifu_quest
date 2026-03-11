@@ -137,24 +137,31 @@ function LogoutFooter({ deferred, onDeferredLogout }: LogoutFooterProps) {
         Sign Out
       </button>
 
-      <GuestLogoutDialog
-        open={guestDialogOpen}
-        onOpenChange={setGuestDialogOpen}
-        onUpgrade={handleGuestUpgrade}
-        onSignOut={handleGuestSignOut}
-        isUpgrading={isUpgrading}
-        isSigningOut={isSigningOut}
-      />
-      <LogoutConfirmDialog
-        open={googleDialogOpen}
-        onOpenChange={setGoogleDialogOpen}
-        onSignOut={handleGoogleSignOut}
-        isSigningOut={isSigningOut}
-        displayName={accountStatus?.displayName ?? undefined}
-      />
+      {/* Only render dialogs when not deferred — in MobileSidebar the dialogs
+          are mounted outside the Sheet to avoid duplicate instances. */}
+      {!deferred && (
+        <>
+          <GuestLogoutDialog
+            open={guestDialogOpen}
+            onOpenChange={setGuestDialogOpen}
+            onUpgrade={handleGuestUpgrade}
+            onSignOut={handleGuestSignOut}
+            isUpgrading={isUpgrading}
+            isSigningOut={isSigningOut}
+          />
+          <LogoutConfirmDialog
+            open={googleDialogOpen}
+            onOpenChange={setGoogleDialogOpen}
+            onSignOut={handleGoogleSignOut}
+            isSigningOut={isSigningOut}
+            displayName={accountStatus?.displayName ?? undefined}
+          />
+        </>
+      )}
     </>
   )
 }
+
 
 export function Sidebar() {
   return (
