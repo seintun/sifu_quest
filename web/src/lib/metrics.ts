@@ -1,11 +1,12 @@
 import { getDay } from 'date-fns'
-import { readMemoryFile } from './memory'
-import { createAdminClient } from './supabase-admin'
-import { parseDSAPatterns, parseProblemHistory } from './parsers/dsa-patterns'
-import { parseJobApplications } from './parsers/job-search'
-import { parsePlan } from './parsers/plan-parser'
-import { parseSystemDesign } from './parsers/system-design'
-import { getPlanProgressMeta, getPlanTimelineMeta, parseProfileSnapshot } from './profile-timeline'
+import { readMemoryFiles } from './memory.ts'
+import { createAdminClient } from './supabase-admin.ts'
+import { parseDSAPatterns, parseProblemHistory } from './parsers/dsa-patterns.ts'
+import { parseJobApplications } from './parsers/job-search.ts'
+import { parsePlan } from './parsers/plan-parser.ts'
+import { parseSystemDesign } from './parsers/system-design.ts'
+import { getPlanProgressMeta, getPlanTimelineMeta, parseProfileSnapshot } from './profile-timeline.ts'
+import { computeStreak } from './streak.ts'
 
 export interface DashboardMetrics {
   dsaPatternsTotal: number
@@ -26,13 +27,18 @@ export interface DashboardMetrics {
 }
 
 export async function computeMetrics(userId: string): Promise<DashboardMetrics> {
-  const [dsaContent, jobContent, planContent, sysDesignContent, profileContent] = await Promise.all([
-    readMemoryFile(userId, 'dsa-patterns.md'),
-    readMemoryFile(userId, 'job-search.md'),
-    readMemoryFile(userId, 'plan.md'),
-    readMemoryFile(userId, 'system-design.md'),
-    readMemoryFile(userId, 'profile.md'),
+  const memoryFiles = await readMemoryFiles(userId, [
+    'dsa-patterns.md',
+    'job-search.md',
+    'plan.md',
+    'system-design.md',
+    'profile.md',
   ])
+  const dsaContent = memoryFiles['dsa-patterns.md'] ?? ''
+  const jobContent = memoryFiles['job-search.md'] ?? ''
+  const planContent = memoryFiles['plan.md'] ?? ''
+  const sysDesignContent = memoryFiles['system-design.md'] ?? ''
+  const profileContent = memoryFiles['profile.md'] ?? ''
 
   // DSA metrics
   const patterns = parseDSAPatterns(dsaContent) || []
@@ -79,16 +85,7 @@ export async function computeMetrics(userId: string): Promise<DashboardMetrics> 
 
   // Calculate current streak from progress_events
   const supabase = createAdminClient()
-  const { data: events } = await supabase
-    .from('progress_events')
-    .select('occurred_at')
-    .eq('user_id', userId)
-    .gte('occurred_at', lookbackDate.toISOString())
-
-  const eventDates = (events || []).map(e => {
-    // occurred_at is a TIMESTAMPTZ, so convert to YYYY-MM-DD
-    return new Date(e.occurred_at).toISOString().split('T')[0]
-  })
+  const eventDates = await fetchProgressEventDays(userId, lookbackDate.toISOString(), supabase)
 
   // We should also include any dates parsed from files *before* the DB migration
   // to preserve old streaks, combining them into one Set
@@ -124,28 +121,35 @@ export async function computeMetrics(userId: string): Promise<DashboardMetrics> 
   }
 }
 
-function computeStreak(dates: string[]): number {
-  if (dates.length === 0) return 0
+type SupabaseAdminClient = ReturnType<typeof createAdminClient>
 
-  const uniqueDates = [...new Set(dates)].sort().reverse()
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+async function fetchProgressEventDays(
+  userId: string,
+  fromIso: string,
+  supabase: SupabaseAdminClient,
+): Promise<string[]> {
+  const rpcResult = await supabase.rpc('list_progress_event_days', {
+    user_id_param: userId,
+    from_iso_param: fromIso,
+  })
 
-  let streak = 0
-  const checkDate = new Date(today)
-
-  for (let i = 0; i < 365; i++) {
-    const dateStr = checkDate.toISOString().split('T')[0]
-    if (uniqueDates.includes(dateStr)) {
-      streak++
-      checkDate.setDate(checkDate.getDate() - 1)
-    } else if (i === 0) {
-      // Today hasn't been logged yet, check from yesterday
-      checkDate.setDate(checkDate.getDate() - 1)
-    } else {
-      break
-    }
+  if (!rpcResult.error && Array.isArray(rpcResult.data)) {
+    return rpcResult.data
+      .map((entry: { day?: string } | null) => entry?.day ?? '')
+      .filter((day) => Boolean(day))
   }
 
-  return streak
+  const { data: events } = await supabase
+    .from('progress_events')
+    .select('occurred_at')
+    .eq('user_id', userId)
+    .gte('occurred_at', fromIso)
+
+  const uniqueDays = new Set<string>()
+  for (const event of events || []) {
+    if (!event?.occurred_at) continue
+    uniqueDays.add(new Date(event.occurred_at).toISOString().split('T')[0])
+  }
+
+  return [...uniqueDays]
 }

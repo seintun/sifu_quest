@@ -1,22 +1,18 @@
 import { computeMetrics } from '@/lib/metrics'
+import { createProgressGetHandler } from '@/lib/progress-api'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
-import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 
-export async function GET() {
-  try {
-    const session = await auth()
-    if (!session?.user?.id) {
-       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
+const handleProgressGet = createProgressGetHandler({
+  authFn: auth,
+  resolveUserIdFn: resolveCanonicalUserId,
+  computeMetricsFn: computeMetrics,
+})
 
-    const metrics = await computeMetrics(userId)
-    return NextResponse.json(metrics)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
+export async function GET() {
+  const result = await handleProgressGet()
+  return NextResponse.json(result.body, { status: result.status })
 }
