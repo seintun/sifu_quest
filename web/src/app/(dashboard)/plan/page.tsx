@@ -50,13 +50,6 @@ type OnboardingStatusResponse = {
 
 const PLAN_PLACEHOLDER_MARKER = 'being generated in the background'
 
-function formatPlanStatus(status: OnboardingPlanStatus): string {
-  return status
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
-}
-
 function shouldShowPlanStatusBanner(status: OnboardingPlanStatus | null): boolean {
   if (!status) {
     return false
@@ -95,9 +88,14 @@ function PlanRoadmapBadges({
           </Badge>
         </>
       )}
-      {(planStatus === 'queued' || planStatus === 'running') && (
-        <Badge variant="outline" className={`${baseBadgeClass} border-border/60 bg-elevated/70 text-muted-foreground`}>
-          Status: {formatPlanStatus(planStatus)}
+      {planStatus === 'queued' && (
+        <Badge variant="outline" className={`${baseBadgeClass} border-warning/40 bg-warning/10 text-warning`}>
+          Status: Queued
+        </Badge>
+      )}
+      {planStatus === 'running' && (
+        <Badge variant="outline" className={`${baseBadgeClass} border-warning/40 bg-warning/10 text-warning`}>
+          Status: Running
         </Badge>
       )}
       {planStatus === 'failed' && (
