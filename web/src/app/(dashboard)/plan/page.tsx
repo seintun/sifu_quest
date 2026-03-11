@@ -256,29 +256,33 @@ export default function PlanPage() {
           <p className="text-muted-foreground text-sm mt-1">Your personalized roadmap</p>
         </div>
         {(isPlanPlaceholder || planStatus === 'not_queued') && (
-          <div className="flex flex-wrap items-center gap-2">
-            {planStatus === 'not_queued' && (
-              <Badge variant="outline" className="cursor-default pointer-events-none border-info/40 bg-info/10 text-info">
-                New profile updates available
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              {planStatus === 'not_queued' && (
+                <Badge variant="outline" className="cursor-default pointer-events-none border-info/40 bg-info/10 text-info">
+                  New profile updates available
+                </Badge>
+              )}
+              <Badge variant="outline" className="cursor-default pointer-events-none border-border/60 bg-elevated/70 text-muted-foreground">
+                Status: {formatPlanStatus(planStatus)}
               </Badge>
-            )}
-            <Badge variant="outline" className="cursor-default pointer-events-none border-border/60 bg-elevated/70 text-muted-foreground">
-              Status: {formatPlanStatus(planStatus)}
-            </Badge>
-            {planErrorCode && (
-              <Badge variant="outline" className="cursor-default pointer-events-none border-danger/40 bg-danger/10 text-danger">
-                Error: {planErrorCode}
-              </Badge>
-            )}
-            <button
-              type="button"
-              onClick={() => void queuePlanRefresh()}
-              disabled={!canRequestRefresh || isQueueingPlanRefresh}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 py-1.5 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${isQueueingPlanRefresh ? 'animate-spin' : ''}`} />
-              {isQueueingPlanRefresh ? 'Queueing update...' : 'Generate Updated Plan'}
-            </button>
+              {planErrorCode && (
+                <Badge variant="outline" className="cursor-default pointer-events-none border-danger/40 bg-danger/10 text-danger">
+                  Error: {planErrorCode}
+                </Badge>
+              )}
+            </div>
+            <div className="flex justify-start sm:justify-end">
+              <button
+                type="button"
+                onClick={() => void queuePlanRefresh()}
+                disabled={!canRequestRefresh || isQueueingPlanRefresh}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 py-1.5 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isQueueingPlanRefresh ? 'animate-spin' : ''}`} />
+                {isQueueingPlanRefresh ? 'Queueing update...' : 'Generate Updated Plan'}
+              </button>
+            </div>
           </div>
         )}
         {rawContent ? (
@@ -302,36 +306,40 @@ export default function PlanPage() {
         <h1 className="font-display text-2xl font-bold">{title}</h1>
         <p className="text-muted-foreground text-sm mt-1">Your structured roadmap to interview success</p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {planStatus === 'not_queued' && (
-          <Badge variant="outline" className="cursor-default pointer-events-none border-info/40 bg-info/10 text-info">
-            New profile updates available
-          </Badge>
-        )}
-        {(planStatus === 'queued' || planStatus === 'running') && (
-          <Badge variant="outline" className="cursor-default pointer-events-none border-border/60 bg-elevated/70 text-muted-foreground">
-            Status: {formatPlanStatus(planStatus)}
-          </Badge>
-        )}
-        {planStatus === 'failed' && (
-          <Badge variant="outline" className="cursor-default pointer-events-none border-danger/40 bg-danger/10 text-danger">
-            Plan generation failed
-          </Badge>
-        )}
-        {planErrorCode && (
-          <Badge variant="outline" className="cursor-default pointer-events-none border-danger/40 bg-danger/10 text-danger">
-            Error: {planErrorCode}
-          </Badge>
-        )}
-        <button
-          type="button"
-          onClick={() => void queuePlanRefresh()}
-          disabled={!canRequestRefresh || isQueueingPlanRefresh}
-          className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 py-1.5 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isQueueingPlanRefresh ? 'animate-spin' : ''}`} />
-          {isQueueingPlanRefresh ? 'Queueing update...' : 'Generate Updated Plan'}
-        </button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          {planStatus === 'not_queued' && (
+            <Badge variant="outline" className="cursor-default pointer-events-none border-info/40 bg-info/10 text-info">
+              New profile updates available
+            </Badge>
+          )}
+          {(planStatus === 'queued' || planStatus === 'running') && (
+            <Badge variant="outline" className="cursor-default pointer-events-none border-border/60 bg-elevated/70 text-muted-foreground">
+              Status: {formatPlanStatus(planStatus)}
+            </Badge>
+          )}
+          {planStatus === 'failed' && (
+            <Badge variant="outline" className="cursor-default pointer-events-none border-danger/40 bg-danger/10 text-danger">
+              Plan generation failed
+            </Badge>
+          )}
+          {planErrorCode && (
+            <Badge variant="outline" className="cursor-default pointer-events-none border-danger/40 bg-danger/10 text-danger">
+              Error: {planErrorCode}
+            </Badge>
+          )}
+        </div>
+        <div className="flex justify-start sm:justify-end">
+          <button
+            type="button"
+            onClick={() => void queuePlanRefresh()}
+            disabled={!canRequestRefresh || isQueueingPlanRefresh}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 py-1.5 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isQueueingPlanRefresh ? 'animate-spin' : ''}`} />
+            {isQueueingPlanRefresh ? 'Queueing update...' : 'Generate Updated Plan'}
+          </button>
+        </div>
       </div>
 
       {/* Weekly Rhythm */}
