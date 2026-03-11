@@ -197,7 +197,7 @@ export default function DashboardPage() {
   }
 
   const planHref = '/plan'
-  const planLabel = metrics.planLabel || 'Active Interview Plan'
+  const planLabel = 'Game Plan'
   const overallPlanPct = metrics.planItemsTotal > 0
     ? Math.round((metrics.planItemsCompleted / metrics.planItemsTotal) * 100)
     : 0
