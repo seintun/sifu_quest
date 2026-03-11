@@ -306,27 +306,27 @@ export default function PlanPage() {
   const [manualErrorCode, setManualErrorCode] = useState<string | null>(null)
 
   // SWR automatically handles caching and deduplication
-  const { data: rawData, mutate: mutatePlan } = useSWR('/api/memory?file=plan.md', fetcher)
-  const { data: statusData, mutate: mutateStatus } = useSWR('/api/onboarding/status', fetcher)
+  const { data: statusData, mutate: mutateStatus } = useSWR('/api/onboarding/status', fetcher, {
+    refreshInterval: (data: any) => {
+      const status = data?.plan?.status
+      return status === 'queued' || status === 'running' ? 15000 : 0
+    }
+  })
+  
+  const { data: rawData, mutate: mutatePlan } = useSWR('/api/memory?file=plan.md', fetcher, {
+    refreshInterval: (data: any) => {
+      const content = typeof data?.content === 'string' ? data.content : ''
+      const isPlaceholder = content.toLowerCase().includes(PLAN_PLACEHOLDER_MARKER)
+      const status = statusData?.plan?.status
+      return status === 'queued' || status === 'running' || (isPlaceholder && status !== 'failed') ? 15000 : 0
+    }
+  })
 
   const rawContent = typeof rawData?.content === 'string' ? rawData.content : ''
   const plan = rawData ? parsePlan(rawContent) : null
 
   const planStatus: OnboardingPlanStatus | null = statusData?.plan?.status ?? null
   const planErrorCode: string | null = manualErrorCode ?? (statusData?.plan?.lastErrorCode ?? null)
-
-  const isPlanPlaceholder = rawContent.toLowerCase().includes(PLAN_PLACEHOLDER_MARKER)
-
-  // Configure dynamic polling
-  const shouldPoll =
-    planStatus === 'queued' ||
-    planStatus === 'running' ||
-    (isPlanPlaceholder && planStatus !== 'failed')
-
-  const pollingInterval = shouldPoll ? 15000 : 0
-
-  useSWR('/api/memory?file=plan.md', fetcher, { refreshInterval: pollingInterval })
-  useSWR('/api/onboarding/status', fetcher, { refreshInterval: pollingInterval })
 
   const refreshPlanStatus = useCallback(async () => {
     await mutateStatus()
@@ -349,10 +349,7 @@ export default function PlanPage() {
       }
 
       setManualErrorCode(null)
-      // Fake local state updates for instant UI, SWR will revalidate in background automatically because of the mutate call.
-      // But actually, we don't need to fake if we just clear the error code. Wait, we can't mutate planErrorCode manually since it's derived.
-      // However mutate() triggers revalidation.
-      // Doing `mutateStatus` immediately.
+      // Trigger immediate revalidation so the latest plan status and errors are reflected after queueing the refresh.
       void refreshPlanStatus()
     } finally {
       setIsQueueingPlanRefresh(false)

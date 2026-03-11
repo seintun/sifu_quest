@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 type AccountStatusResponse = {
   onboarding?: {
@@ -16,6 +16,8 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
     pathname === '/login' ||
     pathname === '/onboarding' ||
     pathname.startsWith('/api')
+
+  const [checked, setChecked] = useState(false)
 
   useEffect(() => {
     if (isBypassPath) {
@@ -39,12 +41,18 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
           onboardingStatus === 'enriched_complete'
         if (!complete) {
           router.replace('/onboarding')
+        } else {
+          setChecked(true)
         }
       })
       .catch(() => {
         router.replace('/login')
       })
   }, [isBypassPath, router])
+
+  if (!isBypassPath && !checked) {
+    return <div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center"><div className="h-8 w-8 animate-pulse rounded-full bg-muted" /></div>
+  }
 
   return <>{children}</>
 }

@@ -272,8 +272,13 @@ export default function MemoryPage() {
 
       <div className="flex flex-1 min-h-0 gap-4">
         <div className="hidden w-56 shrink-0 overflow-y-auto py-1 md:block">
-          {(!files.length && listError) ? (
+          {(!files.length && !listError) ? (
             <p className="text-sm text-muted-foreground">No memory files are available yet.</p>
+          ) : (!files.length && listError) ? (
+            <p className="flex items-center gap-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              {toMemoryErrorMessage(listError, 'Unable to load memory files right now.')}
+            </p>
           ) : !files.length ? (
             <div className="space-y-2 animate-pulse">
               {Array.from({ length: 6 }).map((_, i) => (

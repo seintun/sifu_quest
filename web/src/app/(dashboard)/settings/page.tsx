@@ -151,13 +151,13 @@ function SettingsPageContent() {
 
   const isDeletePhraseValid = deleteConfirmText === 'DELETE'
 
-  const { data: accountData, mutate: mutateAccountStatus, isLoading: isAccountStatusLoading } = useSWR('/api/account/status', fetcher)
+  const { data: accountData, mutate: mutateAccountStatus, isLoading: isAccountStatusLoading, error: accountSwrError } = useSWR('/api/account/status', fetcher)
   const { data: usageData, mutate: mutateUsage, isLoading: isUsageLoading } = useSWR('/api/account/usage', fetcher)
   const { data: onboardingData, mutate: mutateOnboarding } = useSWR('/api/onboarding/status?kick=true', fetcher)
 
   const accountStatus = accountData?.account as AccountStatus | undefined
-  const accountStatusError = accountData?.error || ''
-  const isAccountStatusInitialized = accountData !== undefined || accountStatusError !== ''
+  const accountStatusError = accountData?.error || accountSwrError?.message || ''
+  const isAccountStatusInitialized = accountData !== undefined || accountSwrError !== undefined || (!isAccountStatusLoading && accountStatusError !== '')
 
   const usage = usageData as AccountUsage | undefined
   const usageError = usageData?.message || usageData?.error || ''

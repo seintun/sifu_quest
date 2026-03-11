@@ -56,7 +56,6 @@ function intensityClass(count: number): string {
 
 export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [activities, setActivities] = useState<Map<string, DayActivity> | null>(null)
   const [selectedDay, setSelectedDay] = useState<DayActivity | null>(null)
   const [streak, setStreak] = useState(0)
 

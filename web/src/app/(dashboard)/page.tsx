@@ -27,7 +27,7 @@ import {
   Target,
 } from 'lucide-react'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { fetcher } from '@/lib/fetcher'
 
@@ -269,6 +269,15 @@ export default function DashboardPage() {
   )
   const [savingEnrichment, setSavingEnrichment] = useState(false)
   const [showAllPromptOptions, setShowAllPromptOptions] = useState(false)
+
+  useEffect(() => {
+    if (onboardingState?.draft?.enrichment) {
+      setEnrichmentDraft(prev => ({
+        ...prev,
+        ...onboardingState.draft.enrichment,
+      }))
+    }
+  }, [onboardingState?.draft?.enrichment])
 
   const nextPromptKey = onboardingState?.onboarding.nextPromptKey ?? null
 
