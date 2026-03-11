@@ -75,7 +75,7 @@ function PlanRoadmapBadges({
     return null
   }
 
-  const baseBadgeClass = 'h-7 cursor-default pointer-events-none px-2.5 text-[11px] font-medium'
+  const baseBadgeClass = 'h-6 cursor-default pointer-events-none px-2 text-[10px] font-medium'
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -113,30 +113,96 @@ function PlanRoadmapBadges({
   )
 }
 
+function PlanActionButton({
+  planStatus,
+  canRequestRefresh,
+  isQueueingPlanRefresh,
+  onQueuePlanRefresh,
+  className,
+}: {
+  planStatus: OnboardingPlanStatus | null
+  canRequestRefresh: boolean
+  isQueueingPlanRefresh: boolean
+  onQueuePlanRefresh: () => void
+  className?: string
+}) {
+  const isGenerating = planStatus === 'queued' || planStatus === 'running' || isQueueingPlanRefresh
+  const buttonLabel = isQueueingPlanRefresh
+    ? 'Queueing update...'
+    : isGenerating
+      ? 'Plan is being generated'
+      : planStatus === 'failed'
+        ? 'Retry Plan Generation'
+        : 'Generate Updated Plan'
+
+  return (
+    <button
+      type="button"
+      onClick={onQueuePlanRefresh}
+      disabled={!canRequestRefresh || isQueueingPlanRefresh}
+      className={`inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${className ?? ''}`}
+    >
+      <RefreshCw className={`h-3.5 w-3.5 ${isQueueingPlanRefresh ? 'animate-spin' : ''}`} />
+      {buttonLabel}
+    </button>
+  )
+}
+
 function PlanHeader({
   title,
   mobileTitle,
   subtitle,
   planStatus,
   planErrorCode,
+  showPlanAction,
+  canRequestRefresh,
+  isQueueingPlanRefresh,
+  onQueuePlanRefresh,
 }: {
   title: string
   mobileTitle: { heading: string; subtitle: string | null }
   subtitle: string
   planStatus: OnboardingPlanStatus | null
   planErrorCode: string | null
+  showPlanAction: boolean
+  canRequestRefresh: boolean
+  isQueueingPlanRefresh: boolean
+  onQueuePlanRefresh: () => void
 }) {
   return (
     <div>
-      <div className="min-w-0">
-        <h1 className="font-display hidden text-2xl font-bold leading-tight sm:block">{title}</h1>
-        <h1 className="font-display text-[1.7rem] font-bold leading-tight sm:hidden">{mobileTitle.heading}</h1>
-        {mobileTitle.subtitle && <p className="mt-1 text-xs text-muted-foreground sm:hidden">{mobileTitle.subtitle}</p>}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display hidden text-2xl font-bold leading-tight sm:block">{title}</h1>
+          <h1 className="font-display text-[1.7rem] font-bold leading-tight sm:hidden">{mobileTitle.heading}</h1>
+          {mobileTitle.subtitle && <p className="mt-1 text-xs text-muted-foreground sm:hidden">{mobileTitle.subtitle}</p>}
+        </div>
+        {showPlanAction && (
+          <div className="hidden shrink-0 pt-0.5 sm:block">
+            <PlanActionButton
+              planStatus={planStatus}
+              canRequestRefresh={canRequestRefresh}
+              isQueueingPlanRefresh={isQueueingPlanRefresh}
+              onQueuePlanRefresh={onQueuePlanRefresh}
+            />
+          </div>
+        )}
       </div>
       <div className="mt-1 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">{subtitle}</p>
         <PlanRoadmapBadges planStatus={planStatus} planErrorCode={planErrorCode} />
       </div>
+      {showPlanAction && (
+        <div className="mt-2 sm:hidden">
+          <PlanActionButton
+            planStatus={planStatus}
+            canRequestRefresh={canRequestRefresh}
+            isQueueingPlanRefresh={isQueueingPlanRefresh}
+            onQueuePlanRefresh={onQueuePlanRefresh}
+            className="w-full"
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -151,41 +217,6 @@ function getMobileTitle(title: string): { heading: string; subtitle: string | nu
     heading: 'Your Game Plan',
     subtitle: truncated,
   }
-}
-
-function PlanStatusControls({
-  planStatus,
-  canRequestRefresh,
-  isQueueingPlanRefresh,
-  onQueuePlanRefresh,
-}: {
-  planStatus: OnboardingPlanStatus | null
-  canRequestRefresh: boolean
-  isQueueingPlanRefresh: boolean
-  onQueuePlanRefresh: () => void
-}) {
-  const isGenerating = planStatus === 'queued' || planStatus === 'running' || isQueueingPlanRefresh
-  const buttonLabel = isQueueingPlanRefresh
-    ? 'Queueing update...'
-    : isGenerating
-      ? 'Plan is being generated'
-      : planStatus === 'failed'
-        ? 'Retry Plan Generation'
-        : 'Generate Updated Plan'
-
-  return (
-    <div className="flex justify-start sm:justify-end">
-      <button
-        type="button"
-        onClick={onQueuePlanRefresh}
-        disabled={!canRequestRefresh || isQueueingPlanRefresh}
-        className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 sm:w-auto sm:justify-start disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
-      >
-        <RefreshCw className={`h-3.5 w-3.5 ${isQueueingPlanRefresh ? 'animate-spin' : ''}`} />
-        {buttonLabel}
-      </button>
-    </div>
-  )
 }
 
 function PlanCheckItem({
@@ -396,15 +427,11 @@ export default function PlanPage() {
           subtitle="Your personalized roadmap"
           planStatus={planStatus}
           planErrorCode={planErrorCode}
+          showPlanAction={showPlanStatusBanner}
+          canRequestRefresh={canRequestRefresh}
+          isQueueingPlanRefresh={isQueueingPlanRefresh}
+          onQueuePlanRefresh={() => void queuePlanRefresh()}
         />
-        {showPlanStatusBanner && (
-          <PlanStatusControls
-            planStatus={planStatus}
-            canRequestRefresh={canRequestRefresh}
-            isQueueingPlanRefresh={isQueueingPlanRefresh}
-            onQueuePlanRefresh={() => void queuePlanRefresh()}
-          />
-        )}
         {fallbackMarkdownContent ? (
           <Card className="border-border bg-surface pt-0">
             <CardContent className="px-4 pt-1 pb-4 sm:px-6 sm:pt-1 sm:pb-5 [&>*:first-child]:!mt-0">
@@ -428,15 +455,11 @@ export default function PlanPage() {
         subtitle="Your structured roadmap to interview success"
         planStatus={planStatus}
         planErrorCode={planErrorCode}
+        showPlanAction={showPlanStatusBanner}
+        canRequestRefresh={canRequestRefresh}
+        isQueueingPlanRefresh={isQueueingPlanRefresh}
+        onQueuePlanRefresh={() => void queuePlanRefresh()}
       />
-      {showPlanStatusBanner && (
-        <PlanStatusControls
-          planStatus={planStatus}
-          canRequestRefresh={canRequestRefresh}
-          isQueueingPlanRefresh={isQueueingPlanRefresh}
-          onQueuePlanRefresh={() => void queuePlanRefresh()}
-        />
-      )}
 
       {/* Weekly Rhythm */}
       {plan.weeklyRhythm?.length > 0 && (
