@@ -2,58 +2,22 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { createDashboardMarkdownComponents } from '@/components/markdown/dashboard-markdown-components'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { ParsedPlan, PlanItem } from '@/lib/parsers/plan-parser'
 import { parsePlan } from '@/lib/parsers/plan-parser'
 import { DOMAIN_COLORS } from '@/lib/theme'
-import { AlertTriangle, Calendar, CheckCircle2, ChevronRight, Info } from 'lucide-react'
+import { AlertTriangle, Calendar, CheckCircle2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import type { Components } from 'react-markdown'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
-const mdComponents: Components = {
-  h1: ({ children }) => <h1 className="text-xl font-display font-bold text-foreground mb-4">{children}</h1>,
-  h2: ({ children }) => (
-    <div className="flex items-center gap-2 mt-8 mb-3 px-3 py-2 rounded-lg border border-plan/30 bg-plan/5">
-      <ChevronRight className="h-3.5 w-3.5 opacity-50 shrink-0" />
-      <h2 className="text-sm font-display font-semibold text-foreground tracking-wide">{children}</h2>
-    </div>
-  ),
-  h3: ({ children }) => <h3 className="text-xs font-display font-semibold text-foreground/60 uppercase tracking-wider mt-5 mb-2 ml-1">{children}</h3>,
-  blockquote: ({ children }) => (
-    <div className="flex items-start gap-2.5 px-3.5 py-2.5 my-3 rounded-lg bg-coach/5 border border-coach/20">
-      <Info className="h-3.5 w-3.5 text-coach shrink-0 mt-0.5" />
-      <div className="text-[13px] text-foreground/50 leading-relaxed [&_p]:my-0">{children}</div>
-    </div>
-  ),
-  p: ({ children }) => <p className="text-[13px] text-foreground/75 my-1.5 leading-relaxed">{children}</p>,
-  ul: ({ children }) => <ul className="space-y-1.5 my-2 ml-1">{children}</ul>,
-  ol: ({ children }) => <ol className="space-y-1.5 my-2 ml-1 list-decimal list-inside">{children}</ol>,
-  li: ({ children }) => (
-    <li className="text-[13px] text-foreground/75 leading-relaxed flex items-start gap-2">
-      <span className="w-1.5 h-1.5 rounded-full bg-foreground/20 mt-[7px] shrink-0" />
-      <span className="flex-1">{children}</span>
-    </li>
-  ),
-  strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-  a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="text-plan hover:underline underline-offset-2">
-      {children}
-    </a>
-  ),
-  table: ({ children }) => (
-    <div className="my-3 rounded-lg border border-border/40 overflow-hidden">
-      <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>{children}</table>
-    </div>
-  ),
-  thead: ({ children }) => <thead className="bg-elevated/60">{children}</thead>,
-  th: ({ children }) => <th className="text-left text-[11px] uppercase tracking-wider font-medium py-2.5 px-3 text-foreground/50 border-b border-border/50">{children}</th>,
-  td: ({ children }) => <td className="py-2 px-3 text-foreground/70 border-b border-border/15 text-[13px]">{children}</td>,
-  tr: ({ children }) => <tr className="transition-colors hover:bg-elevated/20">{children}</tr>,
-  hr: () => <div className="my-4" />,
-}
+const mdComponents = createDashboardMarkdownComponents({
+  variant: 'plan',
+  accentClassName: 'border-plan/30 bg-plan/5',
+})
 
 const checklistItemMdComponents: Components = {
   p: ({ children }) => <span>{children}</span>,
