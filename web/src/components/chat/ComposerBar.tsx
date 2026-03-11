@@ -29,8 +29,11 @@ export function ComposerBar({
   textareaRef,
 }: ComposerBarProps) {
   return (
-    <div data-testid="composer-bar" className="border-t border-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shrink-0 bg-background/95 supports-backdrop-filter:backdrop-blur">
-      <div className="flex items-end gap-2">
+    <div
+      data-testid="composer-bar"
+      className="border-t border-border px-2.5 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] md:px-3 md:pt-3 md:pb-3 shrink-0 bg-background/95 supports-backdrop-filter:backdrop-blur"
+    >
+      <div className="flex items-end gap-1.5 md:gap-2">
         <Textarea
           data-testid="composer-input"
           ref={textareaRef}
@@ -38,7 +41,7 @@ export function ComposerBar({
           onChange={(event) => onInputChange(event.target.value)}
           onKeyDown={onKeyDown}
           placeholder={placeholder}
-          className="bg-elevated border-border resize-none min-h-[2.75rem] max-h-36"
+          className="bg-elevated border-border resize-none min-h-10 max-h-32"
           rows={1}
           disabled={isStreaming || isDisabled}
         />
@@ -48,7 +51,7 @@ export function ComposerBar({
             size="icon"
             variant="outline"
             onClick={onStop}
-            className="h-11 w-11 shrink-0"
+            className="h-10 w-10 shrink-0"
           >
             <Square className="h-4 w-4" />
           </Button>
@@ -58,7 +61,7 @@ export function ComposerBar({
             size="icon"
             onClick={onSend}
             disabled={!input.trim() || isDisabled}
-            className="h-11 w-11 shrink-0"
+            className="h-10 w-10 shrink-0"
           >
             <Send className="h-4 w-4" />
           </Button>
