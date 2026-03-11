@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createDashboardMarkdownComponents } from '@/components/markdown/dashboard-markdown-components'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ParsedPlan, PlanItem } from '@/lib/parsers/plan-parser'
 import { parsePlan } from '@/lib/parsers/plan-parser'
 import { DOMAIN_COLORS } from '@/lib/theme'
@@ -134,17 +135,27 @@ function PlanActionButton({
       : planStatus === 'failed'
         ? 'Retry Plan Generation'
         : 'Generate Updated Plan'
+  const tooltipText = isGenerating
+    ? 'Plan regeneration is currently in progress. You can keep using the app while this runs.'
+    : 'Regenerates your game plan using your latest profile updates. Your checklist progress remains intact.'
 
   return (
-    <button
-      type="button"
-      onClick={onQueuePlanRefresh}
-      disabled={!canRequestRefresh || isQueueingPlanRefresh}
-      className={`inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${className ?? ''}`}
-    >
-      <RefreshCw className={`h-3.5 w-3.5 ${isQueueingPlanRefresh ? 'animate-spin' : ''}`} />
-      {buttonLabel}
-    </button>
+    <TooltipProvider delay={180}>
+      <Tooltip>
+        <TooltipTrigger
+          type="button"
+          onClick={onQueuePlanRefresh}
+          disabled={!canRequestRefresh || isQueueingPlanRefresh}
+          className={`inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${className ?? ''}`}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isQueueingPlanRefresh ? 'animate-spin' : ''}`} />
+          {buttonLabel}
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[18rem] leading-snug">
+          {tooltipText}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
