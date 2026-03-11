@@ -58,6 +58,47 @@ class ProviderStreamError extends Error {
   }
 }
 
+class ClientStreamClosedError extends Error {
+  constructor() {
+    super('Client stream is already closed.')
+    this.name = 'ClientStreamClosedError'
+  }
+}
+
+function isControllerAlreadyClosedError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  const maybeCode = (error as Error & { code?: string }).code
+  return maybeCode === 'ERR_INVALID_STATE' || error.message.includes('Controller is already closed')
+}
+
+function enqueueSseFrame(
+  controller: ReadableStreamDefaultController<Uint8Array>,
+  encoder: TextEncoder,
+  payload: string,
+): void {
+  try {
+    controller.enqueue(encoder.encode(payload))
+  } catch (error) {
+    if (isControllerAlreadyClosedError(error)) {
+      throw new ClientStreamClosedError()
+    }
+    throw error
+  }
+}
+
+function closeSseStream(controller: ReadableStreamDefaultController<Uint8Array>): void {
+  try {
+    controller.close()
+  } catch (error) {
+    if (!isControllerAlreadyClosedError(error)) {
+      throw error
+    }
+  }
+}
+
 async function buildSystemPrompt(
   userId: string,
   mode: string | undefined,
@@ -151,7 +192,7 @@ async function streamAnthropic(
   for await (const event of stream) {
     if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
       assistantMessageContent += event.delta.text
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`))
+      enqueueSseFrame(controller, encoder, `data: ${JSON.stringify({ text: event.delta.text })}\n\n`)
     }
   }
 
@@ -252,7 +293,7 @@ async function streamOpenRouterModel(
       if (deltaText) {
         streamStarted = true
         assistantMessageContent += deltaText
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: deltaText })}\n\n`))
+        enqueueSseFrame(controller, encoder, `data: ${JSON.stringify({ text: deltaText })}\n\n`)
       }
 
       const usagePayload = parsed.usage as { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown } | undefined
@@ -295,6 +336,9 @@ async function streamOpenRouterWithFallback(
       return await streamOpenRouterModel(apiKey, candidate, systemPrompt, messages, controller, encoder)
     } catch (error) {
       lastError = error
+      if (error instanceof ClientStreamClosedError) {
+        throw error
+      }
       const isFinalCandidate = index === candidates.length - 1
       if (isFinalCandidate) {
         throw error
@@ -488,23 +532,23 @@ export async function POST(request: NextRequest) {
 
           const usage = assistantResult.usage
           const estimatedCostMicrousd = estimateCostMicrousd(resolvedProvider, assistantResult.modelUsed, usage)
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: 'usage',
-                provider: resolvedProvider,
-                model: assistantResult.modelUsed,
-                inputTokens: usage.inputTokens,
-                outputTokens: usage.outputTokens,
-                totalTokens: usage.totalTokens,
-                estimatedCostMicrousd,
-                latencyMs: assistantResult.latencyMs,
-              })}\n\n`,
-            ),
+          enqueueSseFrame(
+            controller,
+            encoder,
+            `data: ${JSON.stringify({
+              type: 'usage',
+              provider: resolvedProvider,
+              model: assistantResult.modelUsed,
+              inputTokens: usage.inputTokens,
+              outputTokens: usage.outputTokens,
+              totalTokens: usage.totalTokens,
+              estimatedCostMicrousd,
+              latencyMs: assistantResult.latencyMs,
+            })}\n\n`,
           )
 
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-          controller.close()
+          enqueueSseFrame(controller, encoder, 'data: [DONE]\n\n')
+          closeSseStream(controller)
           streamClosed = true
 
           if (sessionId && lastUserMessage && assistantResult) {
@@ -580,10 +624,21 @@ export async function POST(request: NextRequest) {
             }
           }
         } catch (error) {
+          if (error instanceof ClientStreamClosedError) {
+            streamClosed = true
+            return
+          }
+
           if (!streamClosed) {
             console.error('Chat stream failed', error)
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: CHAT_STREAM_ERROR_MESSAGE })}\n\n`))
-            controller.close()
+            try {
+              enqueueSseFrame(controller, encoder, `data: ${JSON.stringify({ error: CHAT_STREAM_ERROR_MESSAGE })}\n\n`)
+            } catch (streamWriteError) {
+              if (!(streamWriteError instanceof ClientStreamClosedError)) {
+                console.error('Failed to write stream error payload', streamWriteError)
+              }
+            }
+            closeSseStream(controller)
             return
           }
 
