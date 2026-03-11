@@ -30,6 +30,12 @@ for (const scenario of scenarios) {
     await expect(composer).toBeVisible()
     await expect(scrollContainer).toBeVisible()
 
+    if (scenario.width < 768) {
+      await expect(page.getByTestId('mobile-bottom-nav')).toHaveCount(0)
+      await expect(page.getByTestId('mobile-coach-toggle')).toBeVisible()
+      await expect(page.getByTestId('mobile-coach-toggle')).toHaveText('Back Home')
+    }
+
     const before = await composer.boundingBox()
     await scrollContainer.evaluate((node) => {
       node.scrollTop = node.scrollHeight

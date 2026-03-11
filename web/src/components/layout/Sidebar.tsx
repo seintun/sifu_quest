@@ -161,6 +161,9 @@ export function Sidebar() {
 }
 
 export function MobileSidebar() {
+  const pathname = usePathname()
+  const onCoachRoute = pathname.startsWith('/coach')
+
   return (
     <div
       data-testid="mobile-sidebar-header"
@@ -168,8 +171,12 @@ export function MobileSidebar() {
     >
       <div className="flex h-full items-center justify-between px-3">
         <h1 className="font-display text-base font-bold text-foreground">Sifu Quest</h1>
-        <Link href="/coach" className="text-xs text-coach hover:text-coach/80 transition-colors">
-          Open Coach
+        <Link
+          href={onCoachRoute ? '/' : '/coach'}
+          data-testid="mobile-coach-toggle"
+          className="text-xs text-coach hover:text-coach/80 transition-colors"
+        >
+          {onCoachRoute ? 'Back Home' : 'Open Coach'}
         </Link>
       </div>
     </div>
@@ -178,6 +185,7 @@ export function MobileSidebar() {
 
 export function MobileBottomNav() {
   const pathname = usePathname()
+  const onCoachRoute = pathname.startsWith('/coach')
   const [open, setOpen] = useState(false)
   const { isGuest, accountStatus } = useAuthStatus()
   const [pendingLogout, setPendingLogout] = useState(false)
@@ -210,6 +218,10 @@ export function MobileBottomNav() {
   const handleSignOut = async () => {
     setIsSigningOut(true)
     await performSignOut()
+  }
+
+  if (onCoachRoute) {
+    return null
   }
 
   return (
