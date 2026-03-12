@@ -23,7 +23,7 @@ import { getAnthropicModelCostTier } from '@/lib/chat-provider-config'
 import type { ChatModelOption, ChatProviderOption } from '@/hooks/useChat'
 import { Briefcase, Coins, Lightbulb, LockKeyhole, Medal, MessageSquare, Network, Settings2, Sparkles, Trash2, Trophy } from 'lucide-react'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
 export type ModeOption = {
   value: string
@@ -145,19 +145,19 @@ function ProviderOptionLabel({ provider }: { provider: ChatProviderOption }) {
 
 function ModeOptionContent({ mode }: { mode: ModeOption }) {
   const source = `${mode.value.toLowerCase()} ${mode.label.toLowerCase()}`
-  const Icon = source.includes('system')
-    ? Network
+  const { Icon, colorClassName } = source.includes('system')
+    ? { Icon: Network, colorClassName: 'text-design' }
     : source.includes('interview')
-      ? MessageSquare
+      ? { Icon: MessageSquare, colorClassName: 'text-primary' }
       : source.includes('job')
-      ? Briefcase
+      ? { Icon: Briefcase, colorClassName: 'text-jobs' }
       : source.includes('business')
-        ? Lightbulb
-        : Medal
+        ? { Icon: Lightbulb, colorClassName: 'text-warning' }
+        : { Icon: Medal, colorClassName: 'text-dsa' }
 
   return (
     <span className="inline-flex items-center gap-2">
-      <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+      <Icon className={`h-3.5 w-3.5 ${colorClassName}`} />
       <span>{mode.label}</span>
     </span>
   )
@@ -383,7 +383,7 @@ export function DesktopChatControls(props: SharedControlProps) {
                 variant="ghost"
                 size="sm"
                 onClick={props.onClear}
-                className="text-muted-foreground hover:text-danger"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-danger/35 bg-gradient-to-r from-danger/20 via-danger/10 to-danger/5 text-danger shadow-[0_8px_24px_rgb(239_68_68_/_0.2)] backdrop-blur hover:border-danger/55 hover:from-danger/25 hover:to-danger/10"
                 aria-label="Clear chat history"
               >
                 <Trash2 className="h-4 w-4" />
@@ -399,7 +399,13 @@ export function DesktopChatControls(props: SharedControlProps) {
   )
 }
 
-export function ResponsiveChatControls(props: SharedControlProps) {
+type ResponsiveChatControlsProps = SharedControlProps & {
+  triggerClassName?: string
+  triggerContent?: ReactNode
+  triggerAriaLabel?: string
+}
+
+export function ResponsiveChatControls(props: ResponsiveChatControlsProps) {
   const [open, setOpen] = useState(false)
   const [isTabletUp, setIsTabletUp] = useState(false)
 
@@ -412,12 +418,23 @@ export function ResponsiveChatControls(props: SharedControlProps) {
   }, [])
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
-        render={<button className="inline-flex xl:hidden items-center gap-1.5 rounded-lg border border-border px-2.5 h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-elevated" aria-label="Open chat controls" />}
+        render={(
+          <button
+            className={props.triggerClassName ?? 'inline-flex xl:hidden h-8 items-center gap-1.5 rounded-xl border border-plan/35 bg-gradient-to-r from-plan/20 via-plan/10 to-plan/5 px-2.5 text-xs font-display font-semibold text-plan shadow-[0_8px_24px_rgb(244_63_94_/_0.2)] backdrop-blur hover:border-plan/55 hover:from-plan/25 hover:to-plan/10'}
+            aria-label={props.triggerAriaLabel ?? 'Open chat controls'}
+          />
+        )}
       >
-        <Settings2 className="h-3.5 w-3.5" />
-        Controls
+        {props.triggerContent ?? (
+          <>
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-lg bg-plan/20 ring-1 ring-plan/35">
+              <Settings2 className="h-3 w-3" />
+            </span>
+            Controls
+          </>
+        )}
       </SheetTrigger>
       <SheetContent
         side={isTabletUp ? 'right' : 'bottom'}

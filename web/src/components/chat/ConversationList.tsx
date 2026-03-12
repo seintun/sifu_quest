@@ -95,7 +95,7 @@ const ChatBubble = memo(function ChatBubble({
   if (message.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="bg-elevated rounded-xl p-3 text-sm max-w-[85%] whitespace-pre-wrap text-foreground/90">
+        <div className="rounded-2xl border border-primary/35 bg-gradient-to-r from-primary/22 via-primary/14 to-primary/8 p-3 text-sm max-w-[85%] whitespace-pre-wrap text-foreground/95 shadow-[0_8px_22px_rgb(99_102_241_/_0.2)] backdrop-blur">
           {message.content}
         </div>
       </div>
@@ -104,7 +104,7 @@ const ChatBubble = memo(function ChatBubble({
 
   return (
     <div className="flex justify-start">
-      <div className="bg-surface border border-coach/15 rounded-xl p-3.5 md:p-4 text-sm max-w-[92%] shadow-sm overflow-x-auto">
+      <div className="rounded-2xl border border-coach/22 bg-surface/95 p-3.5 md:p-4 text-sm max-w-[92%] shadow-[0_8px_20px_rgb(14_165_233_/_0.08)] backdrop-blur overflow-x-auto">
         {isStreaming ? (
           <div className="whitespace-pre-wrap text-foreground/85 leading-relaxed">
             {normalizedContent}

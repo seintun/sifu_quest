@@ -16,7 +16,7 @@ import { useChat } from "@/hooks/useChat";
 import { BRAND_NAME, MODE_LABELS, NAV_COPY } from "@/lib/brand";
 import { buildSystemMeta, getSystemMessage } from "@/lib/chat-system-messages";
 import { fetcher } from "@/lib/fetcher";
-import { ArrowDown, KeyRound, MessageCircle, RotateCcw } from "lucide-react";
+import { ArrowDown, ChevronDown, KeyRound, MessageCircle, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import {
   useCallback,
@@ -360,14 +360,30 @@ export default function CoachPage() {
     onClear: handleClearHistory,
     byokNotice,
   };
+  const askSifuCtaClassName =
+    "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-xl border border-coach/35 bg-gradient-to-r from-coach/20 via-coach/10 to-coach/5 px-2.5 text-xs font-display font-semibold text-coach shadow-[0_8px_24px_rgb(14_165_233_/_0.2)] backdrop-blur cursor-pointer transition-all duration-150 hover:border-coach/60 hover:from-coach/25 hover:to-coach/10 hover:shadow-[0_10px_30px_rgb(14_165_233_/_0.28)] active:scale-[0.98]";
+  const askSifuCtaContent = (
+    <>
+      <span className="inline-flex h-5 w-5 items-center justify-center rounded-lg bg-coach/20 ring-1 ring-coach/35">
+        <MessageCircle className="h-3 w-3 text-coach shrink-0" />
+      </span>
+      <span>{NAV_COPY.askSifu}</span>
+      <span className="relative top-px text-[10px] text-coach/70">
+        ({selectedModeInlineLabel})
+      </span>
+      <span className="inline-flex h-4 w-4 items-center justify-center rounded-md border border-coach/40 bg-coach/15">
+        <ChevronDown className="h-2.5 w-2.5 opacity-90" />
+      </span>
+    </>
+  );
 
   return (
     <div
       data-testid="coach-shell"
       className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+3.25rem)] bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] flex flex-col overflow-hidden md:static md:h-[calc(100dvh-3rem)]"
     >
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 pt-[env(safe-area-inset-top)]">
-        <div className="relative flex h-12 items-center gap-2 border-b border-border/40 bg-surface/30 px-3 backdrop-blur-xl">
+      <div className="xl:hidden fixed top-0 left-0 right-0 md:left-56 z-40 pt-[env(safe-area-inset-top)]">
+        <div className="grid h-12 grid-cols-[auto_1fr_auto] items-center gap-2 border-b border-border/40 bg-surface/30 px-3 backdrop-blur-xl">
           <Link
             href="/"
             aria-label="Go to Home Dashboard"
@@ -375,34 +391,38 @@ export default function CoachPage() {
           >
             {BRAND_NAME}
           </Link>
-          <p className="pointer-events-none absolute left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-display font-semibold text-foreground">
-            <MessageCircle className="h-4 w-4 text-coach shrink-0" />
-            <span>{NAV_COPY.askSifu}</span>
-            <span className="relative top-px text-[11px] text-muted-foreground/90">
-              ({selectedModeInlineLabel})
-            </span>
-          </p>
-          <div className="ml-auto">
-            <ResponsiveChatControls {...responsiveControlsProps} />
+          <div className="justify-self-center">
+            <ResponsiveChatControls
+              {...responsiveControlsProps}
+              triggerClassName={askSifuCtaClassName}
+              triggerAriaLabel="Open chat controls"
+              triggerContent={askSifuCtaContent}
+            />
+          </div>
+          <div className="justify-self-end">
+            <button
+              type="button"
+              onClick={handleClearHistory}
+              aria-label="Clear chat history"
+              className="inline-flex h-8 items-center justify-center rounded-xl border border-danger/35 bg-gradient-to-r from-danger/20 via-danger/10 to-danger/5 px-2.5 text-danger hover:border-danger/55"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="hidden md:flex items-center justify-between gap-2 mb-2 shrink-0">
+      <div className="hidden xl:flex items-center justify-between gap-2 mb-2 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <MessageCircle className="h-[18px] w-[18px] text-coach shrink-0" />
-          <div className="min-w-0 flex items-baseline gap-2">
-            <h1 className="font-display text-xl md:text-2xl leading-tight font-bold truncate">
-              {NAV_COPY.askSifu}
-            </h1>
-            <span className="relative top-px text-xs text-muted-foreground/90 whitespace-nowrap">
-              ({selectedModeInlineLabel})
-            </span>
-          </div>
+          <ResponsiveChatControls
+            {...responsiveControlsProps}
+            triggerClassName={askSifuCtaClassName}
+            triggerAriaLabel="Open chat controls"
+            triggerContent={askSifuCtaContent}
+          />
         </div>
 
         <div className="flex items-center gap-2">
-          <ResponsiveChatControls {...responsiveControlsProps} />
           <DesktopChatControls
             providers={providers}
             selectedProvider={selectedProvider}
@@ -419,7 +439,7 @@ export default function CoachPage() {
       </div>
 
       {isAnthropicLocked && anthropicProvider?.reason && (
-        <div className="hidden md:flex mb-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] text-warning items-center justify-between gap-2 shrink-0">
+        <div className="hidden xl:flex mb-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] text-warning items-center justify-between gap-2 shrink-0">
           <span className="inline-flex items-center gap-1.5 flex-1 min-w-0 whitespace-nowrap">
             <KeyRound className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">
