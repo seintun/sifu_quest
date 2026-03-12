@@ -1,5 +1,29 @@
 "use client";
 
+const SIFU_MODE_STORAGE_KEY = 'sifu-mode-v1'
+
+function getStoredMode(): string {
+  if (typeof window === 'undefined') return 'dsa'
+  try {
+    const stored = window.localStorage.getItem(SIFU_MODE_STORAGE_KEY)
+    if (stored && MODE_LABELS[stored as keyof typeof MODE_LABELS]) {
+      return stored
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return 'dsa'
+}
+
+function persistMode(mode: string): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(SIFU_MODE_STORAGE_KEY, mode)
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 import { ApiKeyPrompt } from "@/components/ApiKeyPrompt";
 import {
   DesktopChatControls,
@@ -111,7 +135,12 @@ function ChatSkeleton() {
 }
 
 export default function CoachPage() {
-  const [mode, setMode] = useState("dsa");
+  const [mode, setMode] = useState(getStoredMode)
+
+  // Persist mode to localStorage when it changes
+  useEffect(() => {
+    persistMode(mode)
+  }, [mode])
   const {
     messages,
     setMessages,
@@ -375,6 +404,7 @@ export default function CoachPage() {
     onModeChange: handleModeChange,
     onClear: handleClearHistory,
     byokNotice,
+    isOpenRouterLocked: !hasProviderKey.openrouter,
   };
   const askSifuCtaClassName =
     "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-xl border border-coach/35 bg-gradient-to-r from-coach/20 via-coach/10 to-coach/5 px-2.5 text-xs font-display font-semibold text-coach shadow-[0_8px_24px_rgb(14_165_233_/_0.2)] backdrop-blur cursor-pointer transition-all duration-150 hover:border-coach/60 hover:from-coach/25 hover:to-coach/10 hover:shadow-[0_10px_30px_rgb(14_165_233_/_0.28)] active:scale-[0.98]";
@@ -398,7 +428,7 @@ export default function CoachPage() {
       data-testid="coach-shell"
       className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+3.25rem)] bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] flex flex-col overflow-hidden md:static md:h-[calc(100dvh-3rem)]"
     >
-      <div className="xl:hidden fixed top-0 left-0 right-0 md:left-56 z-40 pt-[env(safe-area-inset-top)]">
+      <div className="xl:hidden fixed top-0 left-0 right-0 md:left-64 z-40 pt-[env(safe-area-inset-top)]">
         <div className="grid h-12 grid-cols-[auto_1fr_auto] items-center gap-2 border-b border-border/10 bg-surface/10 px-3 backdrop-blur-2xl">
           <Link
             href="/"
@@ -454,6 +484,7 @@ export default function CoachPage() {
             selectedMode={mode}
             onModeChange={handleModeChange}
             onClear={handleClearHistory}
+            isOpenRouterLocked={!hasProviderKey.openrouter}
           />
         </div>
       </div>
@@ -515,7 +546,7 @@ export default function CoachPage() {
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
                 data-testid="conversation-scroll"
-                className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-3 pb-28 md:px-4 md:pt-4 md:pb-32"
+                className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-3 pt-16 pb-28 md:px-4 md:pb-32 xl:pt-4"
               >
                 <ConversationList
                   messages={messages}

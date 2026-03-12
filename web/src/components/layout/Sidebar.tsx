@@ -227,7 +227,7 @@ export function Sidebar() {
   return (
     <aside
       data-testid="desktop-sidebar"
-      className="hidden md:flex w-56 flex-col fixed inset-y-0 left-0 bg-surface border-r border-border z-30"
+      className="hidden md:flex w-64 flex-col fixed inset-y-0 left-0 bg-surface border-r border-border z-30"
     >
       <div className="p-4 border-b border-border">
         <h1 className="font-display text-lg font-bold text-violet-200">{BRAND_NAME}</h1>

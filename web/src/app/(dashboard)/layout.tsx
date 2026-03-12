@@ -22,7 +22,7 @@ export default function DashboardLayout({
       <MobileBottomNav />
       <main
         className={cn(
-          "md:ml-56 min-h-screen md:pt-0 md:pb-0",
+          "md:ml-64 min-h-screen md:pt-0 md:pb-0",
           onCoachRoute
             ? "pt-0 pb-0 overflow-hidden"
             : "pt-12 pb-[calc(env(safe-area-inset-bottom)+4.5rem)]",

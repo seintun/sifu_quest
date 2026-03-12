@@ -180,7 +180,7 @@ export function createPlanJobPayload(
 function buildProfileContent(data: LegacyOnboardingPayload): string {
   return `# User Profile
 
-> Auto-maintained by Claude. Updated after substantive sessions.
+> Auto-maintained by Sifu Assistant. Updated after substantive sessions.
 
 ---
 
@@ -232,7 +232,7 @@ ${data.weaknesses
 function buildProgressContent(data: LegacyOnboardingPayload): string {
   return `# Progress Tracker
 
-> Auto-maintained by Claude. Updated after substantive sessions.
+> Auto-maintained by Sifu Assistant. Updated after substantive sessions.
 
 ---
 

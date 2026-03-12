@@ -326,7 +326,7 @@ export function useChat(mode: string) {
   }, [modelGroupsByProvider, modelsByProvider])
 
   const loadAllOpenRouterModels = useCallback(async () => {
-    if (isLoadingOpenRouterAllModels) return
+    if (isLoadingOpenRouterAllModels || !hasProviderKey.openrouter) return
     openRouterCatalogAbortRef.current?.abort()
     const controller = new AbortController()
     openRouterCatalogAbortRef.current = controller
@@ -362,7 +362,7 @@ export function useChat(mode: string) {
         setIsLoadingOpenRouterAllModels(false)
       }
     }
-  }, [isLoadingOpenRouterAllModels])
+  }, [isLoadingOpenRouterAllModels, hasProviderKey.openrouter])
 
   const updateModelSelection = useCallback((modelId: string) => {
     setUpgradeRequired(null)

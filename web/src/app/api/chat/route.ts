@@ -2,8 +2,8 @@ import { auth } from '@/auth'
 import { decryptKey } from '@/lib/apikey'
 import { ensureUserProfile, touchUserLastActiveAt } from '@/lib/account-state'
 import { sanitizeIncomingChatMessages } from '@/lib/chat-message-sanitizer'
+import { estimateCostMicrousd, normalizeTokenUsage, parseUsdToMicrousd, type TokenUsage } from '@/lib/chat-usage'
 import { loadChatEntitlements } from '@/lib/chat-entitlements'
-import { estimateCostMicrousd, normalizeTokenUsage, type TokenUsage } from '@/lib/chat-usage'
 import {
   isMissingMessageTelemetryColumnError,
   isMissingSessionTelemetryColumnError,
@@ -54,6 +54,7 @@ function getEnrichmentCoachQuestion(promptKey: string | null): string | null {
 type StreamResult = {
   assistantContent: string
   usage: TokenUsage
+  providerReportedCostMicrousd: number | null
   requestId: string | null
   latencyMs: number
   modelUsed: string
@@ -127,6 +128,15 @@ function isMissingRpcFunctionError(
 ): boolean {
   if (!error) return false
   return error.code === 'PGRST202' || Boolean(error.message?.includes(functionName)) || Boolean(error.message?.includes('Could not find the function'))
+}
+
+function resolveCostMicrousd(
+  provider: ChatProvider,
+  model: string,
+  usage: TokenUsage,
+  providerReportedCostMicrousd: number | null,
+): number | null {
+  return providerReportedCostMicrousd ?? estimateCostMicrousd(provider, model, usage)
 }
 
 type PersistTurnInput = {
@@ -446,6 +456,7 @@ async function streamAnthropic(
   return {
     assistantContent: assistantMessageContent,
     usage,
+    providerReportedCostMicrousd: null,
     requestId,
     latencyMs: Date.now() - startedAt,
     modelUsed: model,
@@ -496,6 +507,7 @@ async function streamOpenRouterModel(
   let assistantMessageContent = ''
   let streamStarted = false
   let usage = normalizeTokenUsage(null, null, null)
+  let providerReportedCostMicrousd: number | null = null
 
   while (true) {
     const { done, value } = await reader.read()
@@ -533,13 +545,23 @@ async function streamOpenRouterModel(
         enqueueSseFrame(controller, encoder, `data: ${JSON.stringify({ text: deltaText })}\n\n`)
       }
 
-      const usagePayload = parsed.usage as { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown } | undefined
+      const usagePayload = parsed.usage as {
+        prompt_tokens?: unknown
+        completion_tokens?: unknown
+        total_tokens?: unknown
+        cost?: unknown
+        total_cost?: unknown
+      } | undefined
       if (usagePayload) {
         usage = normalizeTokenUsage(
           usagePayload.prompt_tokens,
           usagePayload.completion_tokens,
           usagePayload.total_tokens,
         )
+        const liveCostMicrousd = parseUsdToMicrousd(usagePayload.cost) ?? parseUsdToMicrousd(usagePayload.total_cost)
+        if (liveCostMicrousd !== null) {
+          providerReportedCostMicrousd = liveCostMicrousd
+        }
       }
     }
   }
@@ -547,6 +569,7 @@ async function streamOpenRouterModel(
   return {
     assistantContent: assistantMessageContent,
     usage,
+    providerReportedCostMicrousd,
     requestId,
     latencyMs: Date.now() - startedAt,
     modelUsed: model,
@@ -794,7 +817,12 @@ export async function POST(request: NextRequest) {
           }
 
           const usage = assistantResult.usage
-          const estimatedCostMicrousd = estimateCostMicrousd(resolvedProvider, assistantResult.modelUsed, usage)
+          const estimatedCostMicrousd = resolveCostMicrousd(
+            resolvedProvider,
+            assistantResult.modelUsed,
+            usage,
+            assistantResult.providerReportedCostMicrousd,
+          )
           enqueueSseFrame(
             controller,
             encoder,
@@ -815,9 +843,7 @@ export async function POST(request: NextRequest) {
           streamClosed = true
 
           if (sessionId && lastUserMessage && assistantResult) {
-            const usageForPersistence = assistantResult.usage
-            const estimatedCostForPersistence = estimateCostMicrousd(resolvedProvider, assistantResult.modelUsed, usageForPersistence)
-            await persistChatTurn({
+            const persistInput: PersistTurnInput = {
               supabase,
               sessionId,
               userId,
@@ -825,12 +851,25 @@ export async function POST(request: NextRequest) {
               assistantContent: assistantResult.assistantContent,
               provider: resolvedProvider,
               model: assistantResult.modelUsed,
-              usage: usageForPersistence,
+              usage,
               latencyMs: assistantResult.latencyMs,
-              estimatedCostMicrousd: estimatedCostForPersistence,
+              estimatedCostMicrousd, // Reuse from SSE frame
               requestId: assistantResult.requestId,
               enforceQuota,
-            })
+            }
+
+            try {
+              await persistChatTurn(persistInput)
+            } catch (persistError) {
+              console.error('Post-stream persistence failed', {
+                sessionId,
+                userId,
+                provider: resolvedProvider,
+                model: assistantResult?.modelUsed,
+                requestId: assistantResult?.requestId,
+                error: persistError,
+              })
+            }
           }
         } catch (error) {
           if (error instanceof ClientStreamClosedError) {
@@ -850,8 +889,13 @@ export async function POST(request: NextRequest) {
             closeSseStream(controller)
             return
           }
-
-          console.error('Post-stream persistence failed after stream closed', error)
+          console.error('Unexpected post-close stream error', {
+            sessionId,
+            userId,
+            provider: resolvedProvider,
+            model: resolvedModel,
+            error,
+          })
         }
       },
     })

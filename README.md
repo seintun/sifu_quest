@@ -11,7 +11,7 @@ Breaking into top-tier tech companies is brutal. You're juggling LeetCode grindi
 Existing tools don't help much either:
 
 - **LeetCode** tracks _problems solved_, not _patterns mastered_
-- **ChatGPT/Claude** are powerful but stateless — every session starts from scratch
+- **Single-chat tools** are powerful but stateless — every session starts from scratch
 - **Notion/spreadsheets** require constant manual upkeep that falls apart under stress
 - **Paid coaching** costs $200+/hr and doesn't scale to daily practice
 
@@ -21,7 +21,7 @@ You need a system that **knows you** — your strengths, your gaps, your timelin
 
 ## What Sifu Quest Does
 
-Sifu Quest is an AI career coach powered by Claude that **remembers everything**. It turns scattered interview prep into a structured, trackable path to mastery.
+Sifu Quest is an AI career coach with a multi-provider model layer that **remembers everything**. It turns scattered interview prep into a structured, trackable path to mastery.
 
 ### 🧠 It Remembers You
 Your profile, learning style, career goals, and technical strengths are stored persistently. Every session picks up exactly where you left off — no re-explaining, no wasted time.
@@ -40,9 +40,9 @@ A visual dashboard shows your current streak, DSA patterns mastered, system desi
 
 ### 🔒 Your Data, Your Keys
 - **Free mode** uses a shared server OpenRouter key for users without a personal key (guest or signed-in): **10 user messages**
-- **Anthropic BYOK** — add your Anthropic API key in **Settings** to use Anthropic models
+- **Provider BYOK** — add your own OpenRouter and/or Anthropic API keys in **Settings**
 - **Infrastructure secrets** (`Supabase`, `Google OAuth`, shared `OPENROUTER_API_KEY`) are env-only (`.env.local` or Vercel env vars)
-- **Personal Anthropic keys** are encrypted before storage per user in Supabase, plaintext keys are never stored or logged
+- **Personal provider keys** are encrypted before storage per user in Supabase, plaintext keys are never stored or logged
 - **Server-side encryption secret** (`API_KEY_ENCRYPTION_SECRET`) is managed by app operators only; end users never provide it
 - **GDPR compliant** — delete your account and all data with one click
 
@@ -52,7 +52,7 @@ A visual dashboard shows your current streak, DSA patterns mastered, system desi
 
 - **Memory Source of Truth:** user memory/profile/plan markdown is stored in Supabase `memory_files`
 - **Coaching Modes:** prompts are loaded from `web/src/modes/*.md`
-- **Local Claude workspace files** (`.claude/*`, local `memory/*.md`) are tooling context, not the deployed app memory backend
+- **Local Codex/Claude workspace files** (`.claude/*`, local `memory/*.md`) are tooling context, not the deployed app memory backend
 
 ---
 
@@ -62,10 +62,10 @@ Sifu Quest was designed from day one with data privacy and security as non-negot
 
 | Layer | How It's Protected |
 |-------|-------------------|
-| **API Key Storage** | Users provide only `sk-ant-...`. Keys are encrypted server-side with **AES-256-CBC** and a unique random IV before storage. Plaintext keys are **never stored, logged, or shared**. |
+| **API Key Storage** | Users provide provider keys (for example `sk-ant-...`, `sk-or-...`). Keys are encrypted server-side with **AES-256-CBC** and a unique random IV before storage. Plaintext keys are **never stored, logged, or shared**. |
 | **Data Isolation** | Every database table uses Supabase **Row Level Security (RLS)**, guaranteeing that User A can never access User B's data — even through direct database queries. |
 | **Authentication** | Google OAuth 2.0 via NextAuth.js with JWT-based sessions. Tokens carry only the user's UUID — no sensitive data in the session payload. |
-| **Free-tier Guardrails** | Accounts without personal Anthropic keys are sandboxed to **10 user messages** on shared OpenRouter free models, enforced server-side in chat entitlement checks. |
+| **Free-tier Guardrails** | Accounts without personal provider keys are sandboxed to **10 user messages** on shared OpenRouter free models, enforced server-side in chat entitlement checks. |
 | **GDPR Compliance** | One-click account deletion wipes **all** user data across every table (profile, chat history, memory files, progress, audit logs) and removes the authentication record entirely. |
 | **Audit Trail** | Sensitive operations — API key changes, account deletions, plan generation — are logged to a tamper-evident `audit_log` table for full traceability. |
 | **Error Monitoring** | Sentry captures errors across client, server, and edge runtimes with configurable sampling rates, providing observability without exposing user data. |
@@ -76,7 +76,7 @@ Sifu Quest was designed from day one with data privacy and security as non-negot
 ## How It Works
 
 ```
-You ←→ Sifu Quest (Next.js on Vercel) ←→ Claude AI (Anthropic)
+You ←→ Sifu Quest (Next.js on Vercel) ←→ Provider Layer (OpenRouter, Anthropic, future providers)
                     ↕
               Supabase (PostgreSQL)
            Your profile, progress, chat history
@@ -87,7 +87,7 @@ You ←→ Sifu Quest (Next.js on Vercel) ←→ Claude AI (Anthropic)
 3. **Pick a mode** (DSA, System Design, Interview, Job Search, or Business Ideas)
 4. **Start learning** — Sifu reads your Supabase memory files to give context-aware coaching
 5. **Track progress** — your dashboard updates automatically as you log problems, toggle plan items, and chat
-6. **Use Anthropic models** by saving your personal Anthropic key in Settings
+6. **Use multiple providers/models** by saving provider keys in Settings and switching in chat controls
 
 Everything is saved in the cloud. Close your laptop, come back tomorrow, and Sifu picks up right where you left off.
 
@@ -106,7 +106,7 @@ npm install
 npm run dev
 ```
 
-> **Full setup instructions** (including how to get API keys from Google, Supabase, Anthropic, and Sentry) are in the **[Setup Guide](./docs/setup/local-development.md)**.
+> **Full setup instructions** (including how to get API keys from Google, Supabase, OpenRouter, Anthropic, and Sentry) are in the **[Setup Guide](./docs/setup/local-development.md)**.
 
 ---
 
@@ -130,7 +130,7 @@ npm run dev
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS |
 | Backend | Next.js API Routes (serverless on Vercel) |
 | Database | Supabase (PostgreSQL with Row Level Security) |
-| AI | Claude by Anthropic |
+| AI | Multi-provider: OpenRouter + Anthropic (extensible provider architecture) |
 | Auth | NextAuth.js + Supabase Auth (Google OAuth + Anonymous) |
 | Monitoring | Sentry |
 | Encryption | AES-256-CBC for stored API keys |

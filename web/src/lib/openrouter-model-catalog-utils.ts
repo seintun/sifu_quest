@@ -1,4 +1,10 @@
-import { isOpenRouterFreeModel, sanitizeModelLabel, type ChatModelDescriptor } from './chat-provider-config.ts'
+import {
+  generateModelId,
+  isOpenRouterFreeModel,
+  resolveModelRank,
+  sanitizeModelLabel,
+  type ChatModelDescriptor,
+} from './chat-provider-config.ts'
 
 export type OpenRouterModelRecord = {
   id?: string
@@ -24,6 +30,7 @@ function parseOpenRouterCreatedTimestamp(value: number | string | null | undefin
 
 export function normalizeOpenRouterModelRecords(records: OpenRouterModelRecord[]): ChatModelDescriptor[] {
   const byId = new Map<string, { id: string; created: number | null }>()
+
   for (const record of records) {
     const id = typeof record.id === 'string' ? record.id.trim() : ''
     if (!id) continue
@@ -46,6 +53,7 @@ export function normalizeOpenRouterModelRecords(records: OpenRouterModelRecord[]
     .map<ChatModelDescriptor>(({ id }) => ({
       id,
       label: sanitizeModelLabel(id),
+      modelId: generateModelId(id),
       provider: 'openrouter',
       isFree: isOpenRouterFreeModel(id),
       availability: 'available',
@@ -64,7 +72,7 @@ export function sortAndAnnotateOpenRouterModelsByRanking(
 
   return models
     .map((model) => {
-      const rank = rankById.get(model.id.toLowerCase())
+      const rank = resolveModelRank(rankById, model.id)
       return rank ? { ...model, recommendationRank: rank } : model
     })
     .sort((a, b) => {
@@ -82,19 +90,24 @@ export function buildRecommendedOpenRouterModels(
 ): ChatModelDescriptor[] {
   if (models.length === 0 || limit <= 0) return []
 
+  // If no ranking data, return first N models sorted by recency
   if (dynamicOrder.length === 0) {
     return models.slice(0, Math.min(models.length, limit))
   }
 
+  // Build rank map from order
   const rankById = new Map<string, number>(dynamicOrder.map((id, index) => [id.toLowerCase(), index + 1]))
-  const ranked: ChatModelDescriptor[] = []
 
+  // Filter models that appear in rankings and add their rank
+  const ranked: ChatModelDescriptor[] = []
   for (const model of models) {
-    const rank = rankById.get(model.id.toLowerCase())
-    if (!rank) continue
-    ranked.push({ ...model, recommendationRank: rank })
+    const rank = resolveModelRank(rankById, model.id)
+    if (rank) {
+      ranked.push({ ...model, recommendationRank: rank })
+    }
   }
 
+  // Sort by rank
   if (ranked.length > 0) {
     ranked.sort((a, b) => {
       const rankA = a.recommendationRank ?? Number.MAX_SAFE_INTEGER
@@ -105,5 +118,6 @@ export function buildRecommendedOpenRouterModels(
     return ranked.slice(0, limit)
   }
 
+  // Fallback: return newest models
   return models.slice(0, Math.min(models.length, limit))
 }
