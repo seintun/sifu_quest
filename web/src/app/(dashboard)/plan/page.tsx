@@ -9,8 +9,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import type { ParsedPlan, PlanItem } from '@/lib/parsers/plan-parser'
 import { parsePlan } from '@/lib/parsers/plan-parser'
 import { DOMAIN_COLORS } from '@/lib/theme'
+import { normalizeMarkdownContent } from '@/lib/markdown-formatting'
 import { AlertTriangle, Calendar, CheckCircle2, RefreshCw } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { fetcher } from '@/lib/fetcher'
 import type { Components } from 'react-markdown'
@@ -238,6 +239,7 @@ function PlanCheckItem({
   onToggle: (id: string, checked: boolean) => void
 }) {
   const [loading, setLoading] = useState(false)
+  const normalizedItemText = useMemo(() => normalizeMarkdownContent(item.text), [item.text])
 
   const handleToggle = async () => {
     setLoading(true)
@@ -255,7 +257,7 @@ function PlanCheckItem({
       />
       <div className={`text-sm ${item.checked ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={checklistItemMdComponents}>
-          {item.text}
+          {normalizedItemText}
         </ReactMarkdown>
       </div>
     </div>
@@ -424,6 +426,7 @@ export default function PlanPage() {
   const canRequestRefresh = planStatus !== null && planStatus !== 'queued' && planStatus !== 'running'
   const showPlanStatusBanner = shouldShowPlanStatusBanner(planStatus)
   const fallbackMarkdownContent = stripLeadingHeading(rawContent)
+  const normalizedFallbackMarkdownContent = normalizeMarkdownContent(fallbackMarkdownContent)
 
   // AI-generated plan: fall back to markdown rendering
   if (!hasStructuredContent(plan)) {
@@ -444,7 +447,7 @@ export default function PlanPage() {
           <Card className="border-border bg-surface mt-8 sm:mt-10 p-6 py-8 sm:p-10 sm:py-12">
             <CardContent className="p-0 [&>*:first-child]:!mt-0">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-                {fallbackMarkdownContent}
+                {normalizedFallbackMarkdownContent}
               </ReactMarkdown>
             </CardContent>
           </Card>

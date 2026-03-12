@@ -3,7 +3,7 @@
 import { consumeChatStream } from '@/lib/chat/stream-parser'
 import { applyQuotaOnChatError } from '@/lib/chat-quota-ui'
 import { buildSystemMeta, getSystemMessage, type ChatMessageMeta } from '@/lib/chat-system-messages'
-import type { ChatProvider, ModelAvailability } from '@/lib/chat-provider-config'
+import { isChatProvider, type ChatProvider, type ModelAvailability } from '@/lib/chat-provider-config'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface FreeQuota {
@@ -64,6 +64,55 @@ type ChatSessionResponse = {
 }
 
 const PAGE_SIZE = 40
+const CHAT_SELECTION_STORAGE_KEY = 'sifu-chat-selection-v1'
+
+type ChatSelection = {
+  provider: ChatProvider
+  model: string
+}
+
+function readStoredSelection(): ChatSelection | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw = window.localStorage.getItem(CHAT_SELECTION_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { provider?: unknown; model?: unknown }
+    if (!isChatProvider(parsed.provider) || typeof parsed.model !== 'string') return null
+    return { provider: parsed.provider, model: parsed.model }
+  } catch {
+    return null
+  }
+}
+
+function persistSelection(selection: ChatSelection): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(CHAT_SELECTION_STORAGE_KEY, JSON.stringify(selection))
+  } catch {
+    // Ignore storage write failures (private mode / quota).
+  }
+}
+
+function resolveSelection(
+  candidate: ChatSelection | null,
+  modelsByProvider: Record<ChatProvider, ChatModelOption[]>,
+): ChatSelection | null {
+  if (!candidate) return null
+
+  const models = modelsByProvider[candidate.provider] ?? []
+  if (models.length === 0) return null
+
+  const exact = models.find((model) => model.id === candidate.model && model.availability === 'available')
+  if (exact) {
+    return { provider: candidate.provider, model: exact.id }
+  }
+
+  const fallback = models.find((model) => model.availability === 'available') ?? models[0]
+  if (!fallback) return null
+
+  return { provider: candidate.provider, model: fallback.id }
+}
 
 function toMicrousdDisplay(microusd: number): string {
   return `$${(microusd / 1_000_000).toFixed(4)}`
@@ -118,10 +167,18 @@ export function useChat(mode: string) {
   const abortRef = useRef<AbortController | null>(null)
   const bootstrapAbortRef = useRef<AbortController | null>(null)
   const olderAbortRef = useRef<AbortController | null>(null)
+  const storedSelectionRef = useRef<ChatSelection | null | undefined>(undefined)
 
   const applySelection = useCallback((provider: ChatProvider, model: string) => {
     setSelectedProvider(provider)
     setSelectedModel(model)
+  }, [])
+
+  const getStoredSelection = useCallback((): ChatSelection | null => {
+    if (storedSelectionRef.current === undefined) {
+      storedSelectionRef.current = readStoredSelection()
+    }
+    return storedSelectionRef.current
   }, [])
 
   const applyPaging = useCallback((paging: ChatSessionPaging | null | undefined) => {
@@ -163,11 +220,16 @@ export function useChat(mode: string) {
       if (bootstrapAbortRef.current !== controller) return
 
       setProviders(providerData.providers ?? [])
-      setModelsByProvider(providerData.modelsByProvider ?? { openrouter: [], anthropic: [] })
+      const nextModelsByProvider = providerData.modelsByProvider ?? { openrouter: [], anthropic: [] }
+      setModelsByProvider(nextModelsByProvider)
       setHasAnthropicKey(Boolean(providerData.account?.hasAnthropicKey))
 
-      if (providerData.defaults) {
-        applySelection(providerData.defaults.provider, providerData.defaults.model)
+      const sessionSelection = resolveSelection(sessionData.selection ?? null, nextModelsByProvider)
+      const storedSelection = resolveSelection(getStoredSelection(), nextModelsByProvider)
+      const defaultSelection = resolveSelection(providerData.defaults ?? null, nextModelsByProvider)
+      const nextSelection = sessionSelection ?? storedSelection ?? defaultSelection
+      if (nextSelection) {
+        applySelection(nextSelection.provider, nextSelection.model)
       }
 
       if (sessionData.session) {
@@ -176,10 +238,6 @@ export function useChat(mode: string) {
       } else {
         setSessionId(null)
         setMessages([])
-      }
-
-      if (sessionData.selection) {
-        applySelection(sessionData.selection.provider, sessionData.selection.model)
       }
 
       setSessionMetrics(sessionData.metrics ?? null)
@@ -195,7 +253,7 @@ export function useChat(mode: string) {
         bootstrapAbortRef.current = null
       }
     }
-  }, [mode, applySelection, applyPaging])
+  }, [mode, applySelection, applyPaging, getStoredSelection])
 
   useEffect(() => {
     abortRef.current?.abort()
@@ -244,6 +302,13 @@ export function useChat(mode: string) {
     setUpgradeRequired(null)
     setSelectedModel(modelId)
   }, [])
+
+  useEffect(() => {
+    if (!selectedModel) return
+    const selection = { provider: selectedProvider, model: selectedModel }
+    storedSelectionRef.current = selection
+    persistSelection(selection)
+  }, [selectedProvider, selectedModel])
 
   const ensureSession = useCallback(async (): Promise<string> => {
     if (sessionId) return sessionId
