@@ -40,7 +40,12 @@ The provider catalog now uses dynamic OpenRouter ranking data to order free mode
   - `#1`: trophy
   - `#2-#3`: medal
   - `#4+`: sparkles
-- Works for desktop and mobile controls.
+- Grouped menu sections now include:
+  - `Recommended for Coding`
+  - `Free Models`
+  - `All OpenRouter Models`
+- `Recommended for Coding` and `All OpenRouter Models` are collapsible/expandable (desktop + mobile).
+- `Free Models` provides a free-only filtered list even when BYOK unlocks paid models.
 
 ## Failure Handling
 The implementation intentionally never blocks chat model loading:

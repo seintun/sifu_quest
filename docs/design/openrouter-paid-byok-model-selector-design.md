@@ -8,7 +8,11 @@
 ## Selector Behavior
 - Model menu shows grouped OpenRouter sections:
   - `Recommended for Coding`
+  - `Free Models`
   - `All OpenRouter Models`
+- Group sections are collapsible/expandable in both desktop and mobile controls.
+  - Default: `Recommended for Coding` expanded.
+  - Default: `Free Models` and `All OpenRouter Models` collapsed.
 - `All OpenRouter Models` can be truncated on initial load for performance.
 - When truncated, show `Load full OpenRouter catalog` action in selector.
 - Add in-menu search for OpenRouter model IDs/labels.

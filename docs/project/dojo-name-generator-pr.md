@@ -2,7 +2,7 @@
 
 Adds two shipped scopes in one PR:
 - Dojo profile name generation in onboarding/settings with accessible micro-interactions.
-- OpenRouter programming ranking integration for model ordering and ranking badges in chat controls, plus related UI refinements.
+- OpenRouter programming ranking integration for model ordering and ranking badges in chat controls, plus grouped selector UX refinements (`Recommended`, `Free`, `All`) with collapsible sections.
 
 ## Proposal / Design Links
 
@@ -21,6 +21,8 @@ Users lacked fast, on-theme name inspiration during onboarding/profile setup, le
 - Add unit tests for generator behavior and timing constants.
 - Add dynamic OpenRouter programming ranking fetch/caching and annotate/sort model options by rank.
 - Show recommendation rank badges in model selectors and tighten control layout behavior.
+- Add explicit `Free Models` group in OpenRouter selector.
+- Make OpenRouter model groups collapsible/expandable in both mobile and desktop controls.
 
 ## Non-Goals
 
@@ -42,6 +44,8 @@ Users lacked fast, on-theme name inspiration during onboarding/profile setup, le
 - [x] Generate buttons include dice icon, accessible labeling, and tooltip text.
 - [x] Name generation feedback includes light animation and screen-reader live updates.
 - [x] Generator utility has 20+ options for each word list and deterministic tests.
+- [x] OpenRouter model selector has grouped sections for Recommended, Free, and All models.
+- [x] OpenRouter Recommended/All sections are collapsible/expandable on mobile and desktop.
 
 ## Implementation Notes
 
@@ -49,6 +53,8 @@ Users lacked fast, on-theme name inspiration during onboarding/profile setup, le
 - Kept existing `generateDojoTitle()` for compatibility and testability.
 - Centralized animation window in `DOJO_TITLE_ROLL_EFFECT_MS` and reused across onboarding/settings.
 - Reduced onboarding bootstrap state churn by merging draft + prefill + fallback into a single `setCore` update.
+- Extended provider catalog grouping with a dedicated `Free Models` OpenRouter group.
+- Added non-selectable group header toggle buttons with preserved keyboard/search behavior in model dropdowns.
 
 ## Alternatives Considered
 
@@ -65,11 +71,13 @@ Users lacked fast, on-theme name inspiration during onboarding/profile setup, le
 - Existing account display/prefill name is preserved; random prefill only used when both are absent.
 - Repeated rapid clicks reset animation timer cleanly without stacking leaks.
 - Timer cleanup on unmount prevents stale state updates.
+- OpenRouter search keeps matching grouped results visible while preserving section toggle state.
 
 ## DRY / Tech Debt Impact
 
 - DRY improvement: shared `DOJO_TITLE_ROLL_EFFECT_MS` avoids duplicated magic numbers.
 - DRY improvement: shared `generateDojoTitlePhrase()` avoids repeated string assembly logic.
+- DRY improvement: reused grouped rendering pattern across desktop and mobile model selectors.
 - No known new debt introduced.
 
 ## Architecture / Flow Diagram (Mermaid, if helpful)
@@ -81,6 +89,9 @@ flowchart TD
   UTIL --> NAME["Set name field value"]
   UI --> FX["runDojoNameRollEffect()"]
   FX --> FEEDBACK["Dice spin + input pulse + aria-live message"]
+  CATALOG["Provider catalog"] --> GROUPS["Recommended / Free / All groups"]
+  GROUPS --> CONTROLS["Desktop + Mobile model selector"]
+  CONTROLS --> TOGGLES["Collapsible section headers"]
 ```
 
 ## Test Plan
@@ -95,13 +106,15 @@ flowchart TD
 Commands run:
 
 ```bash
-npm test -- src/lib/dojo-title.test.mts src/lib/onboarding-name.test.mts src/lib/profile-name.test.mts
+npm run lint -- src/components/chat/ChatControls.tsx src/lib/provider-catalog.ts
+npm test
 ```
 
 Results:
 
-- Pass: 109 tests, 0 failures.
-- Verified deterministic generation, phrase helper behavior, list size minimums, and effect timing constant.
+- Pass: lint on touched selector/catalog files.
+- Pass: 128 tests, 0 failures.
+- Verified grouped OpenRouter selector behavior is wired through provider catalog and dropdown rendering paths.
 
 ### Manual Verification
 
@@ -111,6 +124,7 @@ Results:
 
 - Scenario 1: Onboarding name step shows generate button; clicking rerolls name and shows animation/feedback.
 - Scenario 2: Settings profile name section rerolls name and shows animation/feedback without save regressions.
+- Scenario 3: Coach model selector shows Recommended/Free/All groups and allows section collapse/expand on desktop and mobile.
 
 ## Risks and Mitigations
 
