@@ -2,8 +2,8 @@
 
 import type { FreeQuota, SessionUsageMetrics, ChatProviderOption } from '@/hooks/useChat'
 import { Button } from '@/components/ui/button'
-import { Sparkles } from 'lucide-react'
-import { useMemo } from 'react'
+import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
+import { useId, useMemo } from 'react'
 
 type StatusStripProps = {
   freeQuota: FreeQuota | null
@@ -24,6 +24,9 @@ export function StatusStrip({
   isExpanded,
   onToggle,
 }: StatusStripProps) {
+  const detailsId = useId()
+  const DetailsIcon = isExpanded ? ChevronUp : ChevronDown
+
   const summaryLabel = useMemo(() => {
     const labels: string[] = []
 
@@ -33,7 +36,7 @@ export function StatusStrip({
 
     if (sessionMetrics) {
       labels.push(`Turns ${sessionMetrics.userTurns}`)
-      labels.push(`Cost ${formatMicrousd(sessionMetrics.estimatedCostMicrousd)}`)
+      labels.push(formatMicrousd(sessionMetrics.estimatedCostMicrousd))
     }
 
     if (selectedProviderInfo?.availability !== 'available' && selectedProviderInfo?.reason) {
@@ -52,24 +55,29 @@ export function StatusStrip({
   if (!showAnything) return null
 
   return (
-    <div className="mb-2 rounded-md border border-border/60 bg-elevated/30 px-2.5 py-2">
+    <div className="mb-1">
       <Button
         type="button"
         variant="ghost"
         onClick={onToggle}
-        className="h-auto w-full justify-between px-1 py-0 text-xs text-foreground/80"
+        aria-expanded={isExpanded}
+        aria-controls={detailsId}
+        className="h-auto w-full justify-between rounded-md px-1.5 py-1 text-xs text-foreground/95 hover:bg-background/20"
       >
         <span className="inline-flex items-center gap-1.5 min-w-0 text-left">
           <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
           <span className="truncate">{summaryLabel}</span>
         </span>
-        <span>{isExpanded ? 'Hide' : 'Details'}</span>
+        <span className="inline-flex items-center gap-1 text-foreground">
+          <span>{isExpanded ? 'Hide details' : 'Details'}</span>
+          <DetailsIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        </span>
       </Button>
 
       {isExpanded && (
-        <div className="mt-2 space-y-2 text-xs text-foreground/80">
+        <div id={detailsId} className="mt-1 space-y-1 text-xs text-foreground/90 px-1">
           {freeQuota?.isFreeTier && selectedProvider === 'openrouter' && (
-            <div className="rounded-md border border-border/60 bg-elevated/40 px-3 py-2">
+            <div className="px-1.5 py-1">
               <div className="flex items-center justify-between gap-2 font-medium">
                 <span>Free tier usage</span>
                 <span>{freeQuota.remaining} / {freeQuota.total} remaining</span>
@@ -84,13 +92,13 @@ export function StatusStrip({
           )}
 
           {selectedProviderInfo?.availability !== 'available' && selectedProviderInfo?.reason && (
-            <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-warning">
+            <div className="px-1.5 py-1 text-warning">
               {selectedProviderInfo?.reason}
             </div>
           )}
 
           {sessionMetrics && (
-            <div className="rounded-md border border-border/60 bg-elevated/40 px-3 py-2">
+            <div className="px-1.5 py-1">
               <div className="flex flex-wrap gap-x-4 gap-y-1">
                 <span>Turns: {sessionMetrics.userTurns}</span>
                 <span>Input tokens: {sessionMetrics.inputTokens}</span>

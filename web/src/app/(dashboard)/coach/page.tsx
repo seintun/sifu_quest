@@ -13,10 +13,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { useChat } from "@/hooks/useChat";
-import { MODE_LABELS, NAV_COPY } from "@/lib/brand";
+import { BRAND_NAME, MODE_LABELS, NAV_COPY } from "@/lib/brand";
 import { buildSystemMeta, getSystemMessage } from "@/lib/chat-system-messages";
 import { fetcher } from "@/lib/fetcher";
-import { KeyRound, MessageCircle, RotateCcw } from "lucide-react";
+import { ArrowDown, KeyRound, MessageCircle, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import {
   useCallback,
@@ -68,6 +68,9 @@ const MODES: ModeOption[] = [
   { value: "job-search", label: MODE_LABELS["job-search"] },
   { value: "business-ideas", label: MODE_LABELS["business-ideas"] },
 ];
+
+const BYOK_NOTICE = "BYOK in Settings for unlimited chat.";
+const SCROLL_FOLLOW_THRESHOLD_PX = 80;
 
 function ChatSkeleton() {
   return (
@@ -131,6 +134,7 @@ export default function CoachPage() {
   const [dismissedPrompt, setDismissedPrompt] = useState(false);
   const [statusExpanded, setStatusExpanded] = useState(false);
   const [input, setInput] = useState("");
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
 
   const hasGreetedRef = useRef<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -196,6 +200,19 @@ export default function CoachPage() {
     isGuest,
   ]);
 
+  const syncScrollState = useCallback(() => {
+    if (!scrollContainerRef.current) return;
+    const container = scrollContainerRef.current;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    const nearBottom = distanceFromBottom < SCROLL_FOLLOW_THRESHOLD_PX;
+
+    if (!isStreaming) {
+      shouldAutoScrollRef.current = nearBottom;
+    }
+    setShowJumpToBottom(!nearBottom);
+  }, [isStreaming]);
+
   const scrollToBottom = useCallback(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop =
@@ -204,13 +221,38 @@ export default function CoachPage() {
   }, []);
 
   useEffect(() => {
-    if (shouldAutoScrollRef.current) {
-      scrollToBottom();
+    if (isStreaming) {
+      // Follow assistant output as it grows.
+      shouldAutoScrollRef.current = true;
+      const rafId = window.requestAnimationFrame(() => {
+        setShowJumpToBottom(false);
+      });
+      return () => window.cancelAnimationFrame(rafId);
     }
-  }, [messages, scrollToBottom]);
+    const rafId = window.requestAnimationFrame(() => {
+      syncScrollState();
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [isStreaming, syncScrollState]);
 
   useEffect(() => {
-    if (!isStreaming && textareaRef.current && !isQuotaBlocked) {
+    if (shouldAutoScrollRef.current) {
+      scrollToBottom();
+      return;
+    }
+    const rafId = window.requestAnimationFrame(() => {
+      syncScrollState();
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [messages, scrollToBottom, syncScrollState]);
+
+  useEffect(() => {
+    if (
+      !isStreaming &&
+      textareaRef.current &&
+      !isQuotaBlocked &&
+      window.matchMedia("(min-width: 768px)").matches
+    ) {
       textareaRef.current.focus();
     }
   }, [isStreaming, isQuotaBlocked]);
@@ -242,13 +284,8 @@ export default function CoachPage() {
   }, [isStreaming, isQuotaBlocked, messages, setMessages, isGuest]);
 
   const handleScroll = useCallback(() => {
-    if (!scrollContainerRef.current) return;
-
-    const container = scrollContainerRef.current;
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    shouldAutoScrollRef.current = distanceFromBottom < 80;
-  }, []);
+    syncScrollState();
+  }, [syncScrollState]);
 
   const handleClearHistory = () => {
     hasGreetedRef.current = null;
@@ -261,9 +298,20 @@ export default function CoachPage() {
     setStatusExpanded(false);
   };
 
+  const handleStatusToggle = useCallback(() => {
+    setStatusExpanded((prev) => !prev);
+  }, []);
+
+  const handleJumpToBottom = useCallback(() => {
+    scrollToBottom();
+    setShowJumpToBottom(false);
+  }, [scrollToBottom]);
+
   const handleSend = () => {
     const text = input.trim();
     if (!text || isStreaming) return;
+    shouldAutoScrollRef.current = true;
+    setShowJumpToBottom(false);
     setInput("");
     sendMessage(text);
   };
@@ -287,13 +335,52 @@ export default function CoachPage() {
   const isAnthropicLocked = Boolean(
     anthropicProvider && anthropicProvider.availability !== "available",
   );
+  const byokNotice = isAnthropicLocked ? BYOK_NOTICE : null;
+  const isComposerDisabled =
+    isQuotaBlocked || selectedProviderInfo?.availability !== "available";
+  const composerPlaceholder = isQuotaBlocked
+    ? isGuest
+      ? "Guest limit reached"
+      : "Free limit reached"
+    : "Type a message...";
+  const responsiveControlsProps = {
+    providers,
+    selectedProvider,
+    onProviderChange: updateProviderSelection,
+    models: availableModelsForSelectedProvider,
+    selectedModel,
+    onModelChange: updateModelSelection,
+    modes: MODES,
+    selectedMode: mode,
+    onModeChange: handleModeChange,
+    onClear: handleClearHistory,
+    byokNotice,
+  };
 
   return (
     <div
       data-testid="coach-shell"
-      className="flex flex-col h-[calc(100dvh-4.5rem)] md:h-[calc(100dvh-3rem)] overflow-hidden"
+      className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+3.25rem)] bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] flex flex-col overflow-hidden md:static md:h-[calc(100dvh-3rem)]"
     >
-      <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 pt-[env(safe-area-inset-top)]">
+        <div className="relative flex h-12 items-center gap-2 border-b border-border/40 bg-surface/30 px-3 backdrop-blur-xl">
+          <Link
+            href="/"
+            aria-label="Go to Home Dashboard"
+            className="inline-flex items-center rounded-full border border-border/70 bg-surface/35 px-3 py-1 text-sm font-display font-semibold text-foreground"
+          >
+            {BRAND_NAME}
+          </Link>
+          <p className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-base font-display font-semibold text-foreground">
+            {NAV_COPY.askSifu}
+          </p>
+          <div className="ml-auto">
+            <ResponsiveChatControls {...responsiveControlsProps} />
+          </div>
+        </div>
+      </div>
+
+      <div className="hidden md:flex items-center justify-between gap-2 mb-2 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <MessageCircle className="h-[18px] w-[18px] text-coach shrink-0" />
           <div className="min-w-0">
@@ -307,6 +394,9 @@ export default function CoachPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="lg:hidden">
+            <ResponsiveChatControls {...responsiveControlsProps} />
+          </div>
           <DesktopChatControls
             providers={providers}
             selectedProvider={selectedProvider}
@@ -319,21 +409,6 @@ export default function CoachPage() {
             onModeChange={handleModeChange}
             onClear={handleClearHistory}
           />
-          <ResponsiveChatControls
-            providers={providers}
-            selectedProvider={selectedProvider}
-            onProviderChange={updateProviderSelection}
-            models={availableModelsForSelectedProvider}
-            selectedModel={selectedModel}
-            onModelChange={updateModelSelection}
-            modes={MODES}
-            selectedMode={mode}
-            onModeChange={handleModeChange}
-            onClear={handleClearHistory}
-            byokNotice={
-              isAnthropicLocked ? `BYOK in Settings for unlimited chat.` : null
-            }
-          />
         </div>
       </div>
 
@@ -342,7 +417,7 @@ export default function CoachPage() {
           <span className="inline-flex items-center gap-1.5 flex-1 min-w-0 whitespace-nowrap">
             <KeyRound className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">
-              BYOK in Settings for unlimited chat.
+              {BYOK_NOTICE}
             </span>
           </span>
           <Link
@@ -383,7 +458,7 @@ export default function CoachPage() {
           ) : (
             <>
               {isQuotaBlocked && !isStreaming && !dismissedPrompt && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
                   {isGuest ? (
                     <UpgradePrompt onClose={() => setDismissedPrompt(true)} />
                   ) : (
@@ -396,7 +471,7 @@ export default function CoachPage() {
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
                 data-testid="conversation-scroll"
-                className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-3 md:p-4"
+                className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-3 pb-28 md:px-4 md:pt-4 md:pb-32"
               >
                 <ConversationList
                   messages={messages}
@@ -411,36 +486,44 @@ export default function CoachPage() {
                 />
               </div>
 
-              <StatusStrip
-                freeQuota={freeQuota}
-                selectedProvider={selectedProvider}
-                selectedProviderInfo={selectedProviderInfo}
-                sessionMetrics={sessionMetrics}
-                formatMicrousd={formatMicrousd}
-                isExpanded={statusExpanded}
-                onToggle={() => setStatusExpanded((prev) => !prev)}
-              />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-1.5 pb-1.5 md:px-2 md:pb-2">
+                <div className="pointer-events-auto rounded-2xl border border-border/45 bg-background/15 shadow-[0_12px_34px_rgb(2_6_23_/_0.36)] backdrop-blur-2xl">
+                  <div className="px-2 pt-1.5 md:px-2.5 md:pt-2">
+                    <StatusStrip
+                      freeQuota={freeQuota}
+                      selectedProvider={selectedProvider}
+                      selectedProviderInfo={selectedProviderInfo}
+                      sessionMetrics={sessionMetrics}
+                      formatMicrousd={formatMicrousd}
+                      isExpanded={statusExpanded}
+                      onToggle={handleStatusToggle}
+                    />
+                  </div>
 
-              <ComposerBar
-                input={input}
-                onInputChange={setInput}
-                onKeyDown={handleKeyDown}
-                onSend={handleSend}
-                isStreaming={isStreaming}
-                onStop={stopStreaming}
-                isDisabled={
-                  isQuotaBlocked ||
-                  selectedProviderInfo?.availability !== "available"
-                }
-                placeholder={
-                  isQuotaBlocked
-                    ? isGuest
-                      ? "Guest limit reached"
-                      : "Free limit reached"
-                    : "Type a message..."
-                }
-                textareaRef={textareaRef}
-              />
+                  <ComposerBar
+                    input={input}
+                    onInputChange={setInput}
+                    onKeyDown={handleKeyDown}
+                    onSend={handleSend}
+                    isStreaming={isStreaming}
+                    onStop={stopStreaming}
+                    isDisabled={isComposerDisabled}
+                    placeholder={composerPlaceholder}
+                    textareaRef={textareaRef}
+                  />
+                </div>
+              </div>
+
+              {showJumpToBottom && (
+                <button
+                  type="button"
+                  onClick={handleJumpToBottom}
+                  aria-label="Jump to latest message"
+                  className="absolute left-1/2 -translate-x-1/2 z-20 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-background/25 text-foreground/90 shadow-[0_8px_20px_rgb(2_6_23_/_0.4)] backdrop-blur-xl transition-all duration-150 hover:bg-background/35 active:scale-95 bottom-[5.5rem] md:bottom-24"
+                >
+                  <ArrowDown className="h-4 w-4" />
+                </button>
+              )}
             </>
           )}
         </CardContent>

@@ -15,7 +15,7 @@ import {
 } from '@/lib/dashboard-navigation'
 import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
 import { cn } from '@/lib/utils'
-import { ArrowRight, Home, LogOut, MessageCircle, MoreHorizontal } from 'lucide-react'
+import { ArrowRight, LogOut, MessageCircle, MoreHorizontal } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -160,42 +160,11 @@ function LogoutFooter({ deferred, onDeferredLogout }: LogoutFooterProps) {
   )
 }
 
-function MobileCoachToggle({ onCoachRoute }: { onCoachRoute: boolean }) {
-  const destination = onCoachRoute ? '/' : '/coach'
-  const label = onCoachRoute ? NAV_COPY.toDojo : NAV_COPY.askSifu
-  const helper = onCoachRoute ? 'Dashboard' : 'Live'
-  const Icon = onCoachRoute ? Home : MessageCircle
-
-  return (
-    <Link
-      href={destination}
-      data-testid="mobile-coach-toggle"
-      aria-label={label}
-      className={cn(
-        'group inline-flex items-center gap-1.5 rounded-full border border-coach/35 bg-coach/8 pl-2 pr-2.5 py-1',
-        'text-coach hover:text-coach/90 hover:border-coach/55 hover:bg-coach/12 active:scale-[0.98]',
-        'motion-safe:transition-all motion-safe:duration-200',
-      )}
-    >
-      <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-coach/18">
-        <Icon className="h-3.5 w-3.5 motion-safe:transition-transform motion-safe:duration-200 group-hover:scale-110 group-hover:rotate-6" />
-      </span>
-      <span className="text-xs font-medium leading-none">{label}</span>
-      <span className="inline-flex items-center gap-1 pl-0.5 text-[10px] text-coach/75">
-        <span className="h-1.5 w-1.5 rounded-full bg-coach/90 animate-pulse" aria-hidden="true" />
-        {helper}
-      </span>
-      <ArrowRight className="h-3 w-3 opacity-80 motion-safe:transition-transform motion-safe:duration-200 group-hover:translate-x-0.5" />
-    </Link>
-  )
-}
-
 export function DesktopCoachFloatingCta() {
   const pathname = usePathname()
   const onCoachRoute = pathname.startsWith('/coach')
   const destination = '/coach'
   const title = NAV_COPY.askSifu
-  const helper = 'Open Coach'
   const Icon = MessageCircle
 
   if (onCoachRoute) {
@@ -219,9 +188,37 @@ export function DesktopCoachFloatingCta() {
       </span>
       <span className="flex flex-col leading-tight">
         <span className="text-sm font-semibold">{title}</span>
-        <span className="text-[11px] text-coach/80">{helper}</span>
       </span>
       <ArrowRight className="h-3.5 w-3.5 opacity-80 motion-safe:transition-transform motion-safe:duration-200 group-hover:translate-x-0.5" />
+    </Link>
+  )
+}
+
+export function MobileCoachFloatingCta() {
+  const pathname = usePathname()
+  const onCoachRoute = pathname.startsWith('/coach')
+
+  if (onCoachRoute) {
+    return null
+  }
+
+  return (
+    <Link
+      href="/coach"
+      data-testid="mobile-coach-floating-cta"
+      aria-label={NAV_COPY.askSifu}
+      className={cn(
+        'md:hidden group fixed right-3 z-40 inline-flex items-center gap-2 rounded-full border border-coach/35 px-3 py-2',
+        'bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] bg-gradient-to-r from-coach/20 via-coach/10 to-coach/5 backdrop-blur shadow-[0_10px_30px_rgb(14_165_233_/_0.22)]',
+        'text-coach hover:border-coach/55 hover:shadow-[0_12px_34px_rgb(14_165_233_/_0.3)] active:scale-[0.98]',
+        'motion-safe:transition-all motion-safe:duration-200',
+      )}
+    >
+      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-coach/20 ring-1 ring-coach/35">
+        <MessageCircle className="h-3.5 w-3.5 motion-safe:transition-transform motion-safe:duration-200 group-hover:scale-110" />
+      </span>
+      <span className="text-xs font-semibold leading-none">{NAV_COPY.askSifu}</span>
+      <ArrowRight className="h-3 w-3 opacity-80 motion-safe:transition-transform motion-safe:duration-200 group-hover:translate-x-0.5" />
     </Link>
   )
 }
@@ -250,14 +247,23 @@ export function MobileSidebar() {
   const pathname = usePathname()
   const onCoachRoute = pathname.startsWith('/coach')
 
+  if (onCoachRoute) {
+    return null
+  }
+
   return (
     <div
       data-testid="mobile-sidebar-header"
       className="md:hidden fixed top-0 left-0 right-0 z-40 bg-surface border-b border-border h-[calc(env(safe-area-inset-top)+3rem)] pt-[env(safe-area-inset-top)]"
     >
-      <div className="flex h-full items-center justify-between px-3">
-        <h1 className="font-display text-base font-bold text-foreground">{BRAND_NAME}</h1>
-        <MobileCoachToggle onCoachRoute={onCoachRoute} />
+      <div className="flex h-full items-center px-3">
+        <Link
+          href="/"
+          aria-label="Go to Home Dashboard"
+          className="inline-flex items-center rounded-full border border-border/70 bg-surface/90 px-3 py-1 text-sm font-display font-semibold text-foreground shadow-[0_6px_18px_rgb(2_6_23_/_0.14)] backdrop-blur"
+        >
+          {BRAND_NAME}
+        </Link>
       </div>
     </div>
   )

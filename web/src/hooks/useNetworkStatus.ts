@@ -2,15 +2,9 @@
 
 import { useEffect, useState } from 'react'
 
-function getInitialOnlineState(): boolean {
-  if (typeof navigator === 'undefined') {
-    return true
-  }
-  return navigator.onLine
-}
-
 export function useNetworkStatus() {
-  const [isOnline, setIsOnline] = useState<boolean>(getInitialOnlineState)
+  // Keep SSR and first client render identical to avoid hydration drift.
+  const [isOnline, setIsOnline] = useState<boolean>(true)
 
   useEffect(() => {
     const sync = () => setIsOnline(navigator.onLine)
