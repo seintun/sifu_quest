@@ -3,7 +3,6 @@
 import { Card, CardContent } from '@/components/ui/card'
 import type { DashboardMetrics } from '@/lib/metrics'
 import { Target } from 'lucide-react'
-import Link from 'next/link'
 
 type DashboardHeroProps = {
   metrics?: DashboardMetrics
@@ -32,13 +31,6 @@ export function DashboardHero({ metrics, overallPlanPct }: DashboardHeroProps) {
                 <div className="h-6 w-44 animate-pulse rounded-md bg-muted/80" />
               )}
             </div>
-            <Link
-              href="/coach"
-              data-testid="dashboard-primary-coach-cta"
-              className="mt-4 inline-flex items-center gap-2 rounded-md border border-coach/40 bg-coach/10 px-3 py-1.5 text-xs font-medium text-coach hover:bg-coach/20 transition-colors"
-            >
-              Open Coach Chat
-            </Link>
           </div>
 
           {metrics?.todayFocus && (
