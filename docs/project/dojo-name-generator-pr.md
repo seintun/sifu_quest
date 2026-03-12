@@ -23,6 +23,7 @@ Users lacked fast, on-theme name inspiration during onboarding/profile setup, le
 - Show recommendation rank badges in model selectors and tighten control layout behavior.
 - Add explicit `Free Models` group in OpenRouter selector.
 - Make OpenRouter model groups collapsible/expandable in both mobile and desktop controls.
+- Address PR review follow-ups across selector, catalog, and API behaviors.
 
 ## Non-Goals
 
@@ -55,6 +56,11 @@ Users lacked fast, on-theme name inspiration during onboarding/profile setup, le
 - Reduced onboarding bootstrap state churn by merging draft + prefill + fallback into a single `setCore` update.
 - Extended provider catalog grouping with a dedicated `Free Models` OpenRouter group.
 - Added non-selectable group header toggle buttons with preserved keyboard/search behavior in model dropdowns.
+- Hardened ranking payload parsing to ignore non-model links/fragments and only accept valid model-id shapes.
+- Aligned provider defaults to the exact returned catalog payload to avoid fallback thrash with truncated lists.
+- Added abort wiring for `loadAllOpenRouterModels`, removed unused selector state/refs, and kept selection behavior deterministic.
+- Added OpenRouter key-decrypt fallback behavior so free-model requests can continue on shared key when BYOK decrypt fails.
+- Hardened free-model detection so malformed values like `model::free` are rejected while `openrouter/free` remains valid.
 
 ## Alternatives Considered
 
@@ -72,6 +78,8 @@ Users lacked fast, on-theme name inspiration during onboarding/profile setup, le
 - Repeated rapid clicks reset animation timer cleanly without stacking leaks.
 - Timer cleanup on unmount prevents stale state updates.
 - OpenRouter search keeps matching grouped results visible while preserving section toggle state.
+- Truncated OpenRouter payloads no longer return defaults that are missing from the same response payload.
+- Ranking extraction ignores non-model links (`/rankings`, `/pricing`, query/hash links) to prevent recommendation pollution.
 
 ## DRY / Tech Debt Impact
 
@@ -107,14 +115,15 @@ Commands run:
 
 ```bash
 npm run lint -- src/components/chat/ChatControls.tsx src/lib/provider-catalog.ts
+npm run lint -- src/lib/openrouter-ranking-utils.ts src/lib/openrouter-model-catalog-utils.ts src/app/api/chat/route.ts src/hooks/useChat.ts src/app/api/chat/providers/route.ts src/lib/chat-provider-config.ts
 npm test
 ```
 
 Results:
 
-- Pass: lint on touched selector/catalog files.
-- Pass: 128 tests, 0 failures.
-- Verified grouped OpenRouter selector behavior is wired through provider catalog and dropdown rendering paths.
+- Pass: lint on touched selector/catalog/api/hook/config files.
+- Pass: 131 tests, 0 failures.
+- Verified parser hardening, free-model validation, API default alignment, and selector load-abort behavior.
 
 ### Manual Verification
 
@@ -125,6 +134,7 @@ Results:
 - Scenario 1: Onboarding name step shows generate button; clicking rerolls name and shows animation/feedback.
 - Scenario 2: Settings profile name section rerolls name and shows animation/feedback without save regressions.
 - Scenario 3: Coach model selector shows Recommended/Free/All groups and allows section collapse/expand on desktop and mobile.
+- Scenario 4: Stored-but-undecipherable OpenRouter BYOK still allows free-model chat via shared key path and blocks paid-model usage.
 
 ## Risks and Mitigations
 

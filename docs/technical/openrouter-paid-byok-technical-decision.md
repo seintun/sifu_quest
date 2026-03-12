@@ -30,3 +30,7 @@
 - Settings UI must be provider-aware.
 - Unit tests need selection and provider-key matrix coverage.
 - Full OpenRouter model fetch becomes user-key dependent and must never use shared global cache keys.
+- BYOK decrypt failure behavior is provider-aware:
+  - OpenRouter free-model requests may fall back to shared key path when configured.
+  - Paid-model requests still require a valid decryptable user key.
+- Free-model classification treats both `openrouter/free` and `<provider>/<model>:free` as free, while malformed `::free` variants are rejected.

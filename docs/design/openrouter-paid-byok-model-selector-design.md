@@ -28,8 +28,10 @@
 ## Error/State UX
 - If full catalog fetch fails, preserve existing model list and show retry-safe message.
 - Invalid/decryption-failed saved provider key returns clear Settings re-entry action message.
+- If OpenRouter BYOK decryption fails, free-model requests can still use shared key fallback when available; paid-model requests remain blocked until key is re-added.
 
 ## Accessibility/Clarity Notes
 - Keep recommendation rank badges visible in OpenRouter lists.
 - Keep provider labels explicit (`OpenRouter`, `Anthropic`).
 - Keep key-required reasons human-readable in provider/model availability states.
+- Ensure OpenRouter in-menu search inputs have explicit accessible names (`aria-label`).

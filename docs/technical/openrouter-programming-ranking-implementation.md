@@ -15,6 +15,7 @@ The provider catalog now uses dynamic OpenRouter ranking data to order free mode
     - ranking anchor hrefs
     - raw `<provider>/<model>:free` tokens
   - Returns deduplicated lowercase model ids in discovery order.
+  - Validates extracted ids against model-id shape and ignores captures followed by query/hash delimiters (`?`, `#`) so navigation links do not pollute ranking order.
 
 ### 2. Ranking Fetch + Caching
 - File: `web/src/lib/provider-catalog.ts`
@@ -33,6 +34,9 @@ The provider catalog now uses dynamic OpenRouter ranking data to order free mode
 - Sorting logic:
   - If ranking list exists, annotate matching models with `recommendationRank` and sort by rank.
   - If ranking list is empty/unavailable, return original model order unchanged.
+- Recommended/open catalog consistency:
+  - Recommended models are derived from the same dropdown catalog slice to guarantee recommended ids are selectable within the returned payload.
+  - Default OpenRouter model now prefers top recommended entry and falls back to first available catalog item.
 
 ### 4. UI Rendering
 - File: `web/src/components/chat/ChatControls.tsx`
