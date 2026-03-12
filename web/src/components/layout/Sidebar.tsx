@@ -233,7 +233,7 @@ export function Sidebar() {
       <div className="p-4 border-b border-border">
         <h1 className="font-display text-lg font-bold text-violet-200">
           {BRAND_NAME}
-          <BetaBadge className="ml-2 align-bottom" />
+          <BetaBadge className="ml-2 align-middle text-[8px] h-4" />
         </h1>
         <p className="text-xs text-muted-foreground mt-0.5">{NAV_COPY.dashboardHint}</p>
       </div>
