@@ -31,7 +31,7 @@ export function ComposerBar({
   return (
     <div
       data-testid="composer-bar"
-      className="border-t border-border px-2.5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] md:px-3 md:pt-2 md:pb-2.5 shrink-0 bg-background/95 supports-backdrop-filter:backdrop-blur"
+      className="border-t border-border/35 px-2 pt-0.5 pb-1.5 md:px-2.5 md:pt-1 md:pb-2 shrink-0 bg-transparent"
     >
       <div className="flex items-end gap-1.5 md:gap-2">
         <Textarea
@@ -41,7 +41,7 @@ export function ComposerBar({
           onChange={(event) => onInputChange(event.target.value)}
           onKeyDown={onKeyDown}
           placeholder={placeholder}
-          className="bg-elevated border-border resize-none min-h-9 max-h-28 py-1.5"
+          className="bg-background/22 border-border/65 resize-none min-h-8 max-h-24 py-1 backdrop-blur-sm text-foreground placeholder:text-foreground/60"
           rows={1}
           disabled={isStreaming || isDisabled}
         />
@@ -52,7 +52,7 @@ export function ComposerBar({
             size="icon"
             variant="outline"
             onClick={onStop}
-            className="h-9 w-9 shrink-0"
+            className="h-8 w-8 shrink-0"
             aria-label="Stop generating response"
           >
             <Square className="h-3.5 w-3.5" />
@@ -64,7 +64,7 @@ export function ComposerBar({
             size="icon"
             onClick={onSend}
             disabled={!input.trim() || isDisabled}
-            className="h-9 w-9 shrink-0"
+            className="h-8 w-8 shrink-0"
             aria-label="Send message"
           >
             <Send className="h-3.5 w-3.5" />

@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { useChat } from "@/hooks/useChat";
-import { MODE_LABELS, NAV_COPY } from "@/lib/brand";
+import { BRAND_NAME, MODE_LABELS, NAV_COPY } from "@/lib/brand";
 import { buildSystemMeta, getSystemMessage } from "@/lib/chat-system-messages";
 import { fetcher } from "@/lib/fetcher";
 import { KeyRound, MessageCircle, RotateCcw } from "lucide-react";
@@ -210,7 +210,12 @@ export default function CoachPage() {
   }, [messages, scrollToBottom]);
 
   useEffect(() => {
-    if (!isStreaming && textareaRef.current && !isQuotaBlocked) {
+    if (
+      !isStreaming &&
+      textareaRef.current &&
+      !isQuotaBlocked &&
+      window.matchMedia("(min-width: 768px)").matches
+    ) {
       textareaRef.current.focus();
     }
   }, [isStreaming, isQuotaBlocked]);
@@ -291,9 +296,41 @@ export default function CoachPage() {
   return (
     <div
       data-testid="coach-shell"
-      className="flex flex-col h-[calc(100dvh-4.5rem)] md:h-[calc(100dvh-3rem)] overflow-hidden"
+      className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+3.25rem)] bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] flex flex-col overflow-hidden md:static md:h-[calc(100dvh-3rem)]"
     >
-      <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 pt-[env(safe-area-inset-top)]">
+        <div className="relative flex h-12 items-center gap-2 border-b border-border/40 bg-surface/30 px-3 backdrop-blur-xl">
+          <Link
+            href="/"
+            aria-label="Go to Home Dashboard"
+            className="inline-flex items-center rounded-full border border-border/70 bg-surface/35 px-3 py-1 text-sm font-display font-semibold text-foreground"
+          >
+            {BRAND_NAME}
+          </Link>
+          <p className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-base font-display font-semibold text-foreground">
+            {NAV_COPY.askSifu}
+          </p>
+          <div className="ml-auto">
+            <ResponsiveChatControls
+              providers={providers}
+              selectedProvider={selectedProvider}
+              onProviderChange={updateProviderSelection}
+              models={availableModelsForSelectedProvider}
+              selectedModel={selectedModel}
+              onModelChange={updateModelSelection}
+              modes={MODES}
+              selectedMode={mode}
+              onModeChange={handleModeChange}
+              onClear={handleClearHistory}
+              byokNotice={
+                isAnthropicLocked ? `BYOK in Settings for unlimited chat.` : null
+              }
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="hidden md:flex items-center justify-between gap-2 mb-2 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <MessageCircle className="h-[18px] w-[18px] text-coach shrink-0" />
           <div className="min-w-0">
@@ -307,6 +344,23 @@ export default function CoachPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="lg:hidden">
+            <ResponsiveChatControls
+              providers={providers}
+              selectedProvider={selectedProvider}
+              onProviderChange={updateProviderSelection}
+              models={availableModelsForSelectedProvider}
+              selectedModel={selectedModel}
+              onModelChange={updateModelSelection}
+              modes={MODES}
+              selectedMode={mode}
+              onModeChange={handleModeChange}
+              onClear={handleClearHistory}
+              byokNotice={
+                isAnthropicLocked ? `BYOK in Settings for unlimited chat.` : null
+              }
+            />
+          </div>
           <DesktopChatControls
             providers={providers}
             selectedProvider={selectedProvider}
@@ -318,21 +372,6 @@ export default function CoachPage() {
             selectedMode={mode}
             onModeChange={handleModeChange}
             onClear={handleClearHistory}
-          />
-          <ResponsiveChatControls
-            providers={providers}
-            selectedProvider={selectedProvider}
-            onProviderChange={updateProviderSelection}
-            models={availableModelsForSelectedProvider}
-            selectedModel={selectedModel}
-            onModelChange={updateModelSelection}
-            modes={MODES}
-            selectedMode={mode}
-            onModeChange={handleModeChange}
-            onClear={handleClearHistory}
-            byokNotice={
-              isAnthropicLocked ? `BYOK in Settings for unlimited chat.` : null
-            }
           />
         </div>
       </div>
@@ -396,7 +435,7 @@ export default function CoachPage() {
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
                 data-testid="conversation-scroll"
-                className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-3 md:p-4"
+                className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-3 pb-36 md:p-4 md:pb-42"
               >
                 <ConversationList
                   messages={messages}
@@ -411,36 +450,42 @@ export default function CoachPage() {
                 />
               </div>
 
-              <StatusStrip
-                freeQuota={freeQuota}
-                selectedProvider={selectedProvider}
-                selectedProviderInfo={selectedProviderInfo}
-                sessionMetrics={sessionMetrics}
-                formatMicrousd={formatMicrousd}
-                isExpanded={statusExpanded}
-                onToggle={() => setStatusExpanded((prev) => !prev)}
-              />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-1.5 pb-1.5 md:px-2 md:pb-2">
+                <div className="pointer-events-auto rounded-2xl border border-border/45 bg-background/15 shadow-[0_12px_34px_rgb(2_6_23_/_0.36)] backdrop-blur-2xl">
+                  <div className="px-2 pt-1.5 md:px-2.5 md:pt-2">
+                    <StatusStrip
+                      freeQuota={freeQuota}
+                      selectedProvider={selectedProvider}
+                      selectedProviderInfo={selectedProviderInfo}
+                      sessionMetrics={sessionMetrics}
+                      formatMicrousd={formatMicrousd}
+                      isExpanded={statusExpanded}
+                      onToggle={() => setStatusExpanded((prev) => !prev)}
+                    />
+                  </div>
 
-              <ComposerBar
-                input={input}
-                onInputChange={setInput}
-                onKeyDown={handleKeyDown}
-                onSend={handleSend}
-                isStreaming={isStreaming}
-                onStop={stopStreaming}
-                isDisabled={
-                  isQuotaBlocked ||
-                  selectedProviderInfo?.availability !== "available"
-                }
-                placeholder={
-                  isQuotaBlocked
-                    ? isGuest
-                      ? "Guest limit reached"
-                      : "Free limit reached"
-                    : "Type a message..."
-                }
-                textareaRef={textareaRef}
-              />
+                  <ComposerBar
+                    input={input}
+                    onInputChange={setInput}
+                    onKeyDown={handleKeyDown}
+                    onSend={handleSend}
+                    isStreaming={isStreaming}
+                    onStop={stopStreaming}
+                    isDisabled={
+                      isQuotaBlocked ||
+                      selectedProviderInfo?.availability !== "available"
+                    }
+                    placeholder={
+                      isQuotaBlocked
+                        ? isGuest
+                          ? "Guest limit reached"
+                          : "Free limit reached"
+                        : "Type a message..."
+                    }
+                    textareaRef={textareaRef}
+                  />
+                </div>
+              </div>
             </>
           )}
         </CardContent>
