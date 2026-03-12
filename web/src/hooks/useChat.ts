@@ -3,7 +3,7 @@
 import { consumeChatStream } from '@/lib/chat/stream-parser'
 import { applyQuotaOnChatError } from '@/lib/chat-quota-ui'
 import { buildSystemMeta, getSystemMessage, type ChatMessageMeta } from '@/lib/chat-system-messages'
-import type { ChatProvider, ModelAvailability } from '@/lib/chat-provider-config'
+import { isChatProvider, type ChatProvider, type ModelAvailability } from '@/lib/chat-provider-config'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface FreeQuota {
@@ -69,10 +69,6 @@ const CHAT_SELECTION_STORAGE_KEY = 'sifu-chat-selection-v1'
 type ChatSelection = {
   provider: ChatProvider
   model: string
-}
-
-function isChatProvider(value: unknown): value is ChatProvider {
-  return value === 'openrouter' || value === 'anthropic'
 }
 
 function readStoredSelection(): ChatSelection | null {
