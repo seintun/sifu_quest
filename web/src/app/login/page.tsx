@@ -57,7 +57,7 @@ export default async function LoginPage() {
             />
             <Feature
               icon={BookOpen}
-              title={`Ask Sifu Coaching`}
+              title={`${BRAND_EMOJIS.primary} Ask Sifu Coaching`}
               description="Your personal Sifu coach for patterns, mock interviews, and precise corrections."
               color={DOMAIN_COLORS.coach}
             />
