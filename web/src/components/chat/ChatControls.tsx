@@ -84,7 +84,7 @@ const MODEL_SELECT_CONTENT_COMPACT_CLASS =
 const MODEL_SELECT_CONTENT_MOBILE_COMPACT_CLASS =
   "w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] overflow-x-auto";
 const MODEL_TRIGGER_CLASS =
-  "[&_[data-slot=select-value]]:line-clamp-none [&_[data-slot=select-value]]:overflow-visible [&_[data-slot=select-value]]:items-center";
+  "[&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:max-w-full [&_[data-slot=select-value]]:overflow-hidden [&_[data-slot=select-value]]:items-center";
 const PROVIDER_TRIGGER_CLASS =
   "[&_[data-slot=select-value]]:line-clamp-none [&_[data-slot=select-value]]:overflow-visible [&_[data-slot=select-value]]:items-center";
 const PROVIDER_SELECT_CONTENT_CLASS = "min-w-[16rem]";
@@ -203,8 +203,8 @@ function ModelOptionContent({
 
   if (!showRanking) {
     return (
-      <span className="inline-flex max-w-full items-center gap-2">
-        <span className="min-w-0 max-w-[14rem] truncate whitespace-nowrap leading-tight">
+      <span className="inline-flex w-full min-w-0 items-center gap-2">
+        <span className="min-w-0 flex-1 truncate whitespace-nowrap leading-tight">
           {normalizedLabel}
         </span>
         <FreeModelBadge isFree={isFree} />
@@ -215,15 +215,19 @@ function ModelOptionContent({
 
   if (!reserveRankingSlot) {
     return (
-      <span className="inline-flex max-w-full items-center gap-2">
+      <span className="inline-flex w-full min-w-0 items-center gap-2">
         {recommendationRank ? (
-          <RecommendationBadge rank={recommendationRank} />
+          <span className="shrink-0">
+            <RecommendationBadge rank={recommendationRank} />
+          </span>
         ) : null}
-        <span className="min-w-0 max-w-[14rem] truncate whitespace-nowrap leading-tight">
+        <span className="min-w-0 flex-1 truncate whitespace-nowrap leading-tight">
           {normalizedLabel}
         </span>
-        <FreeModelBadge isFree={isFree} />
-        {tier ? <CostTierIcons tier={tier} /> : null}
+        <span className="shrink-0">
+          <FreeModelBadge isFree={isFree} />
+        </span>
+        <span className="shrink-0">{tier ? <CostTierIcons tier={tier} /> : null}</span>
       </span>
     );
   }

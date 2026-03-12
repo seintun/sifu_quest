@@ -501,10 +501,6 @@ function SettingsPageContent() {
               Keep your profile, access, and account safety in one clean place.
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Security first: sensitive keys are protected before they are saved.
-          </div>
         </div>
       </div>
 
@@ -660,15 +656,21 @@ function SettingsPageContent() {
                 Provider API Keys
               </CardTitle>
               <CardDescription>
-                How do we protect your key?
+                <span className="inline-flex items-center gap-1.5">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" />
+                  <span>
+                    Security first: sensitive keys are protected before they
+                    are saved.
+                  </span>
+                </span>
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-3 text-xs text-emerald-100">
-                <p className="font-medium text-emerald-200">
-                  How do we protect your key?
-                </p>
-                <p className="mt-1">
+                <p className="text-emerald-100">
+                  <span className="mr-1.5 font-medium text-emerald-200">
+                    How do we protect your key?
+                  </span>
                   We encrypt it with AES-256-CBC before saving, never print it
                   in logs, and you can remove it at any time.
                 </p>
@@ -678,8 +680,33 @@ function SettingsPageContent() {
                 <Card className={glassInsetClass}>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <KeyRound className="h-4 w-4 text-coach" />
+                      <KeyRound
+                        className={cn(
+                          "h-4 w-4",
+                          hasSavedAnthropicKey
+                            ? "text-emerald-300"
+                            : "text-danger",
+                        )}
+                      />
                       Anthropic API Key
+                      <span
+                        className={cn(
+                          "ml-1 inline-flex items-center gap-1.5 text-xs font-medium",
+                          hasSavedAnthropicKey
+                            ? "text-emerald-300"
+                            : "text-danger",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "inline-block h-1.5 w-1.5 rounded-full",
+                            hasSavedAnthropicKey
+                              ? "bg-emerald-300"
+                              : "bg-danger",
+                          )}
+                        />
+                        {hasSavedAnthropicKey ? "Key added" : "Key not added"}
+                      </span>
                     </CardTitle>
                     <CardDescription>
                       Add your own Anthropic key to use Anthropic models in the
@@ -776,8 +803,33 @@ function SettingsPageContent() {
                 <Card className={glassInsetClass}>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <KeyRound className="h-4 w-4 text-coach" />
+                      <KeyRound
+                        className={cn(
+                          "h-4 w-4",
+                          hasSavedOpenRouterKey
+                            ? "text-emerald-300"
+                            : "text-danger",
+                        )}
+                      />
                       OpenRouter API Key
+                      <span
+                        className={cn(
+                          "ml-1 inline-flex items-center gap-1.5 text-xs font-medium",
+                          hasSavedOpenRouterKey
+                            ? "text-emerald-300"
+                            : "text-danger",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "inline-block h-1.5 w-1.5 rounded-full",
+                            hasSavedOpenRouterKey
+                              ? "bg-emerald-300"
+                              : "bg-danger",
+                          )}
+                        />
+                        {hasSavedOpenRouterKey ? "Key added" : "Key not added"}
+                      </span>
                     </CardTitle>
                     <CardDescription>
                       Add your own OpenRouter key to unlock paid OpenRouter

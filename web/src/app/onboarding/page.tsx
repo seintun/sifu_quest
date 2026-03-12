@@ -169,6 +169,7 @@ export default function OnboardingPage() {
   const [stepIndex, setStepIndex] = useState(0)
   const [isGeneratingName, setIsGeneratingName] = useState(false)
   const generateNameResetTimerRef = useRef<number | null>(null)
+  const generateNameButtonRef = useRef<HTMLButtonElement | null>(null)
 
   const steps = useMemo(() => getOnboardingCoreSteps(core), [core])
   const currentStep = steps[Math.min(stepIndex, Math.max(steps.length - 1, 0))]
@@ -400,7 +401,12 @@ export default function OnboardingPage() {
                   data-testid="onboarding-name-input"
                   value={core.name}
                   onChange={(event) => setCore((prev) => ({ ...prev, name: event.target.value }))}
-                  onBlur={() => setCore((prev) => ({ ...prev, name: toTitleCase(prev.name) }))}
+                  onBlur={(event) => {
+                    if (event.relatedTarget === generateNameButtonRef.current) {
+                      return
+                    }
+                    setCore((prev) => ({ ...prev, name: toTitleCase(prev.name) }))
+                  }}
                   placeholder="Your name"
                   maxLength={ONBOARDING_MAX_NAME_LENGTH}
                   className={cn(
@@ -416,6 +422,7 @@ export default function OnboardingPage() {
                   }}
                 />
                 <Button
+                  ref={generateNameButtonRef}
                   type="button"
                   variant="secondary"
                   size="sm"
