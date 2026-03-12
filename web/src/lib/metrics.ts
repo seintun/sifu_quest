@@ -123,20 +123,60 @@ export async function computeMetrics(userId: string): Promise<DashboardMetrics> 
 
 type SupabaseAdminClient = ReturnType<typeof createAdminClient>
 
+let isListProgressEventDaysRpcAvailable: boolean | null = null
+
+function normalizeProgressEventDays(data: unknown): { recognized: boolean; days: string[] } {
+  if (!Array.isArray(data)) return { recognized: false, days: [] }
+
+  let sawStringShape = false
+  let sawObjectShape = false
+
+  const normalized = data
+    .map((entry): string => {
+      if (typeof entry === 'string') {
+        sawStringShape = true
+        return entry
+      }
+      if (entry && typeof entry === 'object' && 'day' in entry) {
+        sawObjectShape = true
+        const dayValue = (entry as { day?: unknown }).day
+        return typeof dayValue === 'string' ? dayValue : ''
+      }
+      return ''
+    })
+    .filter((day) => Boolean(day))
+
+  const recognized = data.length === 0 || sawStringShape || sawObjectShape
+  return { recognized, days: normalized }
+}
+
+function isMissingListProgressEventDaysError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const code = (error as { code?: string }).code
+  const message = (error as { message?: string }).message ?? ''
+  return code === '42883' || /list_progress_event_days/i.test(message)
+}
+
 async function fetchProgressEventDays(
   userId: string,
   fromIso: string,
   supabase: SupabaseAdminClient,
 ): Promise<string[]> {
-  const rpcResult = await supabase.rpc('list_progress_event_days', {
-    user_id_param: userId,
-    from_iso_param: fromIso,
-  })
+  if (isListProgressEventDaysRpcAvailable !== false) {
+    const rpcResult = await supabase.rpc('list_progress_event_days', {
+      user_id_param: userId,
+      from_iso_param: fromIso,
+    })
 
-  if (!rpcResult.error && Array.isArray(rpcResult.data)) {
-    return rpcResult.data
-      .map((entry: { day?: string } | null) => entry?.day ?? '')
-      .filter((day) => Boolean(day))
+    if (!rpcResult.error) {
+      const normalizedDays = normalizeProgressEventDays(rpcResult.data)
+      if (normalizedDays.recognized) {
+        isListProgressEventDaysRpcAvailable = true
+        return normalizedDays.days
+      }
+    } else if (isMissingListProgressEventDaysError(rpcResult.error)) {
+      isListProgressEventDaysRpcAvailable = false
+    }
   }
 
   const { data: events } = await supabase

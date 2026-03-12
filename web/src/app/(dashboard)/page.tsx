@@ -20,7 +20,7 @@ import {
 } from '@/lib/onboarding-v2'
 import { cn } from '@/lib/utils'
 import { RefreshCcw } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 
@@ -127,16 +127,26 @@ export default function DashboardPage() {
   )
   const [savingEnrichment, setSavingEnrichment] = useState(false)
   const [showAllPromptOptions, setShowAllPromptOptions] = useState(false)
+  const hasShownMetricsErrorToastRef = useRef(false)
+  const hasShownOnboardingErrorToastRef = useRef(false)
 
   useEffect(() => {
-    if (metricsError) {
+    if (metricsError && !hasShownMetricsErrorToastRef.current) {
       toast.error('Unable to load dashboard metrics.')
+      hasShownMetricsErrorToastRef.current = true
+    }
+    if (!metricsError) {
+      hasShownMetricsErrorToastRef.current = false
     }
   }, [metricsError])
 
   useEffect(() => {
-    if (onboardingError) {
+    if (onboardingError && !hasShownOnboardingErrorToastRef.current) {
       toast.error('Unable to load onboarding prompt.')
+      hasShownOnboardingErrorToastRef.current = true
+    }
+    if (!onboardingError) {
+      hasShownOnboardingErrorToastRef.current = false
     }
   }, [onboardingError])
 

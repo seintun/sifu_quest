@@ -248,21 +248,26 @@ export function MobileBottomNav() {
   const onCoachRoute = pathname.startsWith('/coach')
   const [open, setOpen] = useState(false)
   const { isGuest, accountStatus } = useAuthStatus()
-  const [pendingLogout, setPendingLogout] = useState(false)
   const [guestDialogOpen, setGuestDialogOpen] = useState(false)
   const [googleDialogOpen, setGoogleDialogOpen] = useState(false)
   const [isUpgrading, setIsUpgrading] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
 
-  const handleSheetOpenChange = (nextOpen: boolean) => {
+  const openDeferredLogoutDialog = () => {
+    if (isGuest) {
+      setGuestDialogOpen(true)
+    } else {
+      setGoogleDialogOpen(true)
+    }
+  }
+
+  const handleSheetOpenChange = (
+    nextOpen: boolean,
+    options?: { deferredLogout?: boolean },
+  ) => {
     setOpen(nextOpen)
-    if (!nextOpen && pendingLogout) {
-      setPendingLogout(false)
-      if (isGuest) {
-        setGuestDialogOpen(true)
-      } else {
-        setGoogleDialogOpen(true)
-      }
+    if (!nextOpen && options?.deferredLogout) {
+      openDeferredLogoutDialog()
     }
   }
 
@@ -339,8 +344,7 @@ export function MobileBottomNav() {
                 <LogoutFooter
                   deferred
                   onDeferredLogout={() => {
-                    setOpen(false)
-                    setPendingLogout(true)
+                    handleSheetOpenChange(false, { deferredLogout: true })
                   }}
                 />
               </div>

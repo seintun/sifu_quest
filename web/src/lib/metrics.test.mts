@@ -5,8 +5,8 @@ import { computeStreak } from './streak.ts'
 
 function dayOffset(daysFromToday: number): string {
   const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  d.setDate(d.getDate() + daysFromToday)
+  d.setUTCHours(0, 0, 0, 0)
+  d.setUTCDate(d.getUTCDate() + daysFromToday)
   return d.toISOString().split('T')[0]
 }
 
