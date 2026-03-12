@@ -653,188 +653,226 @@ function SettingsPageContent() {
 
           </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <Card className={glassCardClass}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <KeyRound className="h-4 w-4 text-coach" />
-                  Anthropic API Key
-                </CardTitle>
-                <CardDescription>
-                  Add your own Anthropic key to use Anthropic models in the
-                  multi-provider chat stack. Your key is locked before storage,
-                  never shown in plain text, and used only for your requests.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-3 text-xs text-emerald-100">
-                  <p className="font-medium text-emerald-200">
-                    How do we protect your key?
-                  </p>
-                  <p className="mt-1">
-                    We encrypt it with AES-256-CBC before saving, never print it
-                    in logs, and you can remove it at any time.
-                  </p>
-                </div>
-                <form
-                  onSubmit={(event) => handleSaveKey(event, "anthropic")}
-                  className="space-y-3"
-                >
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="anthropicApiKey"
-                      className="text-sm font-medium text-foreground"
-                    >
-                      API Key (sk-ant-...)
-                    </label>
-                    <div className="relative">
-                      <Input
-                        id="anthropicApiKey"
-                        type="password"
-                        value={anthropicApiKey}
-                        onChange={(e) => {
-                          setAnthropicApiKey(e.target.value);
-                          if (apiKeyFieldErrors.anthropic) {
-                            setApiKeyFieldErrors((prev) => ({
-                              ...prev,
-                              anthropic: "",
-                            }));
-                          }
-                        }}
-                        placeholder={
-                          hasSavedAnthropicKey
-                            ? "sk-ant-•••••••••••••••• (stored securely)"
-                            : "Paste your Anthropic key"
-                        }
-                        className={cn(
-                          "bg-elevated/50",
-                          hasSavedAnthropicKey && "pr-[7.25rem]",
-                        )}
-                        required
-                        disabled={isSavingKey}
-                      />
-                      {hasSavedAnthropicKey && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleRemoveKey("anthropic")}
-                          disabled={isSavingKey || isRemovingKey}
-                          className="absolute bottom-1 right-1 top-1 h-auto border border-border/70 bg-surface px-2.5 text-xs shadow-none transition-colors hover:bg-surface/95"
-                        >
-                          {isRemovingKey ? "Removing..." : "Remove Key"}
-                        </Button>
-                      )}
-                    </div>
-                    {apiKeyFieldErrors.anthropic && (
-                      <p className="text-xs text-danger" role="alert">
-                        {apiKeyFieldErrors.anthropic}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                    <Button
-                      type="submit"
-                      disabled={
-                        !canSaveAnthropicApiKey || isSavingKey || isRemovingKey
-                      }
-                      className="w-full sm:w-auto"
-                    >
-                      {isSavingKey
-                        ? "Storing Securely..."
-                        : "Store Securely (AES-256-CBC)"}
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
+          <Card className={glassCardClass}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-coach" />
+                Provider API Keys
+              </CardTitle>
+              <CardDescription>
+                How do we protect your key?
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-3 text-xs text-emerald-100">
+                <p className="font-medium text-emerald-200">
+                  How do we protect your key?
+                </p>
+                <p className="mt-1">
+                  We encrypt it with AES-256-CBC before saving, never print it
+                  in logs, and you can remove it at any time.
+                </p>
+              </div>
 
-            <Card className={glassCardClass}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <KeyRound className="h-4 w-4 text-coach" />
-                  OpenRouter API Key
-                </CardTitle>
-                <CardDescription>
-                  Add your own OpenRouter key to unlock paid OpenRouter models.
-                  Your key is encrypted before storage and used only for your
-                  requests.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <form
-                  onSubmit={(event) => handleSaveKey(event, "openrouter")}
-                  className="space-y-3"
-                >
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="openRouterApiKey"
-                      className="text-sm font-medium text-foreground"
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <Card className={glassInsetClass}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <KeyRound className="h-4 w-4 text-coach" />
+                      Anthropic API Key
+                    </CardTitle>
+                    <CardDescription>
+                      Add your own Anthropic key to use Anthropic models in the
+                      multi-provider chat stack.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Need a key?{" "}
+                      <a
+                        href="https://platform.claude.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-2 hover:text-foreground"
+                      >
+                        Get your Anthropic API key
+                      </a>
+                    </p>
+                    <form
+                      onSubmit={(event) => handleSaveKey(event, "anthropic")}
+                      className="space-y-3"
                     >
-                      API Key (sk-or-...)
-                    </label>
-                    <div className="relative">
-                      <Input
-                        id="openRouterApiKey"
-                        type="password"
-                        value={openRouterApiKey}
-                        onChange={(e) => {
-                          setOpenRouterApiKey(e.target.value);
-                          if (apiKeyFieldErrors.openrouter) {
-                            setApiKeyFieldErrors((prev) => ({
-                              ...prev,
-                              openrouter: "",
-                            }));
-                          }
-                        }}
-                        placeholder={
-                          hasSavedOpenRouterKey
-                            ? "sk-or-•••••••••••••••• (stored securely)"
-                            : "Paste your OpenRouter key"
-                        }
-                        className={cn(
-                          "bg-elevated/50",
-                          hasSavedOpenRouterKey && "pr-[7.25rem]",
-                        )}
-                        required
-                        disabled={isSavingKey}
-                      />
-                      {hasSavedOpenRouterKey && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleRemoveKey("openrouter")}
-                          disabled={isSavingKey || isRemovingKey}
-                          className="absolute bottom-1 right-1 top-1 h-auto border border-border/70 bg-surface px-2.5 text-xs shadow-none transition-colors hover:bg-surface/95"
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="anthropicApiKey"
+                          className="text-sm font-medium text-foreground"
                         >
-                          {isRemovingKey ? "Removing..." : "Remove Key"}
+                          API Key (sk-ant-...)
+                        </label>
+                        <div className="relative">
+                          <Input
+                            id="anthropicApiKey"
+                            type="password"
+                            value={anthropicApiKey}
+                            onChange={(e) => {
+                              setAnthropicApiKey(e.target.value);
+                              if (apiKeyFieldErrors.anthropic) {
+                                setApiKeyFieldErrors((prev) => ({
+                                  ...prev,
+                                  anthropic: "",
+                                }));
+                              }
+                            }}
+                            placeholder={
+                              hasSavedAnthropicKey
+                                ? "sk-ant-•••••••••••••••• (stored securely)"
+                                : "Paste your Anthropic key"
+                            }
+                            className={cn(
+                              "bg-elevated/50",
+                              hasSavedAnthropicKey && "pr-[7.25rem]",
+                            )}
+                            required
+                            disabled={isSavingKey}
+                          />
+                          {hasSavedAnthropicKey && (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleRemoveKey("anthropic")}
+                              disabled={isSavingKey || isRemovingKey}
+                              className="absolute bottom-1 right-1 top-1 h-auto border border-border/70 bg-surface px-2.5 text-xs shadow-none transition-colors hover:bg-surface/95"
+                            >
+                              {isRemovingKey ? "Removing..." : "Remove Key"}
+                            </Button>
+                          )}
+                        </div>
+                        {apiKeyFieldErrors.anthropic && (
+                          <p className="text-xs text-danger" role="alert">
+                            {apiKeyFieldErrors.anthropic}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                        <Button
+                          type="submit"
+                          disabled={
+                            !canSaveAnthropicApiKey ||
+                            isSavingKey ||
+                            isRemovingKey
+                          }
+                          className="w-full sm:w-auto"
+                        >
+                          {isSavingKey
+                            ? "Storing Securely..."
+                            : "Store Securely (AES-256-CBC)"}
                         </Button>
-                      )}
-                    </div>
-                    {apiKeyFieldErrors.openrouter && (
-                      <p className="text-xs text-danger" role="alert">
-                        {apiKeyFieldErrors.openrouter}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                    <Button
-                      type="submit"
-                      disabled={
-                        !canSaveOpenRouterApiKey || isSavingKey || isRemovingKey
-                      }
-                      className="w-full sm:w-auto"
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+
+                <Card className={glassInsetClass}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <KeyRound className="h-4 w-4 text-coach" />
+                      OpenRouter API Key
+                    </CardTitle>
+                    <CardDescription>
+                      Add your own OpenRouter key to unlock paid OpenRouter
+                      models.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Need a key?{" "}
+                      <a
+                        href="https://openrouter.ai/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-2 hover:text-foreground"
+                      >
+                        Get your OpenRouter API key
+                      </a>
+                    </p>
+                    <form
+                      onSubmit={(event) => handleSaveKey(event, "openrouter")}
+                      className="space-y-3"
                     >
-                      {isSavingKey
-                        ? "Storing Securely..."
-                        : "Store Securely (AES-256-CBC)"}
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="openRouterApiKey"
+                          className="text-sm font-medium text-foreground"
+                        >
+                          API Key (sk-or-...)
+                        </label>
+                        <div className="relative">
+                          <Input
+                            id="openRouterApiKey"
+                            type="password"
+                            value={openRouterApiKey}
+                            onChange={(e) => {
+                              setOpenRouterApiKey(e.target.value);
+                              if (apiKeyFieldErrors.openrouter) {
+                                setApiKeyFieldErrors((prev) => ({
+                                  ...prev,
+                                  openrouter: "",
+                                }));
+                              }
+                            }}
+                            placeholder={
+                              hasSavedOpenRouterKey
+                                ? "sk-or-•••••••••••••••• (stored securely)"
+                                : "Paste your OpenRouter key"
+                            }
+                            className={cn(
+                              "bg-elevated/50",
+                              hasSavedOpenRouterKey && "pr-[7.25rem]",
+                            )}
+                            required
+                            disabled={isSavingKey}
+                          />
+                          {hasSavedOpenRouterKey && (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleRemoveKey("openrouter")}
+                              disabled={isSavingKey || isRemovingKey}
+                              className="absolute bottom-1 right-1 top-1 h-auto border border-border/70 bg-surface px-2.5 text-xs shadow-none transition-colors hover:bg-surface/95"
+                            >
+                              {isRemovingKey ? "Removing..." : "Remove Key"}
+                            </Button>
+                          )}
+                        </div>
+                        {apiKeyFieldErrors.openrouter && (
+                          <p className="text-xs text-danger" role="alert">
+                            {apiKeyFieldErrors.openrouter}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                        <Button
+                          type="submit"
+                          disabled={
+                            !canSaveOpenRouterApiKey ||
+                            isSavingKey ||
+                            isRemovingKey
+                          }
+                          className="w-full sm:w-auto"
+                        >
+                          {isSavingKey
+                            ? "Storing Securely..."
+                            : "Store Securely (AES-256-CBC)"}
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
             <Card className={cn(glassCardClass, "xl:col-span-8")}>

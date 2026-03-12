@@ -36,6 +36,8 @@ export type ProviderModelTips = {
   sourceLabel: string;
   sourceUrl: string;
   secondaryText?: string;
+  pricingLabel?: string;
+  pricingUrl?: string;
 };
 
 export type ProviderKeyMap = {
@@ -72,6 +74,8 @@ export const PROVIDER_MODEL_TIPS: Record<ChatProvider, ProviderModelTips> = {
     sourceLabel: "openrouter.ai/rankings",
     sourceUrl: "https://openrouter.ai/rankings?category=programming#categories",
     secondaryText: "Icon + # for accessibility.",
+    pricingLabel: "openrouter.ai/pricing",
+    pricingUrl: "https://openrouter.ai/pricing",
   },
   anthropic: {
     sourceLabel: "platform.claude.com pricing",
