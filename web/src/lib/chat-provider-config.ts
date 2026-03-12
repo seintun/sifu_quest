@@ -23,6 +23,13 @@ export type ChatProviderDescriptor = {
   reason?: string;
 };
 
+export type ProviderModelTips = {
+  primaryText?: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  secondaryText?: string;
+};
+
 export const DEFAULT_CHAT_PROVIDER: ChatProvider = "openrouter";
 export const DEFAULT_OPENROUTER_MODEL = "openai/gpt-oss-20b:free";
 export const OPENROUTER_FREE_ROUTER_MODEL = "openrouter/free";
@@ -42,6 +49,19 @@ export const ANTHROPIC_MODEL_CATALOG: ReadonlyArray<{
   { id: "claude-sonnet-4-6", label: "Claude Sonnet", costTier: 2 },
   { id: "claude-opus-4-6", label: "Claude Opus", costTier: 3 },
 ] as const;
+
+export const PROVIDER_MODEL_TIPS: Record<ChatProvider, ProviderModelTips> = {
+  openrouter: {
+    primaryText: "Ranking: lower # is better (#1 best).",
+    sourceLabel: "openrouter.ai/rankings",
+    sourceUrl: "https://openrouter.ai/rankings?category=programming#categories",
+    secondaryText: "Icon + # for accessibility.",
+  },
+  anthropic: {
+    sourceLabel: "platform.claude.com pricing",
+    sourceUrl: "https://platform.claude.com/docs/en/about-claude/pricing",
+  },
+} as const;
 
 export function isChatProvider(value: unknown): value is ChatProvider {
   return value === "openrouter" || value === "anthropic";
@@ -80,6 +100,10 @@ export function getProviderLabel(provider: ChatProvider): string {
     return "Anthropic";
   }
   return "OpenRouter";
+}
+
+export function getProviderModelTips(provider: ChatProvider): ProviderModelTips {
+  return PROVIDER_MODEL_TIPS[provider];
 }
 
 export function sanitizeModelLabel(modelId: string): string {
