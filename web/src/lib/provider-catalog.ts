@@ -115,6 +115,7 @@ async function fetchOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch
     return extractFreeModelIdsFromRankingPayload(payload)
   } catch (error) {
     console.warn('OpenRouter programming ranking fetch failed; returning empty ranking list and keeping default catalog order', error)
+    console.warn('OpenRouter programming ranking fetch failed; returning empty ranking list and keeping default catalog order', error)
     return []
   }
 }
