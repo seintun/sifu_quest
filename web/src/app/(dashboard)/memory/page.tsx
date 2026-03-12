@@ -11,6 +11,7 @@ import {
   toMemoryErrorMessage,
 } from '@/lib/memory-view'
 import { cn } from '@/lib/utils'
+import { normalizeMarkdownContent } from '@/lib/markdown-formatting'
 import {
   AlertCircle,
   BookOpen,
@@ -156,6 +157,7 @@ export default function MemoryPage() {
   const { data: contentData, error: fetchContentError, isValidating: loading, mutate: mutateContent } = useSWR(selectedFile ? `/api/memory?file=${encodeURIComponent(selectedFile)}` : null, fetcher)
   
   const content = typeof contentData?.content === 'string' ? contentData.content : ''
+  const normalizedContent = useMemo(() => normalizeMarkdownContent(content), [content])
   const contentError = fetchContentError ? toMemoryErrorMessage(fetchContentError, 'Unable to load this memory file.') : (contentData?.error ? contentData.error : null)
 
   useEffect(() => {
@@ -335,7 +337,7 @@ export default function MemoryPage() {
                 </div>
               ) : content ? (
                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                  {content}
+                  {normalizedContent}
                 </ReactMarkdown>
               ) : (
                 <div className="flex h-64 items-center justify-center text-muted-foreground">

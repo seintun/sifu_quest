@@ -162,6 +162,10 @@ export default function CoachPage() {
     () => MODES.find((entry) => entry.value === mode)?.label ?? mode,
     [mode],
   );
+  const selectedModeInlineLabel = useMemo(
+    () => selectedModeLabel.replace(/\s*Sifu$/i, "").trim(),
+    [selectedModeLabel],
+  );
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -371,8 +375,12 @@ export default function CoachPage() {
           >
             {BRAND_NAME}
           </Link>
-          <p className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-base font-display font-semibold text-foreground">
-            {NAV_COPY.askSifu}
+          <p className="pointer-events-none absolute left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-display font-semibold text-foreground">
+            <MessageCircle className="h-4 w-4 text-coach shrink-0" />
+            <span>{NAV_COPY.askSifu}</span>
+            <span className="relative top-px text-[11px] text-muted-foreground/90">
+              ({selectedModeInlineLabel})
+            </span>
           </p>
           <div className="ml-auto">
             <ResponsiveChatControls {...responsiveControlsProps} />
@@ -383,20 +391,18 @@ export default function CoachPage() {
       <div className="hidden md:flex items-center justify-between gap-2 mb-2 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <MessageCircle className="h-[18px] w-[18px] text-coach shrink-0" />
-          <div className="min-w-0">
+          <div className="min-w-0 flex items-baseline gap-2">
             <h1 className="font-display text-xl md:text-2xl leading-tight font-bold truncate">
               {NAV_COPY.askSifu}
             </h1>
-            <p className="hidden sm:block text-xs text-muted-foreground truncate mt-0.5">
-              {selectedModeLabel}
-            </p>
+            <span className="relative top-px text-xs text-muted-foreground/90 whitespace-nowrap">
+              ({selectedModeInlineLabel})
+            </span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="lg:hidden">
-            <ResponsiveChatControls {...responsiveControlsProps} />
-          </div>
+          <ResponsiveChatControls {...responsiveControlsProps} />
           <DesktopChatControls
             providers={providers}
             selectedProvider={selectedProvider}

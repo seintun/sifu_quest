@@ -309,7 +309,7 @@ export function DesktopChatControls(props: SharedControlProps) {
     : null
 
   return (
-    <div className="hidden lg:flex items-center gap-2">
+    <div className="hidden xl:flex items-center gap-2">
       <Select value={props.selectedProvider} onValueChange={(value) => props.onProviderChange(value as 'openrouter' | 'anthropic')}>
         <SelectTrigger data-testid="desktop-provider-select" className="w-36 bg-surface border-border h-9">
           <SelectValue>
@@ -414,7 +414,7 @@ export function ResponsiveChatControls(props: SharedControlProps) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
-        render={<button className="inline-flex lg:hidden items-center gap-1.5 rounded-lg border border-border px-2.5 h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-elevated" aria-label="Open chat controls" />}
+        render={<button className="inline-flex xl:hidden items-center gap-1.5 rounded-lg border border-border px-2.5 h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-elevated" aria-label="Open chat controls" />}
       >
         <Settings2 className="h-3.5 w-3.5" />
         Controls
