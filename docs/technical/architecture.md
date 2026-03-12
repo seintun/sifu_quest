@@ -188,6 +188,30 @@ These files are read at runtime via `fs.readFile()` in `readModeFile()`. On Verc
 
 ---
 
+## Branding, SEO, and AI Tone Architecture
+
+Sifu Quest centralizes branding and tone logic so UI copy, metadata, and AI behavior stay consistent:
+
+- `brandCopy` / `brandTheme`: naming, emoji + Lucide semantics, allowed contexts
+- `seoConfig`: title/description/keywords/canonical host
+- `aiToneConfig`: Sifu Master style and response guardrails
+- Metadata routes: `manifest`, `robots`, `sitemap`
+
+```mermaid
+flowchart LR
+  A["Brand Contracts (brand.ts)"] --> B["App Metadata (layout.tsx)"]
+  A --> C["AI Tone Layer (chat system prompt)"]
+  A --> D["Navigation + UI Labels"]
+  B --> E["manifest / robots / sitemap"]
+  D --> F["Dashboard + Ask Sifu UX"]
+  C --> G["Sifu Master Responses"]
+  E --> H["Search Engine Discoverability"]
+  F --> I["Consistent Product Branding"]
+  G --> I
+```
+
+---
+
 
 
 Sentry is initialized across three runtimes:
