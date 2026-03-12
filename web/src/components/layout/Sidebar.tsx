@@ -261,14 +261,8 @@ export function MobileBottomNav() {
     }
   }
 
-  const handleSheetOpenChange = (
-    nextOpen: boolean,
-    options?: { deferredLogout?: boolean },
-  ) => {
+  const handleSheetOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen)
-    if (!nextOpen && options?.deferredLogout) {
-      openDeferredLogoutDialog()
-    }
   }
 
   const handleGuestUpgrade = async () => {
@@ -344,7 +338,10 @@ export function MobileBottomNav() {
                 <LogoutFooter
                   deferred
                   onDeferredLogout={() => {
-                    handleSheetOpenChange(false, { deferredLogout: true })
+                    setOpen(false)
+                    queueMicrotask(() => {
+                      openDeferredLogoutDialog()
+                    })
                   }}
                 />
               </div>
