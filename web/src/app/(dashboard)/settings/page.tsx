@@ -421,11 +421,29 @@ function SettingsPageContent() {
   const hasAnthropicApiKey = Boolean(
     accountStatus?.hasAnthropicApiKey ?? accountStatus?.hasApiKey,
   );
+  const hasSavedAnthropicKey = shouldShowRemoveApiKey(hasAnthropicApiKey);
 
   const formatMicrousd = useCallback(
     (microusd: number) => `$${(microusd / 1_000_000).toFixed(4)}`,
     [],
   );
+  const formatProviderName = useCallback((provider: string) => {
+    const normalized = provider.trim().toLowerCase();
+    if (normalized === "openrouter") {
+      return "OpenRouter";
+    }
+    if (normalized === "n-traffic" || normalized === "ntraffic") {
+      return "N-Traffic";
+    }
+    if (normalized === "anthropic") {
+      return "Anthropic";
+    }
+    return provider
+      .split(/[_-\s]+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(" ");
+  }, []);
   const glassCardClass =
     "border-white/10 bg-[linear-gradient(150deg,hsl(var(--surface)/0.9),hsl(var(--surface)/0.62))] backdrop-blur-xl shadow-[0_12px_30px_-22px_hsl(var(--streak)/0.75)]";
   const glassInsetClass =
@@ -613,8 +631,8 @@ function SettingsPageContent() {
                     How we protect your key?
                   </p>
                   <p className="mt-1">
-                    We secure it before saving, never print it in logs, and you
-                    can remove it at any time.
+                    We encrypt it with AES-256-CBC before saving, never print it
+                    in logs, and you can remove it at any time.
                   </p>
                 </div>
                 <form onSubmit={handleSaveKey} className="space-y-3">
@@ -636,16 +654,19 @@ function SettingsPageContent() {
                             setApiKeyFieldError("");
                           }
                         }}
-                        placeholder="Paste your Anthropic key"
+                        placeholder={
+                          hasSavedAnthropicKey
+                            ? "sk-ant-•••••••••••••••• (stored securely)"
+                            : "Paste your Anthropic key"
+                        }
                         className={cn(
                           "bg-elevated/50",
-                          shouldShowRemoveApiKey(hasAnthropicApiKey) &&
-                            "pr-[7.25rem]",
+                          hasSavedAnthropicKey && "pr-[7.25rem]",
                         )}
                         required
                         disabled={isSavingKey}
                       />
-                      {shouldShowRemoveApiKey(hasAnthropicApiKey) && (
+                      {hasSavedAnthropicKey && (
                         <Button
                           type="button"
                           variant="secondary"
@@ -670,7 +691,9 @@ function SettingsPageContent() {
                       disabled={!canSaveApiKey || isSavingKey || isRemovingKey}
                       className="w-full sm:w-auto"
                     >
-                      {isSavingKey ? "Saving..." : "Save API Key"}
+                      {isSavingKey
+                        ? "Storing Securely..."
+                        : "Store Securely (AES-256-CBC)"}
                     </Button>
                   </div>
                 </form>
@@ -699,18 +722,38 @@ function SettingsPageContent() {
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                       <div className={glassInsetClass}>
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                          Last 30 days
+                          Last 7 days
                         </p>
                         <p className="mt-2 text-lg font-semibold">
                           {usage.trailing30Days.totalTokens.toLocaleString()}{" "}
                           tokens
                         </p>
-                        <p className="mt-1 text-muted-foreground">
-                          User turns: {usage.trailing30Days.userTurns}
-                        </p>
-                        <p className="text-muted-foreground">
-                          Assistant turns: {usage.trailing30Days.assistantTurns}
-                        </p>
+                        <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                          <div className="rounded-md border border-sky-400/25 bg-sky-500/10 px-2 py-1.5">
+                            <p className="text-[10px] uppercase tracking-wide text-sky-200/80">
+                              Input
+                            </p>
+                            <p className="mt-0.5 font-semibold text-sky-100">
+                              {usage.trailing30Days.inputTokens.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="rounded-md border border-amber-400/25 bg-amber-500/10 px-2 py-1.5">
+                            <p className="text-[10px] uppercase tracking-wide text-amber-200/80">
+                              Output
+                            </p>
+                            <p className="mt-0.5 font-semibold text-amber-100">
+                              {usage.trailing30Days.outputTokens.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="rounded-md border border-emerald-400/25 bg-emerald-500/10 px-2 py-1.5">
+                            <p className="text-[10px] uppercase tracking-wide text-emerald-200/80">
+                              Total Tokens
+                            </p>
+                            <p className="mt-0.5 font-semibold text-emerald-100">
+                              {usage.trailing30Days.totalTokens.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
                         <p className="mt-1">
                           Estimated cost:{" "}
                           {formatMicrousd(
@@ -725,12 +768,32 @@ function SettingsPageContent() {
                         <p className="mt-2 text-lg font-semibold">
                           {usage.lifetime.totalTokens.toLocaleString()} tokens
                         </p>
-                        <p className="mt-1 text-muted-foreground">
-                          User turns: {usage.lifetime.userTurns}
-                        </p>
-                        <p className="text-muted-foreground">
-                          Assistant turns: {usage.lifetime.assistantTurns}
-                        </p>
+                        <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                          <div className="rounded-md border border-sky-400/25 bg-sky-500/10 px-2 py-1.5">
+                            <p className="text-[10px] uppercase tracking-wide text-sky-200/80">
+                              Input
+                            </p>
+                            <p className="mt-0.5 font-semibold text-sky-100">
+                              {usage.lifetime.inputTokens.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="rounded-md border border-amber-400/25 bg-amber-500/10 px-2 py-1.5">
+                            <p className="text-[10px] uppercase tracking-wide text-amber-200/80">
+                              Output
+                            </p>
+                            <p className="mt-0.5 font-semibold text-amber-100">
+                              {usage.lifetime.outputTokens.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="rounded-md border border-emerald-400/25 bg-emerald-500/10 px-2 py-1.5">
+                            <p className="text-[10px] uppercase tracking-wide text-emerald-200/80">
+                              Total Tokens
+                            </p>
+                            <p className="mt-0.5 font-semibold text-emerald-100">
+                              {usage.lifetime.totalTokens.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
                         <p className="mt-1">
                           Estimated cost:{" "}
                           {formatMicrousd(usage.lifetime.estimatedCostMicrousd)}
@@ -738,22 +801,62 @@ function SettingsPageContent() {
                       </div>
                     </div>
                     <div className={glassInsetClass}>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
-                        Provider breakdown
-                      </p>
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Provider breakdown
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {usage.providerBreakdown.length} provider
+                          {usage.providerBreakdown.length === 1 ? "" : "s"}
+                        </p>
+                      </div>
                       {usage.providerBreakdown.length === 0 ? (
                         <p className="text-muted-foreground">
                           No provider usage yet.
                         </p>
                       ) : (
-                        <div className="space-y-1">
-                          {usage.providerBreakdown.map((provider) => (
-                            <p key={provider.provider}>
-                              {provider.provider}: {provider.assistantTurns}{" "}
-                              responses, {provider.totalTokens} tokens,{" "}
-                              {formatMicrousd(provider.estimatedCostMicrousd)}
-                            </p>
-                          ))}
+                        <div className="space-y-2">
+                          {usage.providerBreakdown
+                            .slice()
+                            .sort((a, b) => b.totalTokens - a.totalTokens)
+                            .map((provider) => (
+                              <div
+                                key={provider.provider}
+                                className="rounded-lg border border-white/12 bg-[linear-gradient(110deg,hsl(var(--surface)/0.72),hsl(var(--surface)/0.52))] px-3 py-2"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="font-medium text-foreground">
+                                    {formatProviderName(provider.provider)}
+                                  </p>
+                                  <p className="text-xs text-emerald-200/90">
+                                    Estimated cost:{" "}
+                                    {formatMicrousd(
+                                      provider.estimatedCostMicrousd,
+                                    )}
+                                  </p>
+                                </div>
+                                <div className="mt-1 grid grid-cols-3 gap-2 text-xs">
+                                  <p className="text-muted-foreground">
+                                    Input:{" "}
+                                    <span className="font-semibold text-sky-100">
+                                      {provider.inputTokens.toLocaleString()}
+                                    </span>
+                                  </p>
+                                  <p className="text-muted-foreground">
+                                    Output:{" "}
+                                    <span className="font-semibold text-amber-100">
+                                      {provider.outputTokens.toLocaleString()}
+                                    </span>
+                                  </p>
+                                  <p className="text-muted-foreground">
+                                    Total Tokens:{" "}
+                                    <span className="font-semibold text-emerald-100">
+                                      {provider.totalTokens.toLocaleString()}
+                                    </span>
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
                         </div>
                       )}
                     </div>

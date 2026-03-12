@@ -204,7 +204,7 @@ export async function GET() {
 
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const supabase = createAdminClient()
-    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
     const rpcUsage = await supabase.rpc('get_account_usage_aggregates', {
       user_id_param: userId,
