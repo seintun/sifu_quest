@@ -19,7 +19,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { getAnthropicModelCostTier } from '@/lib/chat-provider-config'
+import { getAnthropicModelCostTier, getProviderModelTips } from '@/lib/chat-provider-config'
 import type { ChatModelOption, ChatProviderOption } from '@/hooks/useChat'
 import { Briefcase, Coins, Lightbulb, LockKeyhole, Medal, MessageSquare, Network, Settings2, Sparkles, Trash2, Trophy } from 'lucide-react'
 import Link from 'next/link'
@@ -44,8 +44,10 @@ type SharedControlProps = {
   byokNotice?: string | null
 }
 
-const MODEL_SELECT_CONTENT_CLASS = 'w-[min(32rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] overflow-x-auto'
-const MODEL_SELECT_CONTENT_MOBILE_CLASS = 'w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] overflow-x-auto'
+const MODEL_SELECT_CONTENT_CLASS = 'w-[min(24rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] overflow-x-auto'
+const MODEL_SELECT_CONTENT_MOBILE_CLASS = 'w-[min(24rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] overflow-x-auto'
+const MODEL_SELECT_CONTENT_COMPACT_CLASS = 'w-[min(18rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] overflow-x-auto'
+const MODEL_SELECT_CONTENT_MOBILE_COMPACT_CLASS = 'w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] overflow-x-auto'
 const MODEL_TRIGGER_CLASS = '[&_[data-slot=select-value]]:line-clamp-none [&_[data-slot=select-value]]:overflow-visible [&_[data-slot=select-value]]:items-center'
 const PROVIDER_SELECT_CONTENT_CLASS = 'min-w-[16rem]'
 const CLEAR_CHAT_TOOLTIP_TEXT = 'Clears all messages in this chat session.'
@@ -84,25 +86,29 @@ function RecommendationBadgeSlot({ rank }: { rank?: number }) {
   )
 }
 
-function ModelRankingTips() {
+function ModelProviderTips({ provider }: { provider: 'openrouter' | 'anthropic' }) {
+  const tips = getProviderModelTips(provider)
+
   return (
     <>
       <SelectGroup>
-        <SelectLabel className="text-[11px] leading-tight text-muted-foreground">
-          Ranking: lower # is better (#1 best).
-        </SelectLabel>
+        {tips.primaryText ? (
+          <SelectLabel className="text-[11px] leading-tight text-muted-foreground">
+            {tips.primaryText}
+          </SelectLabel>
+        ) : null}
         <SelectLabel className="pt-0 text-[11px] leading-tight text-muted-foreground">
           Source:
           {' '}
           <a
-            href="https://openrouter.ai/rankings?category=programming#categories"
+            href={tips.sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="underline underline-offset-2 hover:text-foreground"
           >
-            openrouter.ai/rankings
+            {tips.sourceLabel}
           </a>
-          {' '}• Icon + # for accessibility.
+          {tips.secondaryText ? <> {' '}• {tips.secondaryText}</> : null}
         </SelectLabel>
       </SelectGroup>
       <SelectSeparator />
@@ -114,11 +120,22 @@ function ModelOptionContent({
   label,
   recommendationRank,
   tier,
+  showRanking = true,
 }: {
   label: string
   recommendationRank?: number
   tier?: 1 | 2 | 3 | null
+  showRanking?: boolean
 }) {
+  if (!showRanking) {
+    return (
+      <span className="inline-flex max-w-full items-center gap-2">
+        <span className="min-w-0 max-w-[14rem] truncate whitespace-nowrap leading-tight">{label}</span>
+        {tier ? <CostTierIcons tier={tier} /> : null}
+      </span>
+    )
+  }
+
   return (
     <span className="grid w-full grid-cols-[3.35rem_minmax(0,1fr)_auto] items-center gap-2">
       <RecommendationBadgeSlot rank={recommendationRank} />
@@ -182,6 +199,7 @@ function ControlsBody({
   )
   const selectedModelOption = useMemo(() => models.find((model) => model.id === selectedModel), [models, selectedModel])
   const selectedModeOption = useMemo(() => modes.find((mode) => mode.value === selectedMode), [modes, selectedMode])
+  const showOpenRouterRanking = selectedProvider === 'openrouter'
   const selectedTier = selectedModelOption?.provider === 'anthropic'
     ? getAnthropicModelCostTier(selectedModelOption.id)
     : null
@@ -228,8 +246,9 @@ function ControlsBody({
               {selectedModelOption ? (
                 <ModelOptionContent
                   label={selectedModelOption.label}
-                  recommendationRank={selectedModelOption.recommendationRank}
+                  recommendationRank={showOpenRouterRanking ? selectedModelOption.recommendationRank : undefined}
                   tier={selectedTier}
+                  showRanking={showOpenRouterRanking}
                 />
               ) : 'Model'}
             </SelectValue>
@@ -237,17 +256,18 @@ function ControlsBody({
           <SelectContent
             alignItemWithTrigger={false}
             align="end"
-            className={MODEL_SELECT_CONTENT_MOBILE_CLASS}
+            className={showOpenRouterRanking ? MODEL_SELECT_CONTENT_MOBILE_CLASS : MODEL_SELECT_CONTENT_MOBILE_COMPACT_CLASS}
           >
-            <ModelRankingTips />
+            <ModelProviderTips provider={selectedProvider} />
             {models.map((model) => {
               const modelTier = model.provider === 'anthropic' ? getAnthropicModelCostTier(model.id) : null
               return (
                 <SelectItem key={model.id} value={model.id} disabled={model.availability !== 'available'}>
                   <ModelOptionContent
                     label={model.label}
-                    recommendationRank={model.recommendationRank}
+                    recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
                     tier={modelTier}
+                    showRanking={showOpenRouterRanking}
                   />
                 </SelectItem>
               )
@@ -304,6 +324,7 @@ export function DesktopChatControls(props: SharedControlProps) {
   const selectedDesktopProvider = props.providers.find((provider) => provider.id === props.selectedProvider)
   const selectedDesktopModel = props.models.find((model) => model.id === props.selectedModel)
   const selectedDesktopMode = props.modes.find((mode) => mode.value === props.selectedMode)
+  const showOpenRouterRanking = props.selectedProvider === 'openrouter'
   const selectedDesktopTier = selectedDesktopModel?.provider === 'anthropic'
     ? getAnthropicModelCostTier(selectedDesktopModel.id)
     : null
@@ -326,13 +347,14 @@ export function DesktopChatControls(props: SharedControlProps) {
       </Select>
 
       <Select value={props.selectedModel} onValueChange={(value) => value && props.onModelChange(value)}>
-        <SelectTrigger className={`w-56 bg-surface border-border h-9 ${MODEL_TRIGGER_CLASS}`}>
+        <SelectTrigger className={`${showOpenRouterRanking ? 'w-56' : 'w-48'} bg-surface border-border h-9 ${MODEL_TRIGGER_CLASS}`}>
           <SelectValue>
             {selectedDesktopModel ? (
               <ModelOptionContent
                 label={selectedDesktopModel.label}
-                recommendationRank={selectedDesktopModel.recommendationRank}
+                recommendationRank={showOpenRouterRanking ? selectedDesktopModel.recommendationRank : undefined}
                 tier={selectedDesktopTier}
+                showRanking={showOpenRouterRanking}
               />
             ) : null}
           </SelectValue>
@@ -340,17 +362,18 @@ export function DesktopChatControls(props: SharedControlProps) {
         <SelectContent
           alignItemWithTrigger={false}
           align="end"
-          className={MODEL_SELECT_CONTENT_CLASS}
+          className={showOpenRouterRanking ? MODEL_SELECT_CONTENT_CLASS : MODEL_SELECT_CONTENT_COMPACT_CLASS}
           >
-            <ModelRankingTips />
+            <ModelProviderTips provider={props.selectedProvider} />
           {props.models.map((model) => {
             const modelTier = model.provider === 'anthropic' ? getAnthropicModelCostTier(model.id) : null
             return (
               <SelectItem key={model.id} value={model.id} disabled={model.availability !== 'available'}>
                 <ModelOptionContent
                   label={model.label}
-                  recommendationRank={model.recommendationRank}
+                  recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
                   tier={modelTier}
+                  showRanking={showOpenRouterRanking}
                 />
               </SelectItem>
             )

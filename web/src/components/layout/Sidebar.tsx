@@ -130,7 +130,7 @@ function LogoutFooter({ deferred, onDeferredLogout }: LogoutFooterProps) {
         type="button"
         onClick={handleSignOutClick}
         data-testid="sidebar-signout-button"
-        className="flex w-full items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-danger hover:bg-danger/5 transition-colors"
+        className="flex w-full items-center gap-3 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger transition-colors hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/40"
         aria-label="Sign out of your account"
       >
         <LogOut className="h-4 w-4" />
@@ -230,7 +230,7 @@ export function Sidebar() {
       className="hidden md:flex w-56 flex-col fixed inset-y-0 left-0 bg-surface border-r border-border z-30"
     >
       <div className="p-4 border-b border-border">
-        <h1 className="font-display text-lg font-bold text-foreground">{BRAND_NAME}</h1>
+        <h1 className="font-display text-lg font-bold text-violet-200">{BRAND_NAME}</h1>
         <p className="text-xs text-muted-foreground mt-0.5">{NAV_COPY.dashboardHint}</p>
       </div>
       <div className="flex-1 overflow-y-auto p-3">
@@ -260,7 +260,7 @@ export function MobileSidebar() {
         <Link
           href="/"
           aria-label="Go to Home Dashboard"
-          className="inline-flex items-center rounded-full border border-border/70 bg-surface/90 px-3 py-1 text-sm font-display font-semibold text-foreground shadow-[0_6px_18px_rgb(2_6_23_/_0.14)] backdrop-blur"
+          className="inline-flex items-center rounded-full border border-border/70 bg-surface/90 px-3 py-1 text-sm font-display font-semibold text-violet-200 shadow-[0_6px_18px_rgb(2_6_23_/_0.14)] backdrop-blur"
         >
           {BRAND_NAME}
         </Link>

@@ -1,20 +1,15 @@
-'use client'
+"use client";
 
-import { Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import useSWR from 'swr'
-import { fetcher } from '@/lib/fetcher'
-import { canSaveAnthropicApiKey, shouldShowRemoveApiKey } from '@/lib/account-settings-ui'
-import { DOJO_TITLE_ROLL_EFFECT_MS, generateDojoTitlePhrase } from '@/lib/dojo-title'
-import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
-import { getOnboardingPrefillName } from '@/lib/onboarding-name'
-import { validateFullName } from '@/lib/profile-name'
-import { cn } from '@/lib/utils'
-import { performSignOut } from '@/lib/auth-signout'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { GuestLogoutDialog } from "@/components/auth/GuestLogoutDialog";
+import { LogoutConfirmDialog } from "@/components/auth/LogoutConfirmDialog";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -22,48 +17,83 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { GuestLogoutDialog } from '@/components/auth/GuestLogoutDialog'
-import { LogoutConfirmDialog } from '@/components/auth/LogoutConfirmDialog'
-import { Dice5, KeyRound, Loader2, ShieldAlert, UserRound, LogOut } from 'lucide-react'
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  canSaveAnthropicApiKey,
+  shouldShowRemoveApiKey,
+} from "@/lib/account-settings-ui";
+import { performSignOut } from "@/lib/auth-signout";
+import {
+  DOJO_TITLE_ROLL_EFFECT_MS,
+  generateDojoTitlePhrase,
+} from "@/lib/dojo-title";
+import { fetcher } from "@/lib/fetcher";
+import { startGuestGoogleUpgrade } from "@/lib/guest-upgrade";
+import { getOnboardingPrefillName } from "@/lib/onboarding-name";
+import { validateFullName } from "@/lib/profile-name";
+import { cn } from "@/lib/utils";
+import {
+  Dice5,
+  KeyRound,
+  Loader2,
+  LogOut,
+  ShieldAlert,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import React, {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import useSWR from "swr";
 
 type AccountStatus = {
-  userId: string
-  isGuest: boolean
-  isLinked: boolean
-  displayName: string | null
-  hasApiKey: boolean
-  hasAnthropicApiKey?: boolean
-  defaultProvider?: 'openrouter' | 'anthropic'
-  defaultModel?: string | null
-  prefillName: string | null
-  avatarUrl: string | null
-}
+  userId: string;
+  isGuest: boolean;
+  isLinked: boolean;
+  displayName: string | null;
+  hasApiKey: boolean;
+  hasAnthropicApiKey?: boolean;
+  defaultProvider?: "openrouter" | "anthropic";
+  defaultModel?: string | null;
+  prefillName: string | null;
+  avatarUrl: string | null;
+};
 
 type UsageTotals = {
-  userTurns: number
-  assistantTurns: number
-  inputTokens: number
-  outputTokens: number
-  totalTokens: number
-  estimatedCostMicrousd: number
-}
+  userTurns: number;
+  assistantTurns: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostMicrousd: number;
+};
 
 type AccountUsage = {
-  lifetime: UsageTotals
-  trailing30Days: UsageTotals
-  providerBreakdown: Array<UsageTotals & { provider: string }>
-  modelBreakdown: Array<UsageTotals & { provider: string; model: string }>
-}
+  lifetime: UsageTotals;
+  trailing7Days: UsageTotals;
+  providerBreakdown: Array<UsageTotals & { provider: string }>;
+  modelBreakdown: Array<UsageTotals & { provider: string; model: string }>;
+};
 
-type FlashMessage = { text: string; type: 'success' | 'error' } | null
+type FlashMessage = { text: string; type: "success" | "error" } | null;
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-muted-foreground">Loading settings...</div>}>
+    <Suspense
+      fallback={
+        <div className="p-8 text-muted-foreground">Loading settings...</div>
+      }
+    >
       <SettingsPageContent />
     </Suspense>
-  )
+  );
 }
 
 function SettingsSkeleton() {
@@ -104,237 +134,340 @@ function SettingsSkeleton() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
 
 function SettingsPageContent() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [apiKey, setApiKey] = useState('')
-  const [apiKeyFieldError, setApiKeyFieldError] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [isGeneratingName, setIsGeneratingName] = useState(false)
-  const generateNameResetTimerRef = useRef<number | null>(null)
+  const [apiKey, setApiKey] = useState("");
+  const [apiKeyFieldError, setApiKeyFieldError] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [isGeneratingName, setIsGeneratingName] = useState(false);
+  const generateNameResetTimerRef = useRef<number | null>(null);
 
-  const [isSavingName, setIsSavingName] = useState(false)
-  const [isSavingKey, setIsSavingKey] = useState(false)
-  const [isRemovingKey, setIsRemovingKey] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [isUpgrading, setIsUpgrading] = useState(false)
-  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [isSavingKey, setIsSavingKey] = useState(false);
+  const [isRemovingKey, setIsRemovingKey] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const [guestLogoutOpen, setGuestLogoutOpen] = useState(false)
-  const [googleLogoutOpen, setGoogleLogoutOpen] = useState(false)
+  const [guestLogoutOpen, setGuestLogoutOpen] = useState(false);
+  const [googleLogoutOpen, setGoogleLogoutOpen] = useState(false);
 
-  const [message, setMessage] = useState<FlashMessage>(null)
+  const [message, setMessage] = useState<FlashMessage>(null);
 
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
-  const isDeletePhraseValid = deleteConfirmText === 'DELETE'
+  const isDeletePhraseValid = deleteConfirmText === "DELETE";
 
-  const { data: accountData, mutate: mutateAccountStatus, isLoading: isAccountStatusLoading, error: accountSwrError } = useSWR('/api/account/status', fetcher)
-  const { data: usageData, mutate: mutateUsage, isLoading: isUsageLoading } = useSWR('/api/account/usage', fetcher)
-  const { mutate: mutateOnboarding } = useSWR('/api/onboarding/status?kick=true', fetcher)
+  const {
+    data: accountData,
+    mutate: mutateAccountStatus,
+    isLoading: isAccountStatusLoading,
+    error: accountSwrError,
+  } = useSWR("/api/account/status", fetcher);
+  const {
+    data: usageData,
+    mutate: mutateUsage,
+    isLoading: isUsageLoading,
+  } = useSWR("/api/account/usage", fetcher);
+  const { mutate: mutateOnboarding } = useSWR(
+    "/api/onboarding/status?kick=true",
+    fetcher,
+  );
 
-  const accountStatus = accountData?.account as AccountStatus | undefined
-  const accountStatusError = accountData?.error || accountSwrError?.message || ''
-  const isAccountStatusInitialized = accountData !== undefined || accountSwrError !== undefined || (!isAccountStatusLoading && accountStatusError !== '')
+  const accountStatus = accountData?.account as AccountStatus | undefined;
+  const accountStatusError =
+    accountData?.error || accountSwrError?.message || "";
+  const isAccountStatusInitialized =
+    accountData !== undefined ||
+    accountSwrError !== undefined ||
+    (!isAccountStatusLoading && accountStatusError !== "");
 
-  const usage = usageData as AccountUsage | undefined
-  const usageError = usageData?.message || usageData?.error || ''
+  const usage = usageData as AccountUsage | undefined;
+  const usageError = usageData?.message || usageData?.error || "";
 
   function runDojoNameRollEffect(): void {
-    setIsGeneratingName(true)
+    setIsGeneratingName(true);
     if (generateNameResetTimerRef.current !== null) {
-      window.clearTimeout(generateNameResetTimerRef.current)
+      window.clearTimeout(generateNameResetTimerRef.current);
     }
     generateNameResetTimerRef.current = window.setTimeout(() => {
-      setIsGeneratingName(false)
-      generateNameResetTimerRef.current = null
-    }, DOJO_TITLE_ROLL_EFFECT_MS)
+      setIsGeneratingName(false);
+      generateNameResetTimerRef.current = null;
+    }, DOJO_TITLE_ROLL_EFFECT_MS);
   }
 
   useEffect(() => {
-    if (accountData?.error && String(accountData.error).toLowerCase().includes('unauthorized')) {
-      router.push('/api/auth/signin')
+    if (
+      accountData?.error &&
+      String(accountData.error).toLowerCase().includes("unauthorized")
+    ) {
+      router.push("/api/auth/signin");
     } else if (accountStatus && !fullName) {
-      setFullName(getOnboardingPrefillName(accountStatus.displayName, accountStatus.prefillName))
+      setFullName(
+        getOnboardingPrefillName(
+          accountStatus.displayName,
+          accountStatus.prefillName,
+        ),
+      );
     }
-  }, [accountData, accountStatus, fullName, router])
+  }, [accountData, accountStatus, fullName, router]);
 
   useEffect(() => {
-    if (searchParams.get('success') === 'linked') {
-      setMessage({ text: 'Google account linked. Your guest profile has been upgraded without losing any data.', type: 'success' })
-      mutateAccountStatus()
-      mutateOnboarding()
-    } else if (searchParams.get('error') === 'link_failed') {
-      setMessage({ text: 'Failed to link your Google account. Please try again.', type: 'error' })
+    if (searchParams.get("success") === "linked") {
+      setMessage({
+        text: "Google account linked. Your guest profile has been upgraded without losing any data.",
+        type: "success",
+      });
+      mutateAccountStatus();
+      mutateOnboarding();
+    } else if (searchParams.get("error") === "link_failed") {
+      setMessage({
+        text: "Failed to link your Google account. Please try again.",
+        type: "error",
+      });
     }
-  }, [searchParams, mutateAccountStatus, mutateOnboarding])
+  }, [searchParams, mutateAccountStatus, mutateOnboarding]);
 
   useEffect(() => {
     return () => {
       if (generateNameResetTimerRef.current !== null) {
-        window.clearTimeout(generateNameResetTimerRef.current)
+        window.clearTimeout(generateNameResetTimerRef.current);
       }
-    }
-  }, [])
+    };
+  }, []);
 
   const handleSaveName = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setMessage(null)
+    e.preventDefault();
+    setMessage(null);
 
-    const validation = validateFullName(fullName)
+    const validation = validateFullName(fullName);
     if (!validation.ok) {
-      setMessage({ text: validation.error, type: 'error' })
-      return
+      setMessage({ text: validation.error, type: "error" });
+      return;
     }
 
-    setIsSavingName(true)
+    setIsSavingName(true);
     try {
-      const res = await fetch('/api/account', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fullName: validation.value }),
-      })
-      const data = await res.json().catch(() => ({}))
+      });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMessage({ text: data.error || 'Failed to update full name.', type: 'error' })
-        return
+        setMessage({
+          text: data.error || "Failed to update full name.",
+          type: "error",
+        });
+        return;
       }
 
-      setFullName(data.account?.displayName || validation.value)
-      mutateAccountStatus()
-      setMessage({ text: 'Full name updated successfully.', type: 'success' })
+      setFullName(data.account?.displayName || validation.value);
+      mutateAccountStatus();
+      setMessage({ text: "Full name updated successfully.", type: "success" });
     } catch {
-      setMessage({ text: 'An unexpected error occurred while updating your full name.', type: 'error' })
+      setMessage({
+        text: "An unexpected error occurred while updating your full name.",
+        type: "error",
+      });
     } finally {
-      setIsSavingName(false)
+      setIsSavingName(false);
     }
-  }
+  };
 
   const handleSaveKey = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSavingKey(true)
-    setMessage(null)
-    setApiKeyFieldError('')
+    e.preventDefault();
+    setIsSavingKey(true);
+    setMessage(null);
+    setApiKeyFieldError("");
 
     try {
-      const res = await fetch('/api/auth/apikey', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/auth/apikey", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ apiKey }),
-      })
+      });
 
-      const data = await res.json()
+      const data = await res.json();
       if (res.ok) {
-        setMessage({ text: 'API key saved successfully.', type: 'success' })
-        setApiKey('')
-        mutateAccountStatus()
+        setMessage({ text: "API key saved successfully.", type: "success" });
+        setApiKey("");
+        mutateAccountStatus();
       } else {
-        if (data.code === 'apikey_config_error') {
-          setApiKeyFieldError('Secure key storage is temporarily unavailable. Your key was not saved. Please try again later.')
+        if (data.code === "apikey_config_error") {
+          setApiKeyFieldError(
+            "Secure key storage is temporarily unavailable. Your key was not saved. Please try again later.",
+          );
         } else {
-          setApiKeyFieldError(data.error || 'Failed to save API key.')
+          setApiKeyFieldError(data.error || "Failed to save API key.");
         }
       }
     } catch {
-      setApiKeyFieldError('An unexpected error occurred while saving API key.')
+      setApiKeyFieldError("An unexpected error occurred while saving API key.");
     } finally {
-      setIsSavingKey(false)
+      setIsSavingKey(false);
     }
-  }
+  };
 
   const handleRemoveKey = async () => {
-    setIsRemovingKey(true)
-    setMessage(null)
+    setIsRemovingKey(true);
+    setMessage(null);
 
     try {
-      const res = await fetch('/api/auth/apikey', { method: 'DELETE' })
-      const data = await res.json().catch(() => ({}))
+      const res = await fetch("/api/auth/apikey", { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMessage({ text: data.error || 'Failed to remove API key.', type: 'error' })
-        return
+        setMessage({
+          text: data.error || "Failed to remove API key.",
+          type: "error",
+        });
+        return;
       }
-      setMessage({ text: 'API key removed.', type: 'success' })
-      mutateAccountStatus()
+      setMessage({ text: "API key removed.", type: "success" });
+      mutateAccountStatus();
     } catch {
-      setMessage({ text: 'An unexpected error occurred while removing API key.', type: 'error' })
+      setMessage({
+        text: "An unexpected error occurred while removing API key.",
+        type: "error",
+      });
     } finally {
-      setIsRemovingKey(false)
+      setIsRemovingKey(false);
     }
-  }
+  };
 
   const handleDeleteAccount = async () => {
-    if (!isDeletePhraseValid) return
+    if (!isDeletePhraseValid) return;
 
-    setIsDeleting(true)
-    setMessage(null)
+    setIsDeleting(true);
+    setMessage(null);
     try {
-      const res = await fetch('/api/account', { method: 'DELETE' })
+      const res = await fetch("/api/account", { method: "DELETE" });
       if (res.ok) {
-        await performSignOut()
+        await performSignOut();
       } else {
-        const data = await res.json().catch(() => ({}))
-        setMessage({ text: data.error || 'Failed to delete account.', type: 'error' })
-        setDeleteDialogOpen(false)
+        const data = await res.json().catch(() => ({}));
+        setMessage({
+          text: data.error || "Failed to delete account.",
+          type: "error",
+        });
+        setDeleteDialogOpen(false);
       }
     } catch {
-      setMessage({ text: 'An unexpected error occurred while deleting your account.', type: 'error' })
-      setDeleteDialogOpen(false)
+      setMessage({
+        text: "An unexpected error occurred while deleting your account.",
+        type: "error",
+      });
+      setDeleteDialogOpen(false);
     } finally {
-      setIsDeleting(false)
+      setIsDeleting(false);
     }
-  }
+  };
 
   const handleLinkGoogle = async () => {
-    const result = await startGuestGoogleUpgrade(window.location.origin)
+    const result = await startGuestGoogleUpgrade(window.location.origin);
     if (!result.ok) {
-      setMessage({ text: `Failed to link account: ${result.error}`, type: 'error' })
+      setMessage({
+        text: `Failed to link account: ${result.error}`,
+        type: "error",
+      });
     }
-  }
+  };
 
   const handleGuestUpgradeFromDialog = async () => {
-    setIsUpgrading(true)
-    const result = await startGuestGoogleUpgrade(window.location.origin)
+    setIsUpgrading(true);
+    const result = await startGuestGoogleUpgrade(window.location.origin);
     if (!result.ok) {
-      setMessage({ text: `Failed to link account: ${result.error}`, type: 'error' })
-      setIsUpgrading(false)
-      setGuestLogoutOpen(false)
+      setMessage({
+        text: `Failed to link account: ${result.error}`,
+        type: "error",
+      });
+      setIsUpgrading(false);
+      setGuestLogoutOpen(false);
     }
     // On success the page redirects via OAuth
-  }
+  };
 
   const handleSignOut = async () => {
-    setIsLoggingOut(true)
-    await performSignOut()
-  }
+    setIsLoggingOut(true);
+    await performSignOut();
+  };
 
   const handleSignOutClick = () => {
     if (isGuest) {
-      setGuestLogoutOpen(true)
+      setGuestLogoutOpen(true);
     } else {
-      setGoogleLogoutOpen(true)
+      setGoogleLogoutOpen(true);
     }
-  }
+  };
 
-  const isGuest = Boolean(accountStatus?.isGuest)
+  const isGuest = Boolean(accountStatus?.isGuest);
 
-  const normalizedCurrentName = useMemo(() => (accountStatus?.displayName ?? '').trim(), [accountStatus?.displayName])
-  const normalizedInputName = useMemo(() => fullName.trim().replace(/\s+/g, ' '), [fullName])
-  const canSaveApiKey = useMemo(() => canSaveAnthropicApiKey(apiKey), [apiKey])
-  const isNameDirty = normalizedInputName !== normalizedCurrentName
-  const hasAnthropicApiKey = Boolean(accountStatus?.hasAnthropicApiKey ?? accountStatus?.hasApiKey)
+  const normalizedCurrentName = useMemo(
+    () => (accountStatus?.displayName ?? "").trim(),
+    [accountStatus?.displayName],
+  );
+  const normalizedInputName = useMemo(
+    () => fullName.trim().replace(/\s+/g, " "),
+    [fullName],
+  );
+  const canSaveApiKey = useMemo(() => canSaveAnthropicApiKey(apiKey), [apiKey]);
+  const isNameDirty = normalizedInputName !== normalizedCurrentName;
+  const hasAnthropicApiKey = Boolean(
+    accountStatus?.hasAnthropicApiKey ?? accountStatus?.hasApiKey,
+  );
+  const hasSavedAnthropicKey = shouldShowRemoveApiKey(hasAnthropicApiKey);
 
-  const formatMicrousd = useCallback((microusd: number) => `$${(microusd / 1_000_000).toFixed(4)}`, [])
+  const formatMicrousd = useCallback(
+    (microusd: number) => `$${(microusd / 1_000_000).toFixed(4)}`,
+    [],
+  );
+  const formatProviderName = useCallback((provider: string) => {
+    const normalized = provider.trim().toLowerCase();
+    if (normalized === "openrouter") {
+      return "OpenRouter";
+    }
+    if (normalized === "n-traffic" || normalized === "ntraffic") {
+      return "N-Traffic";
+    }
+    if (normalized === "anthropic") {
+      return "Anthropic";
+    }
+    return provider
+      .split(/[_-\s]+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(" ");
+  }, []);
+  const glassCardClass =
+    "border-white/10 bg-[linear-gradient(150deg,hsl(var(--surface)/0.9),hsl(var(--surface)/0.62))] backdrop-blur-xl shadow-[0_12px_30px_-22px_hsl(var(--streak)/0.75)]";
+  const glassInsetClass =
+    "rounded-xl border border-white/10 bg-white/[0.03] p-3";
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="font-display text-3xl font-bold">Account Settings</h1>
-        <p className="text-muted-foreground text-sm mt-1">Manage profile info, API access, and account safety controls.</p>
+    <div className="mx-auto w-full max-w-6xl space-y-5 px-3 pb-10 sm:px-5 lg:px-7">
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(130deg,hsl(var(--surface)/0.95),hsl(var(--surface)/0.65))] p-6 shadow-[0_24px_60px_-40px_hsl(var(--streak)/0.95)] sm:p-8">
+        <div className="pointer-events-none absolute -left-20 top-0 h-40 w-40 rounded-full bg-streak/20 blur-3xl" />
+        <div className="pointer-events-none absolute -right-16 bottom-0 h-36 w-36 rounded-full bg-plan/20 blur-3xl" />
+        <div className="relative space-y-3">
+          <div>
+            <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+              Account Settings
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
+              Keep your profile, access, and account safety in one clean place.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Security first: sensitive keys are protected before they are saved.
+          </div>
+        </div>
       </div>
 
       {!isAccountStatusInitialized ? (
@@ -343,305 +476,509 @@ function SettingsPageContent() {
         <>
           {message && (
             <div
-              className={`rounded-lg border px-4 py-3 text-sm ${
-                message.type === 'success'
-                  ? 'border-success/30 bg-success/10 text-success'
-                  : 'border-danger/30 bg-danger/10 text-danger'
+              className={`rounded-xl border px-4 py-3 text-sm backdrop-blur-sm ${
+                message.type === "success"
+                  ? "border-success/30 bg-success/10 text-success shadow-[0_10px_26px_-22px_hsl(var(--success)/0.8)]"
+                  : "border-danger/30 bg-danger/10 text-danger shadow-[0_10px_26px_-22px_hsl(var(--danger)/0.8)]"
               }`}
             >
               {message.text}
             </div>
           )}
 
-      {/* ── Session card ── */}
-      {isAccountStatusInitialized && (
-        <Card
-          className={
-            isGuest
-              ? 'border-streak/30 bg-streak/5 shadow-glow-streak'
-              : 'border-border bg-surface/80 backdrop-blur-sm'
-          }
-        >
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserRound className="h-4 w-4 text-streak" />
-              {isGuest ? 'Guest Session' : 'Your Account'}
-            </CardTitle>
-            <CardDescription>
-              {isGuest
-                ? 'You\'re browsing as a guest. Your progress is saved temporarily — it will be lost if you sign out without linking Google.'
-                : accountStatus?.displayName
-                  ? `Signed in as ${accountStatus.displayName}.`
-                  : 'Signed in with Google.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col sm:flex-row flex-wrap gap-2">
-            {isGuest && (
-              <Button onClick={handleLinkGoogle} disabled={isAccountStatusLoading}>
-                Link Google Account
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              className="flex items-center gap-2 text-danger border-danger/30 hover:bg-danger/5 hover:text-danger"
-              onClick={handleSignOutClick}
+          {/* ── Session card ── */}
+          {isAccountStatusInitialized && (
+            <Card
+              className={
+                isGuest
+                  ? "border-streak/30 bg-[linear-gradient(150deg,hsl(var(--streak)/0.13),hsl(var(--surface)/0.72))] shadow-glow-streak backdrop-blur-xl"
+                  : glassCardClass
+              }
             >
-              <LogOut className="h-4 w-4" />
-              Sign Out
-            </Button>
-
-
-          </CardContent>
-        </Card>
-      )}
-
-      <Card className="border-border bg-surface/80 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserRound className="h-4 w-4 text-plan" />
-            Profile
-          </CardTitle>
-          <CardDescription>Set the name used across your workspace and coach context.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSaveName} className="space-y-3">
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <label htmlFor="fullName" className="text-sm font-medium text-foreground">
-                  Full Name
-                </label>
+              <CardHeader className="space-y-2">
+                <CardTitle className="flex items-center gap-2">
+                  <UserRound className="h-4 w-4 text-streak" />
+                  {isGuest ? "Guest Session" : "Your Account"}
+                </CardTitle>
+                <CardDescription>
+                  {isGuest
+                    ? "You're browsing as a guest. Your progress is saved temporarily — it will be lost if you sign out without linking Google."
+                    : accountStatus?.displayName
+                      ? `Signed in as ${accountStatus.displayName}.`
+                      : "Signed in with Google."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                {isGuest && (
+                  <Button
+                    onClick={handleLinkGoogle}
+                    disabled={isAccountStatusLoading}
+                    className="w-full sm:w-auto"
+                  >
+                    Link Google Account
+                  </Button>
+                )}
                 <Button
-                  type="button"
                   variant="outline"
-                  size="sm"
-                  className={cn('transition-transform duration-200', isGeneratingName && 'scale-[1.03]')}
-                  disabled={isSavingName}
-                  aria-label="Generate a random dojo name"
-                  title="Generate a random dojo name"
-                  onClick={() => {
-                    setFullName(generateDojoTitlePhrase())
-                    runDojoNameRollEffect()
-                  }}
+                  className="flex w-full items-center gap-2 border-danger/30 text-danger hover:bg-danger/5 hover:text-danger sm:w-auto"
+                  onClick={handleSignOutClick}
                 >
-                  <Dice5 className={cn('h-3.5 w-3.5', isGeneratingName && 'animate-spin')} aria-hidden="true" />
-                  Generate Dojo Name
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
                 </Button>
-              </div>
-              <Input
-                id="fullName"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="e.g., Ada Lovelace"
-                maxLength={80}
-                disabled={isSavingName}
-                className={cn(
-                  'bg-elevated/50 transition-all duration-300',
-                  isGeneratingName && 'border-primary/60 shadow-[0_0_0_3px_hsl(var(--ring)/0.18)]',
-                )}
-              />
-              <p className="text-xs text-muted-foreground">
-                Click generate to roll a new dojo name.
-              </p>
-              <p className="sr-only" aria-live="polite">
-                {isGeneratingName ? 'New dojo name generated.' : ''}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button type="submit" disabled={isSavingName || !isNameDirty}>
-                {isSavingName ? 'Saving...' : 'Save Full Name'}
-              </Button>
-              <span className="text-xs text-muted-foreground">This also updates your `profile.md` name line.</span>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border bg-surface/80 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <KeyRound className="h-4 w-4 text-coach" />
-            Anthropic API Key
-          </CardTitle>
-          <CardDescription>
-            You only provide your Anthropic key (`sk-ant-...`). We encrypt it with AES-256-CBC before storage, never store or log plaintext, and use it only to call Claude on your behalf.
-            OpenRouter free models use an app-managed server key (`OPENROUTER_API_KEY`), not this field.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSaveKey} className="space-y-3">
-            <div className="space-y-1.5">
-              <label htmlFor="apiKey" className="text-sm font-medium text-foreground">
-                API Key (sk-ant-...)
-              </label>
-              <Input
-                id="apiKey"
-                type="password"
-                value={apiKey}
-                onChange={(e) => {
-                  setApiKey(e.target.value)
-                  if (apiKeyFieldError) {
-                    setApiKeyFieldError('')
-                  }
-                }}
-                placeholder="Paste your Anthropic key"
-                className="bg-elevated/50"
-                required
-                disabled={isSavingKey}
-              />
-              {apiKeyFieldError && (
-                <p className="text-xs text-danger" role="alert">
-                  {apiKeyFieldError}
-                </p>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="submit" disabled={!canSaveApiKey || isSavingKey || isRemovingKey}>
-                {isSavingKey ? 'Saving...' : 'Save API Key'}
-              </Button>
-              {shouldShowRemoveApiKey(hasAnthropicApiKey) && (
-                <Button type="button" variant="outline" onClick={handleRemoveKey} disabled={isSavingKey || isRemovingKey}>
-                  {isRemovingKey ? 'Removing...' : 'Remove Key'}
-                </Button>
-              )}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border bg-surface/80 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle>Chat Usage Metrics</CardTitle>
-          <CardDescription>
-            Session and account usage telemetry aggregated from your chat history.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          {isUsageLoading ? (
-            <p className="text-muted-foreground">Loading usage metrics...</p>
-          ) : usageError ? (
-            <p className="text-danger">{usageError}</p>
-          ) : usage ? (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="rounded-lg border border-border/60 bg-elevated/40 p-3">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Last 30 days</p>
-                  <p className="mt-1">User turns: {usage.trailing30Days.userTurns}</p>
-                  <p>Assistant turns: {usage.trailing30Days.assistantTurns}</p>
-                  <p>Total tokens: {usage.trailing30Days.totalTokens}</p>
-                  <p>Estimated cost: {formatMicrousd(usage.trailing30Days.estimatedCostMicrousd)}</p>
-                </div>
-                <div className="rounded-lg border border-border/60 bg-elevated/40 p-3">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Lifetime</p>
-                  <p className="mt-1">User turns: {usage.lifetime.userTurns}</p>
-                  <p>Assistant turns: {usage.lifetime.assistantTurns}</p>
-                  <p>Total tokens: {usage.lifetime.totalTokens}</p>
-                  <p>Estimated cost: {formatMicrousd(usage.lifetime.estimatedCostMicrousd)}</p>
-                </div>
-              </div>
-              <div className="rounded-lg border border-border/60 bg-elevated/30 p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Provider breakdown</p>
-                {usage.providerBreakdown.length === 0 ? (
-                  <p className="text-muted-foreground">No provider usage yet.</p>
-                ) : (
-                  <div className="space-y-1">
-                    {usage.providerBreakdown.map((provider) => (
-                      <p key={provider.provider}>
-                        {provider.provider}: {provider.assistantTurns} responses, {provider.totalTokens} tokens, {formatMicrousd(provider.estimatedCostMicrousd)}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          ) : (
-            <p className="text-muted-foreground">No usage metrics yet.</p>
+              </CardContent>
+            </Card>
           )}
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => mutateUsage()} disabled={isUsageLoading}>
-              {isUsageLoading ? 'Refreshing...' : 'Refresh Usage'}
-            </Button>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+            <Card className={cn(glassCardClass, "xl:col-span-7")}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserRound className="h-4 w-4 text-plan" />
+                  Profile
+                </CardTitle>
+                <CardDescription>
+                  Set the name used across your workspace and coach context.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <form onSubmit={handleSaveName} className="space-y-2.5">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="fullName"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      Full Name
+                    </label>
+                    <div className="relative">
+                      <Input
+                        id="fullName"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="e.g., Ada Lovelace"
+                        maxLength={80}
+                        disabled={isSavingName}
+                        className={cn(
+                          "bg-elevated/50 pr-[9.5rem] transition-all duration-300 sm:pr-[10.5rem]",
+                          isGeneratingName &&
+                            "border-primary/60 shadow-[0_0_0_3px_hsl(var(--ring)/0.18)]",
+                        )}
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className={cn(
+                          "absolute bottom-1 right-1 top-1 h-auto border border-border/70 bg-surface px-2.5 text-xs shadow-none transition-transform duration-200 hover:bg-surface/95 sm:px-3",
+                          isGeneratingName && "scale-[1.03]",
+                        )}
+                        disabled={isSavingName}
+                        aria-label="Generate a random dojo name"
+                        title="Generate a random dojo name"
+                        onClick={() => {
+                          setFullName(generateDojoTitlePhrase());
+                          runDojoNameRollEffect();
+                        }}
+                      >
+                        <Dice5
+                          className={cn(
+                            "h-3.5 w-3.5",
+                            isGeneratingName && "animate-spin",
+                          )}
+                          aria-hidden="true"
+                        />
+                        <span className="hidden sm:inline">
+                          Generate Dojo Name
+                        </span>
+                        <span className="sm:hidden">Generate</span>
+                      </Button>
+                    </div>
+                    <p className="sr-only" aria-live="polite">
+                      {isGeneratingName ? "New dojo name generated." : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Button
+                      type="submit"
+                      disabled={isSavingName || !isNameDirty}
+                      className="w-full sm:w-auto"
+                    >
+                      {isSavingName ? "Saving..." : "Save Full Name"}
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      This also updates your `profile.md` name line.
+                    </span>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className={cn(glassCardClass, "xl:col-span-5")}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <KeyRound className="h-4 w-4 text-coach" />
+                  Anthropic API Key
+                </CardTitle>
+                <CardDescription>
+                  Add your own Anthropic key to use Claude. Your key is locked
+                  before storage, never shown in plain text, and used only for
+                  your requests.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-3 text-xs text-emerald-100">
+                  <p className="font-medium text-emerald-200">
+                    How do we protect your key?
+                  </p>
+                  <p className="mt-1">
+                    We encrypt it with AES-256-CBC before saving, never print it
+                    in logs, and you can remove it at any time.
+                  </p>
+                </div>
+                <form onSubmit={handleSaveKey} className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="apiKey"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      API Key (sk-ant-...)
+                    </label>
+                    <div className="relative">
+                      <Input
+                        id="apiKey"
+                        type="password"
+                        value={apiKey}
+                        onChange={(e) => {
+                          setApiKey(e.target.value);
+                          if (apiKeyFieldError) {
+                            setApiKeyFieldError("");
+                          }
+                        }}
+                        placeholder={
+                          hasSavedAnthropicKey
+                            ? "sk-ant-•••••••••••••••• (stored securely)"
+                            : "Paste your Anthropic key"
+                        }
+                        className={cn(
+                          "bg-elevated/50",
+                          hasSavedAnthropicKey && "pr-[7.25rem]",
+                        )}
+                        required
+                        disabled={isSavingKey}
+                      />
+                      {hasSavedAnthropicKey && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleRemoveKey}
+                          disabled={isSavingKey || isRemovingKey}
+                          className="absolute bottom-1 right-1 top-1 h-auto border border-border/70 bg-surface px-2.5 text-xs shadow-none transition-colors hover:bg-surface/95"
+                        >
+                          {isRemovingKey ? "Removing..." : "Remove Key"}
+                        </Button>
+                      )}
+                    </div>
+                    {apiKeyFieldError && (
+                      <p className="text-xs text-danger" role="alert">
+                        {apiKeyFieldError}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                    <Button
+                      type="submit"
+                      disabled={!canSaveApiKey || isSavingKey || isRemovingKey}
+                      className="w-full sm:w-auto"
+                    >
+                      {isSavingKey
+                        ? "Storing Securely..."
+                        : "Store Securely (AES-256-CBC)"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card className="border-danger/40 bg-danger/5">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-danger">
-            <ShieldAlert className="h-4 w-4" />
-            Danger Zone
-          </CardTitle>
-          <CardDescription>
-            Permanently delete your account and all associated data. This action is irreversible.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
-            Delete Account
-          </Button>
-        </CardContent>
-      </Card>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+            <Card className={cn(glassCardClass, "xl:col-span-8")}>
+              <CardHeader>
+                <CardTitle>Chat Usage Metrics</CardTitle>
+                <CardDescription>
+                  Session and account usage telemetry aggregated from your chat
+                  history.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                {isUsageLoading ? (
+                  <p className="text-muted-foreground">
+                    Loading usage metrics...
+                  </p>
+                ) : usageError ? (
+                  <p className="text-danger">{usageError}</p>
+                ) : usage ? (
+                  <>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <div className={glassInsetClass}>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Last 7 days
+                        </p>
+                        <p className="mt-2 text-lg font-semibold">
+                          {usage.trailing7Days.totalTokens.toLocaleString()}{" "}
+                          tokens
+                        </p>
+                        <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                          <div className="rounded-md border border-sky-400/25 bg-sky-500/10 px-2 py-1.5">
+                            <p className="text-[10px] uppercase tracking-wide text-sky-200/80">
+                              Input
+                            </p>
+                            <p className="mt-0.5 font-semibold text-sky-100">
+                              {usage.trailing7Days.inputTokens.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="rounded-md border border-amber-400/25 bg-amber-500/10 px-2 py-1.5">
+                            <p className="text-[10px] uppercase tracking-wide text-amber-200/80">
+                              Output
+                            </p>
+                            <p className="mt-0.5 font-semibold text-amber-100">
+                              {usage.trailing7Days.outputTokens.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="rounded-md border border-emerald-400/25 bg-emerald-500/10 px-2 py-1.5">
+                            <p className="text-[10px] uppercase tracking-wide text-emerald-200/80">
+                              Total Tokens
+                            </p>
+                            <p className="mt-0.5 font-semibold text-emerald-100">
+                              {usage.trailing7Days.totalTokens.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="mt-1">
+                          Estimated cost:{" "}
+                          {formatMicrousd(
+                            usage.trailing7Days.estimatedCostMicrousd,
+                          )}
+                        </p>
+                      </div>
+                      <div className={glassInsetClass}>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Lifetime
+                        </p>
+                        <p className="mt-2 text-lg font-semibold">
+                          {usage.lifetime.totalTokens.toLocaleString()} tokens
+                        </p>
+                        <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                          <div className="rounded-md border border-sky-400/25 bg-sky-500/10 px-2 py-1.5">
+                            <p className="text-[10px] uppercase tracking-wide text-sky-200/80">
+                              Input
+                            </p>
+                            <p className="mt-0.5 font-semibold text-sky-100">
+                              {usage.lifetime.inputTokens.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="rounded-md border border-amber-400/25 bg-amber-500/10 px-2 py-1.5">
+                            <p className="text-[10px] uppercase tracking-wide text-amber-200/80">
+                              Output
+                            </p>
+                            <p className="mt-0.5 font-semibold text-amber-100">
+                              {usage.lifetime.outputTokens.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="rounded-md border border-emerald-400/25 bg-emerald-500/10 px-2 py-1.5">
+                            <p className="text-[10px] uppercase tracking-wide text-emerald-200/80">
+                              Total Tokens
+                            </p>
+                            <p className="mt-0.5 font-semibold text-emerald-100">
+                              {usage.lifetime.totalTokens.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="mt-1">
+                          Estimated cost:{" "}
+                          {formatMicrousd(usage.lifetime.estimatedCostMicrousd)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className={glassInsetClass}>
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Provider breakdown
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {usage.providerBreakdown.length} provider
+                          {usage.providerBreakdown.length === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                      {usage.providerBreakdown.length === 0 ? (
+                        <p className="text-muted-foreground">
+                          No provider usage yet.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {usage.providerBreakdown
+                            .slice()
+                            .sort((a, b) => b.totalTokens - a.totalTokens)
+                            .map((provider) => (
+                              <div
+                                key={provider.provider}
+                                className="rounded-lg border border-white/12 bg-[linear-gradient(110deg,hsl(var(--surface)/0.72),hsl(var(--surface)/0.52))] px-3 py-2"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="font-medium text-foreground">
+                                    {formatProviderName(provider.provider)}
+                                  </p>
+                                  <p className="text-xs text-emerald-200/90">
+                                    Estimated cost:{" "}
+                                    {formatMicrousd(
+                                      provider.estimatedCostMicrousd,
+                                    )}
+                                  </p>
+                                </div>
+                                <div className="mt-1 grid grid-cols-3 gap-2 text-xs">
+                                  <p className="text-muted-foreground">
+                                    Input:{" "}
+                                    <span className="font-semibold text-sky-100">
+                                      {provider.inputTokens.toLocaleString()}
+                                    </span>
+                                  </p>
+                                  <p className="text-muted-foreground">
+                                    Output:{" "}
+                                    <span className="font-semibold text-amber-100">
+                                      {provider.outputTokens.toLocaleString()}
+                                    </span>
+                                  </p>
+                                  <p className="text-muted-foreground">
+                                    Total Tokens:{" "}
+                                    <span className="font-semibold text-emerald-100">
+                                      {provider.totalTokens.toLocaleString()}
+                                    </span>
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">No usage metrics yet.</p>
+                )}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => mutateUsage()}
+                    disabled={isUsageLoading}
+                    className="w-full sm:w-auto"
+                  >
+                    {isUsageLoading ? "Refreshing..." : "Refresh Usage"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
-      <GuestLogoutDialog
-        open={guestLogoutOpen}
-        onOpenChange={setGuestLogoutOpen}
-        onUpgrade={handleGuestUpgradeFromDialog}
-        onSignOut={handleSignOut}
-        isUpgrading={isUpgrading}
-        isSigningOut={isLoggingOut}
-      />
-      <LogoutConfirmDialog
-        open={googleLogoutOpen}
-        onOpenChange={setGoogleLogoutOpen}
-        onSignOut={handleSignOut}
-        isSigningOut={isLoggingOut}
-        displayName={accountStatus?.displayName ?? undefined}
-      />
-      <Dialog open={deleteDialogOpen} onOpenChange={(open) => {
-        setDeleteDialogOpen(open)
-        if (!open) setDeleteConfirmText('')
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Account Deletion</DialogTitle>
-            <DialogDescription>
-              This will permanently remove your profile, memory files, chats, progress, and auth account.
-              Type <code className="px-1 py-0.5 rounded bg-elevated text-foreground">DELETE</code> to confirm.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-1.5">
-            <label htmlFor="deleteConfirm" className="text-sm font-medium text-foreground">
-              Type DELETE to continue
-            </label>
-            <Input
-              id="deleteConfirm"
-              value={deleteConfirmText}
-              onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder="DELETE"
-              className="bg-elevated/50"
-              autoComplete="off"
-            />
+            <Card className="border-danger/45 bg-[linear-gradient(170deg,hsl(var(--danger)/0.15),hsl(var(--danger)/0.08))] backdrop-blur-xl xl:sticky xl:top-6 xl:col-span-4">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-danger">
+                  <ShieldAlert className="h-4 w-4" />
+                  Danger Zone
+                </CardTitle>
+                <CardDescription>
+                  Permanently delete your account and all associated data. This
+                  action is irreversible.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  variant="destructive"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  className="w-full sm:w-auto"
+                >
+                  Delete Account
+                </Button>
+              </CardContent>
+            </Card>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteAccount} disabled={!isDeletePhraseValid || isDeleting}>
-              {isDeleting ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Deleting...
-                </span>
-              ) : (
-                'Delete Account'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <GuestLogoutDialog
+            open={guestLogoutOpen}
+            onOpenChange={setGuestLogoutOpen}
+            onUpgrade={handleGuestUpgradeFromDialog}
+            onSignOut={handleSignOut}
+            isUpgrading={isUpgrading}
+            isSigningOut={isLoggingOut}
+          />
+          <LogoutConfirmDialog
+            open={googleLogoutOpen}
+            onOpenChange={setGoogleLogoutOpen}
+            onSignOut={handleSignOut}
+            isSigningOut={isLoggingOut}
+            displayName={accountStatus?.displayName ?? undefined}
+          />
+          <Dialog
+            open={deleteDialogOpen}
+            onOpenChange={(open) => {
+              setDeleteDialogOpen(open);
+              if (!open) setDeleteConfirmText("");
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Confirm Account Deletion</DialogTitle>
+                <DialogDescription>
+                  This will permanently remove your profile, memory files,
+                  chats, progress, and auth account. Type{" "}
+                  <code className="px-1 py-0.5 rounded bg-elevated text-foreground">
+                    DELETE
+                  </code>{" "}
+                  to confirm.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="deleteConfirm"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Type DELETE to continue
+                </label>
+                <Input
+                  id="deleteConfirm"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="DELETE"
+                  className="bg-elevated/50"
+                  autoComplete="off"
+                />
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteDialogOpen(false)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteAccount}
+                  disabled={!isDeletePhraseValid || isDeleting}
+                >
+                  {isDeleting ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Deleting...
+                    </span>
+                  ) : (
+                    "Delete Account"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </div>
-  )
+  );
 }

@@ -70,6 +70,11 @@ function toTitleCase(str: string): string {
     .join(' ')
 }
 
+function isGuestPlaceholderName(value: string): boolean {
+  const normalized = value.trim().toLowerCase()
+  return normalized === 'guest' || normalized === 'guest user'
+}
+
 function readLocalDraft(): OnboardingDraftPayload | null {
   try {
     const raw = localStorage.getItem(ONBOARDING_DRAFT_STORAGE_KEY)
@@ -287,11 +292,11 @@ export default function OnboardingPage() {
 
         setCore((prev) => {
           const merged = activeDraft ? { ...prev, ...activeDraft.core } : prev
-          if (merged.name.trim()) {
+          if (merged.name.trim() && !isGuestPlaceholderName(merged.name)) {
             return merged
           }
 
-          if (namePrefill) {
+          if (namePrefill && !isGuestPlaceholderName(namePrefill)) {
             return { ...merged, name: toTitleCase(namePrefill) }
           }
 
@@ -387,14 +392,37 @@ export default function OnboardingPage() {
 
         <div className="animate-fade-in space-y-5" data-testid={`onboarding-step-${currentStep}`}>
           {currentStep === 'name' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <label htmlFor="name-input" className="block text-lg font-medium">What should we call you?</label>
+            <div className="space-y-2">
+              <label htmlFor="name-input" className="block text-lg font-medium">What should we call you?</label>
+              <div className="relative">
+                <Input
+                  id="name-input"
+                  data-testid="onboarding-name-input"
+                  value={core.name}
+                  onChange={(event) => setCore((prev) => ({ ...prev, name: event.target.value }))}
+                  onBlur={() => setCore((prev) => ({ ...prev, name: toTitleCase(prev.name) }))}
+                  placeholder="Your name"
+                  maxLength={ONBOARDING_MAX_NAME_LENGTH}
+                  className={cn(
+                    'bg-surface border-border pr-[9rem] transition-all duration-300 sm:pr-[10.5rem]',
+                    isGeneratingName && 'border-primary/60 shadow-[0_0_0_3px_hsl(var(--ring)/0.18)]',
+                  )}
+                  autoFocus
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && complete) {
+                      event.preventDefault()
+                      setStepIndex((prev) => Math.min(prev + 1, steps.length - 1))
+                    }
+                  }}
+                />
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
-                  className={cn('transition-transform duration-200', isGeneratingName && 'scale-[1.03]')}
+                  className={cn(
+                    'absolute bottom-1 right-1 top-1 h-auto border border-border/70 bg-surface px-2.5 text-xs shadow-none transition-transform duration-200 hover:bg-surface/95 sm:px-3',
+                    isGeneratingName && 'scale-[1.03]',
+                  )}
                   aria-label="Generate a random dojo name"
                   title="Generate a random dojo name"
                   onClick={() => {
@@ -403,32 +431,10 @@ export default function OnboardingPage() {
                   }}
                 >
                   <Dice5 className={cn('h-3.5 w-3.5', isGeneratingName && 'animate-spin')} aria-hidden="true" />
-                  Generate My Dojo Name
+                  <span className="hidden sm:inline">Generate Dojo Name</span>
+                  <span className="sm:hidden">Generate</span>
                 </Button>
               </div>
-              <Input
-                id="name-input"
-                data-testid="onboarding-name-input"
-                value={core.name}
-                onChange={(event) => setCore((prev) => ({ ...prev, name: event.target.value }))}
-                onBlur={() => setCore((prev) => ({ ...prev, name: toTitleCase(prev.name) }))}
-                placeholder="Your name"
-                maxLength={ONBOARDING_MAX_NAME_LENGTH}
-                className={cn(
-                  'bg-surface border-border transition-all duration-300',
-                  isGeneratingName && 'border-primary/60 shadow-[0_0_0_3px_hsl(var(--ring)/0.18)]',
-                )}
-                autoFocus
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && complete) {
-                    event.preventDefault()
-                    setStepIndex((prev) => Math.min(prev + 1, steps.length - 1))
-                  }
-                }}
-              />
-              <p className="text-xs text-muted-foreground">
-                Need inspiration? Roll for a dojo name.
-              </p>
               <p className="sr-only" aria-live="polite">
                 {isGeneratingName ? 'New dojo name generated.' : ''}
               </p>

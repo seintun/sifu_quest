@@ -17,7 +17,7 @@ type UsageAccumulator = {
 
 type UsageResponse = {
   lifetime: UsageAccumulator
-  trailing30Days: UsageAccumulator
+  trailing7Days: UsageAccumulator
   providerBreakdown: Array<UsageAccumulator & { provider: string }>
   modelBreakdown: Array<UsageAccumulator & { provider: string; model: string }>
 }
@@ -85,7 +85,7 @@ function normalizeUsageResponsePayload(payload: unknown): UsageResponse | null {
 
   return {
     lifetime: normalizeUsageAccumulator(typed.lifetime),
-    trailing30Days: normalizeUsageAccumulator(typed.trailing30Days),
+    trailing7Days: normalizeUsageAccumulator(typed.trailing7Days ?? typed.trailing30Days),
     providerBreakdown: providerBreakdownRaw.map((row) => {
       const typedRow = row as Record<string, unknown>
       return {
@@ -135,7 +135,7 @@ async function loadUsageFromMessageScan(userId: string, cutoff: string): Promise
   }
 
   const lifetime = createAccumulator()
-  const trailing30Days = createAccumulator()
+  const trailing7Days = createAccumulator()
   const providerBreakdown = new Map<string, UsageAccumulator>()
   const modelBreakdown = new Map<string, UsageAccumulator>()
 
@@ -156,7 +156,7 @@ async function loadUsageFromMessageScan(userId: string, cutoff: string): Promise
 
     addToAccumulator(lifetime, delta)
     if (inTrailingWindow) {
-      addToAccumulator(trailing30Days, delta)
+      addToAccumulator(trailing7Days, delta)
     }
 
     if (!isUserTurn) {
@@ -179,7 +179,7 @@ async function loadUsageFromMessageScan(userId: string, cutoff: string): Promise
 
   return {
     lifetime,
-    trailing30Days,
+    trailing7Days,
     providerBreakdown: Array.from(providerBreakdown.entries()).map(([provider, usage]) => ({
       provider,
       ...usage,
@@ -204,7 +204,7 @@ export async function GET() {
 
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const supabase = createAdminClient()
-    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
     const rpcUsage = await supabase.rpc('get_account_usage_aggregates', {
       user_id_param: userId,
