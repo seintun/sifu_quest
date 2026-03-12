@@ -3,6 +3,8 @@
 ## Summary
 The provider catalog now uses dynamic OpenRouter ranking data to order free models for programming use-cases, with graceful fallback to normal catalog behavior when ranking data is unavailable.
 
+This path also now records OpenRouter usage/cost telemetry using provider-reported stream metadata when available.
+
 ## Implemented Components
 
 ### 1. Ranking Payload Extraction
@@ -55,6 +57,33 @@ The implementation intentionally never blocks chat model loading:
 - Model deprecation/new model release:
   - No static ranking dependency is required for correctness.
   - New models still appear via model catalog endpoint.
+
+## Pricing and Cost Telemetry
+
+### Live Cost Source
+- File: `web/src/app/api/chat/route.ts`
+- OpenRouter SSE stream parsing now reads usage payload cost fields:
+  - `usage.cost`
+  - `usage.total_cost` (fallback if `cost` is absent)
+- Values are normalized through `parseUsdToMicrousd(...)` in:
+  - `web/src/lib/chat-usage.ts`
+
+### Cost Resolution Policy
+- Preferred source: provider-reported OpenRouter live cost from stream usage payload.
+- Fallback source: internal estimator (`estimateCostMicrousd`).
+- Current estimator policy for OpenRouter:
+  - returns `0` when tokens exist (acts as safe fallback, not billing source of truth).
+
+### Persistence Path
+- Cost and token usage are emitted in final SSE `usage` frame.
+- The same values are persisted to DB via post-stream persistence:
+  - message-level: `chat_messages` telemetry columns
+  - session-level aggregates: `chat_sessions` usage totals via RPC
+
+### Non-Blocking Behavior
+- Stream completion is not blocked on persistence.
+- After `[DONE]`, persistence runs fire-and-forget with structured error logs for debugging:
+  - `sessionId`, `userId`, `provider`, `model`, `requestId`
 
 ## Data Flow
 ```mermaid
