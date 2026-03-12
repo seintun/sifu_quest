@@ -1,8 +1,48 @@
-import { isOpenRouterFreeModel, sanitizeModelLabel, type ChatModelDescriptor } from './chat-provider-config.ts'
+import { generateModelId, isOpenRouterFreeModel, sanitizeModelLabel, type ChatModelDescriptor } from './chat-provider-config.ts'
 
 export type OpenRouterModelRecord = {
   id?: string
   created?: number | string | null
+}
+
+function getRankingLookupKeys(modelId: string): string[] {
+  const normalized = modelId.trim().toLowerCase()
+  if (!normalized) return []
+
+  const withoutFreeSuffix = normalized.endsWith(':free')
+    ? normalized.replace(/:free$/i, '')
+    : normalized
+
+  const stripDateSuffix = (value: string): string =>
+    value
+      // e.g. minimax-m2.5-20260211
+      .replace(/-\d{8}$/i, '')
+      // e.g. model-2026-02-11
+      .replace(/-\d{4}-\d{2}-\d{2}$/i, '')
+      // e.g. model-02-11
+      .replace(/-\d{2}-\d{2}$/i, '')
+
+  const base = withoutFreeSuffix
+  const dateStripped = stripDateSuffix(base)
+  const keys = new Set<string>()
+  keys.add(base)
+  keys.add(dateStripped)
+  keys.add(`${base}:free`)
+  keys.add(`${dateStripped}:free`)
+
+  if (normalized.endsWith(':free')) {
+    keys.add(normalized)
+  }
+
+  return [...keys].filter(Boolean)
+}
+
+function resolveRankForModelId(rankById: Map<string, number>, modelId: string): number | null {
+  for (const key of getRankingLookupKeys(modelId)) {
+    const rank = rankById.get(key)
+    if (rank) return rank
+  }
+  return null
 }
 
 function parseOpenRouterCreatedTimestamp(value: number | string | null | undefined): number | null {
@@ -46,6 +86,7 @@ export function normalizeOpenRouterModelRecords(records: OpenRouterModelRecord[]
     .map<ChatModelDescriptor>(({ id }) => ({
       id,
       label: sanitizeModelLabel(id),
+      modelId: generateModelId(id),
       provider: 'openrouter',
       isFree: isOpenRouterFreeModel(id),
       availability: 'available',
@@ -64,7 +105,7 @@ export function sortAndAnnotateOpenRouterModelsByRanking(
 
   return models
     .map((model) => {
-      const rank = rankById.get(model.id.toLowerCase())
+      const rank = resolveRankForModelId(rankById, model.id)
       return rank ? { ...model, recommendationRank: rank } : model
     })
     .sort((a, b) => {
@@ -90,7 +131,7 @@ export function buildRecommendedOpenRouterModels(
   const ranked: ChatModelDescriptor[] = []
 
   for (const model of models) {
-    const rank = rankById.get(model.id.toLowerCase())
+    const rank = resolveRankForModelId(rankById, model.id)
     if (!rank) continue
     ranked.push({ ...model, recommendationRank: rank })
   }

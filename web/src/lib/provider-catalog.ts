@@ -8,7 +8,9 @@ import {
   type ChatModelGroupDescriptor,
   type ChatProviderDescriptor,
   DEFAULT_OPENROUTER_MODEL,
+  generateModelId,
   OPENROUTER_ALL_MODELS_INITIAL_LIMIT,
+  OPENROUTER_RANKING_TOP_MODELS_LIMIT,
   OPENROUTER_RECOMMENDED_MODELS_LIMIT,
   OPENROUTER_STATIC_FREE_MODEL_FALLBACKS,
   sanitizeModelLabel,
@@ -18,12 +20,18 @@ import {
 import {
   buildRecommendedOpenRouterModels,
   normalizeOpenRouterModelRecords,
+  sortAndAnnotateOpenRouterModelsByRanking,
   type OpenRouterModelRecord,
 } from './openrouter-model-catalog-utils.ts'
-import { extractRankingModelIdsFromPayload } from './openrouter-ranking-utils.ts'
+import { extractRankingModelIdsFromPayload, mergeRankingModelOrders } from './openrouter-ranking-utils.ts'
 
 const OPENROUTER_MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models'
-const OPENROUTER_PROGRAMMING_RANKINGS_FETCH_URL = 'https://openrouter.ai/rankings?category=programming'
+
+// Weekly usage rankings from OpenRouter leaderboard
+// Using view=week for latest weekly data (avoids client-side rendering issue with #leaderboard)
+const OPENROUTER_PROGRAMMING_RANKINGS_FETCH_URLS = [
+  'https://openrouter.ai/rankings?view=week',
+] as const
 const OPENROUTER_CATALOG_TTL_MS = 5 * 60 * 1000
 const OPENROUTER_RANKINGS_TTL_MS = 30 * 60 * 1000
 const OPENROUTER_USER_CATALOG_TTL_MS = 2 * 60 * 1000
@@ -90,6 +98,7 @@ function buildFallbackOpenRouterModels(): ChatModelDescriptor[] {
   return OPENROUTER_STATIC_FREE_MODEL_FALLBACKS.map((id) => ({
     id,
     label: sanitizeModelLabel(id),
+    modelId: generateModelId(id),
     provider: 'openrouter',
     isFree: true,
     availability: 'available',
@@ -100,23 +109,78 @@ function hashUserCacheKey(userCacheKey: string): string {
   return createHash('sha256').update(userCacheKey).digest('hex').slice(0, 24)
 }
 
-async function fetchOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch): Promise<string[]> {
-  try {
-    const htmlResponse = await fetchImpl(OPENROUTER_PROGRAMMING_RANKINGS_FETCH_URL, {
-      method: 'GET',
-      cache: 'no-store',
-      signal: AbortSignal.timeout(2500),
-    })
-    if (!htmlResponse.ok) {
-      return []
+function parseRankingIdsFromJsonPayload(payload: unknown): string[] {
+  if (!payload || typeof payload !== 'object') return []
+
+  const result: string[] = []
+  const seen = new Set<string>()
+
+  const visit = (value: unknown): void => {
+    if (!value) return
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item)
+      return
+    }
+    if (typeof value !== 'object') return
+
+    const record = value as Record<string, unknown>
+    const modelId = [record.variant_permaslug, record.model, record.model_id, record.id]
+      .find((candidate) => typeof candidate === 'string')
+    if (typeof modelId === 'string') {
+      const normalized = modelId.trim().toLowerCase()
+        .replace(/-\d{8}$/i, '')
+        .replace(/-\d{4}-\d{2}-\d{2}$/i, '')
+        .replace(/-\d{2}-\d{2}$/i, '')
+
+      if (normalized && !seen.has(normalized)) {
+        seen.add(normalized)
+        result.push(normalized)
+      }
     }
 
-    const payload = await htmlResponse.text()
+    for (const nested of Object.values(record)) {
+      if (Array.isArray(nested) || (nested && typeof nested === 'object')) {
+        visit(nested)
+      }
+    }
+  }
+
+  visit(payload)
+  return result
+}
+
+async function fetchRankingModelOrderFromUrl(
+  url: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string[]> {
+  try {
+    const response = await fetchImpl(url, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: { accept: 'application/json, text/html;q=0.9' },
+      signal: AbortSignal.timeout(3000),
+    })
+    if (!response.ok) return []
+
+    const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+    if (contentType.includes('application/json')) {
+      const payload = await response.json().catch(() => null)
+      return parseRankingIdsFromJsonPayload(payload)
+    }
+
+    const payload = await response.text()
     return extractRankingModelIdsFromPayload(payload)
   } catch (error) {
-    console.warn('OpenRouter programming ranking fetch failed; returning empty ranking list and keeping default catalog order', error)
+    console.warn('OpenRouter ranking fetch failed for url; continuing with remaining ranking sources', { url, error })
     return []
   }
+}
+
+async function fetchOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch): Promise<string[]> {
+  const rankingOrders = await Promise.all(
+    OPENROUTER_PROGRAMMING_RANKINGS_FETCH_URLS.map((url) => fetchRankingModelOrderFromUrl(url, fetchImpl)),
+  )
+  return mergeRankingModelOrders(rankingOrders)
 }
 
 async function getOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch): Promise<string[]> {
@@ -292,20 +356,48 @@ export async function buildProviderCatalog(
     ? openRouterModels.filter((model) => model.id.toLowerCase().includes(query) || model.label.toLowerCase().includes(query))
     : openRouterModels
 
+  const rankedOpenRouterModels = sortAndAnnotateOpenRouterModelsByRanking(
+    filteredOpenRouterModels,
+    dynamicProgrammingOrder,
+  )
   const includeAll = Boolean(input.includeAllOpenRouterModels)
   const openRouterModelsForDropdown = includeAll
-    ? filteredOpenRouterModels
-    : filteredOpenRouterModels.slice(0, OPENROUTER_ALL_MODELS_INITIAL_LIMIT)
+    ? rankedOpenRouterModels
+    : rankedOpenRouterModels.slice(0, OPENROUTER_ALL_MODELS_INITIAL_LIMIT)
   const recommendedOpenRouterModels = buildRecommendedOpenRouterModels(
-    openRouterModelsForDropdown,
+    rankedOpenRouterModels,
     dynamicProgrammingOrder,
-    OPENROUTER_RECOMMENDED_MODELS_LIMIT,
+    Math.min(OPENROUTER_RANKING_TOP_MODELS_LIMIT, OPENROUTER_RECOMMENDED_MODELS_LIMIT),
   )
-  const openRouterFreeModelsForDropdown = openRouterModelsForDropdown.filter((model) => model.isFree)
+  // Get list of base model IDs that have a free version available
+  // This helps filter out confusing duplicates like "openai/gpt-oss-120b" when "openai/gpt-oss-120b:free" exists
+  const freeModelIds = new Set(
+    rankedOpenRouterModels
+      .filter((m) => m.isFree)
+      .map((m) => m.id.toLowerCase())
+  )
+
+  // Filter free models: exclude base model if a :free version exists
+  // e.g., exclude "openai/gpt-oss-120b" if "openai/gpt-oss-120b:free" exists
+  const openRouterFreeModelsForDropdown = rankedOpenRouterModels
+    .filter((model) => {
+      if (!model.isFree) return false
+
+      // If this IS a free model (ends with :free), include it
+      if (model.id.toLowerCase().endsWith(':free')) return true
+
+      // If there's a :free version of this model, exclude this one
+      const freeVersionId = `${model.id.toLowerCase()}:free`
+      if (freeModelIds.has(freeVersionId)) return false
+
+      return true
+    })
+    .slice(0, OPENROUTER_RANKING_TOP_MODELS_LIMIT)
 
   const anthropicModels = ANTHROPIC_MODEL_CATALOG.map<ChatModelDescriptor>((model) => ({
     id: model.id,
     label: model.label,
+    modelId: generateModelId(model.id),
     provider: 'anthropic',
     isFree: false,
     availability: input.providerKeys.anthropic ? 'available' : 'requires_key',
@@ -346,7 +438,7 @@ export async function buildProviderCatalog(
           id: 'all',
           label: 'All OpenRouter Models',
           models: openRouterModelsForDropdown,
-          hasMore: !includeAll && filteredOpenRouterModels.length > openRouterModelsForDropdown.length,
+          hasMore: !includeAll && rankedOpenRouterModels.length > openRouterModelsForDropdown.length,
         },
       ],
       anthropic: [

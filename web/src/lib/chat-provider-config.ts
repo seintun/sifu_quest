@@ -10,6 +10,7 @@ export type ModelAvailability =
 export type ChatModelDescriptor = {
   id: string;
   label: string;
+  modelId: string; // Slug-friendly ID for UI elements (e.g., "gpt-oss-120b-free")
   provider: ChatProvider;
   isFree: boolean;
   availability: ModelAvailability;
@@ -53,10 +54,13 @@ export const OPENROUTER_STATIC_FREE_MODEL_FALLBACKS = [
   DEFAULT_OPENROUTER_MODEL,
   "openai/gpt-oss-120b:free",
   "meta-llama/llama-3.3-70b-instruct:free",
+  "stepfun/step-3.5-flash:free",
+  "qwen/qwen3-coder:free",
 ] as const;
 
 export const OPENROUTER_ALL_MODELS_INITIAL_LIMIT = 80;
 export const OPENROUTER_RECOMMENDED_MODELS_LIMIT = 20;
+export const OPENROUTER_RANKING_TOP_MODELS_LIMIT = 10;
 
 export const ANTHROPIC_MODEL_CATALOG: ReadonlyArray<{
   id: string;
@@ -135,4 +139,9 @@ export function sanitizeModelLabel(modelId: string): string {
     .map((part) => part.trim())
     .filter(Boolean)
     .join(" / ");
+}
+
+// Generate a slug-friendly modelId for UI elements (e.g., "openai/gpt-oss-120b:free" -> "openai-gpt-oss-120b-free")
+export function generateModelId(modelId: string): string {
+  return modelId.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
 }
