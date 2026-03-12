@@ -6,8 +6,9 @@ import {
   isKnownAnthropicModel,
   isOpenRouterFreeModel,
   type ChatProvider,
-} from './chat-provider-config'
-import { buildProviderCatalog } from './provider-catalog'
+  type OpenRouterModelScope,
+  type ProviderKeyMap,
+} from './chat-provider-config.ts'
 
 export type ResolvedProviderSelection = {
   provider: ChatProvider
@@ -22,22 +23,45 @@ export type SelectionFailure = {
   message: string
 }
 
-type ResolveSelectionInput = {
+export type ResolveSelectionInput = {
   preferredProvider?: string | null
   preferredModel?: string | null
-  hasAnthropicKey: boolean
+  providerKeys: ProviderKeyMap
+  openRouterModelScope: OpenRouterModelScope
+  userCacheKey?: string | null
+  openRouterApiKey?: string | null
+  catalogOverride?: {
+    modelsByProvider: {
+      openrouter: Array<{ id: string }>
+      anthropic: Array<{ id: string }>
+    }
+  }
 }
 
 export async function resolveProviderSelection(
   input: ResolveSelectionInput,
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ ok: true; selection: ResolvedProviderSelection } | { ok: false; failure: SelectionFailure }> {
-  const catalog = await buildProviderCatalog(input.hasAnthropicKey, fetchImpl)
+  const catalog = input.catalogOverride
+    ? input.catalogOverride
+    : await (async () => {
+      const { buildProviderCatalog } = await import('./provider-catalog.ts')
+      return buildProviderCatalog(
+        {
+          providerKeys: input.providerKeys,
+          openRouterModelScope: input.openRouterModelScope,
+          includeAllOpenRouterModels: true,
+          userCacheKey: input.userCacheKey,
+          openRouterApiKey: input.openRouterApiKey,
+        },
+        fetchImpl,
+      )
+    })()
   const provider = isChatProvider(input.preferredProvider) ? input.preferredProvider : DEFAULT_CHAT_PROVIDER
   const openRouterModelIds = new Set(catalog.modelsByProvider.openrouter.map((m) => m.id))
   const anthropicModelIds = new Set(catalog.modelsByProvider.anthropic.map((m) => m.id))
 
-  if (provider === 'anthropic' && !input.hasAnthropicKey) {
+  if (provider === 'anthropic' && !input.providerKeys.anthropic) {
     return {
       ok: false,
       failure: {
@@ -62,19 +86,28 @@ export async function resolveProviderSelection(
   }
 
   const openRouterModel = typeof input.preferredModel === 'string' ? input.preferredModel.trim() : ''
-  if (openRouterModel.length > 0 && isOpenRouterFreeModel(openRouterModel) && openRouterModelIds.has(openRouterModel)) {
+  if (openRouterModel.length > 0 && openRouterModelIds.has(openRouterModel)) {
+    if (input.openRouterModelScope === 'free_only' && !isOpenRouterFreeModel(openRouterModel)) {
+      return {
+        ok: false,
+        failure: {
+          error: 'model_unavailable',
+          message: 'Selected OpenRouter model requires your OpenRouter API key in Settings.',
+        },
+      }
+    }
     return {
       ok: true,
       selection: { provider: 'openrouter', model: openRouterModel },
     }
   }
 
-  if (openRouterModel.length > 0 && !isOpenRouterFreeModel(openRouterModel)) {
+  if (openRouterModel.length > 0 && input.openRouterModelScope === 'free_only' && !isOpenRouterFreeModel(openRouterModel)) {
     return {
       ok: false,
       failure: {
         error: 'model_unavailable',
-        message: 'Selected OpenRouter model is not available on the free tier for this account.',
+        message: 'Selected OpenRouter model requires your OpenRouter API key in Settings.',
       },
     }
   }

@@ -1,4 +1,5 @@
-import type { ChatProvider } from './chat-provider-config'
+import type { ChatProvider } from './chat-provider-config.ts'
+import { isOpenRouterFreeModel } from './chat-provider-config.ts'
 
 export type TokenUsage = {
   inputTokens: number | null
@@ -104,8 +105,9 @@ export function estimateCostMicrousd(provider: ChatProvider, model: string, usag
   }
 
   // OpenRouter free models are treated as zero-cost for this telemetry surface.
+  // Paid OpenRouter models are currently nullable until pricing metadata is normalized.
   if (provider === 'openrouter') {
-    return 0
+    return isOpenRouterFreeModel(model) ? 0 : null
   }
 
   const pricing = getAnthropicPricing(model)

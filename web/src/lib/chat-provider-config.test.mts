@@ -18,6 +18,7 @@ test('parseChatProvider falls back to openrouter for invalid input', () => {
 test('isOpenRouterFreeModel accepts :free and free router aliases', () => {
   assert.equal(isOpenRouterFreeModel('openai/gpt-oss-20b:free'), true)
   assert.equal(isOpenRouterFreeModel('openrouter/free'), true)
+  assert.equal(isOpenRouterFreeModel('model::free'), false)
   assert.equal(isOpenRouterFreeModel('openai/gpt-4o'), false)
 })
 

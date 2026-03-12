@@ -1,5 +1,6 @@
 export type ChatProvider = "openrouter" | "anthropic";
 export type AnthropicModelCostTier = 1 | 2 | 3;
+export type OpenRouterModelScope = "free_only" | "full_catalog";
 
 export type ModelAvailability =
   | "available"
@@ -16,6 +17,13 @@ export type ChatModelDescriptor = {
   reason?: string;
 };
 
+export type ChatModelGroupDescriptor = {
+  id: string;
+  label: string;
+  models: ChatModelDescriptor[];
+  hasMore?: boolean;
+};
+
 export type ChatProviderDescriptor = {
   id: ChatProvider;
   label: string;
@@ -30,6 +38,11 @@ export type ProviderModelTips = {
   secondaryText?: string;
 };
 
+export type ProviderKeyMap = {
+  openrouter: boolean;
+  anthropic: boolean;
+};
+
 export const DEFAULT_CHAT_PROVIDER: ChatProvider = "openrouter";
 export const DEFAULT_OPENROUTER_MODEL = "openai/gpt-oss-20b:free";
 export const OPENROUTER_FREE_ROUTER_MODEL = "openrouter/free";
@@ -39,6 +52,9 @@ export const OPENROUTER_STATIC_FREE_MODEL_FALLBACKS = [
   "openai/gpt-oss-120b:free",
   "meta-llama/llama-3.3-70b-instruct:free",
 ] as const;
+
+export const OPENROUTER_ALL_MODELS_INITIAL_LIMIT = 80;
+export const OPENROUTER_RECOMMENDED_MODELS_LIMIT = 20;
 
 export const ANTHROPIC_MODEL_CATALOG: ReadonlyArray<{
   id: string;
@@ -75,7 +91,9 @@ export function parseChatProvider(
 }
 
 export function isOpenRouterFreeModel(modelId: string): boolean {
-  return modelId === OPENROUTER_FREE_ROUTER_MODEL || modelId.endsWith(":free");
+  const normalized = modelId.trim().toLowerCase();
+  if (normalized === OPENROUTER_FREE_ROUTER_MODEL) return true;
+  return /.+[^:]:free$/i.test(normalized);
 }
 
 export function isKnownAnthropicModel(modelId: string): boolean {

@@ -1,7 +1,7 @@
 import { auth } from '@/auth'
 import { createApiErrorResponse, createRequestId } from '@/lib/api-error-response'
 import { ensureUserProfile } from '@/lib/account-state'
-import { hasEncryptedProviderApiKey } from '@/lib/provider-api-keys'
+import { loadChatEntitlements } from '@/lib/chat-entitlements'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextResponse } from 'next/server'
 
@@ -22,7 +22,7 @@ export async function GET() {
 
     userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const profile = await ensureUserProfile(userId, session.user.email)
-    const hasAnthropicKey = await hasEncryptedProviderApiKey(userId, 'anthropic')
+    const entitlements = await loadChatEntitlements(userId)
     const sessionName = typeof session.user.name === 'string' ? session.user.name.trim() : ''
     const prefillName = profile.display_name ? null : (sessionName || null)
     const isAnonymousSession = Boolean(session.user.email?.endsWith('@anonymous.local'))
@@ -34,8 +34,7 @@ export async function GET() {
         isAnonymousSession,
         isLinked: !profile.is_guest,
         displayName: profile.display_name,
-        hasApiKey: hasAnthropicKey,
-        hasAnthropicApiKey: hasAnthropicKey,
+        hasProviderKey: entitlements.providerKeys,
         defaultProvider: profile.default_provider,
         defaultModel: profile.default_model,
         prefillName,

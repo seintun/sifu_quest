@@ -1,68 +1,49 @@
 # OpenRouter Dynamic Programming Ranking: Technical Design
 
 ## Summary
-The provider catalog now uses dynamic OpenRouter ranking data to order free models for programming use-cases, with graceful fallback to normal catalog behavior when ranking data is unavailable.
 
-This path also now records OpenRouter usage/cost telemetry using provider-reported stream metadata when available.
+OpenRouter programming ranking data is used to order model recommendations, with resilient fallback when ranking data is unavailable or malformed.
 
-## Implemented Components
+This path also records OpenRouter usage/cost telemetry using provider-reported stream metadata when available.
 
-### 1. Ranking Payload Extraction
+## Implementation
+
+### 1) Ranking Extraction
 - File: `web/src/lib/openrouter-ranking-utils.ts`
-- Function: `extractFreeModelIdsFromRankingPayload(payload)`
-- Behavior:
-  - Accepts ranking payload text (RSC stream or HTML).
-  - Extracts free model ids using multiple patterns:
-    - `variant_permaslug`
-    - ranking anchor hrefs
-    - raw `<provider>/<model>:free` tokens
-  - Returns deduplicated lowercase model ids in discovery order.
+- Inputs: rankings payload text (RSC/HTML)
+- Extracts model ids from multiple patterns and deduplicates.
+- Validates model-id shape and ignores query/hash-tainted captures to avoid nav-link pollution.
 
-### 2. Ranking Fetch + Caching
+### 2) Fetch + Cache
 - File: `web/src/lib/provider-catalog.ts`
-- Added ranking fetch path:
-  - Primary: GET rankings page with `RSC: 1` header.
-  - Fallback: GET standard HTML rankings page.
-- Performance controls:
-  - Short timeout: `AbortSignal.timeout(3500)`
-  - App cache: `unstable_cache` revalidate `1800s`
-  - In-memory cache for injected fetches: TTL `30m`
+- Fetches rankings with bounded timeout.
+- Uses `unstable_cache` for app-level reuse.
+- Uses short-lived in-memory cache for injected fetch paths.
 
-### 3. Catalog Integration
-- `buildProviderCatalog` now fetches concurrently:
-  - free model catalog (`/api/v1/models`)
-  - dynamic ranking order
-- Sorting logic:
-  - If ranking list exists, annotate matching models with `recommendationRank` and sort by rank.
-  - If ranking list is empty/unavailable, return original model order unchanged.
+### 3) Catalog Integration
+- `buildProviderCatalog` fetches free catalog + ranking order concurrently.
+- Applies `recommendationRank` when ranking data matches.
+- Preserves original order on ranking miss/failure.
+- Builds `recommended` from the same dropdown catalog slice to keep recommendations selectable.
+- Default OpenRouter model prefers top recommendation, then first available.
 
-### 4. UI Rendering
+### 4) UI Behavior
 - File: `web/src/components/chat/ChatControls.tsx`
-- Badge rendering based on `recommendationRank`:
-  - `#1`: trophy
-  - `#2-#3`: medal
-  - `#4+`: sparkles
-- Works for desktop and mobile controls.
+- Renders ranking badges (`#1`, `#2-3`, `#4+`).
+- Shows grouped sections: `Recommended`, `Free`, `All`.
+- Supports collapse/expand and model search on desktop/mobile.
 
-## Failure Handling
-The implementation intentionally never blocks chat model loading:
+## Failure Modes
 
-- Ranking endpoint timeout/failure:
-  - Logged warning server-side.
-  - Returns empty ranking list.
-  - Catalog still loads from `/api/v1/models`.
-- Ranking payload shape change:
-  - Multi-pattern parser attempts extraction.
-  - If extraction fails, behavior degrades to normal order.
-- Model deprecation/new model release:
-  - No static ranking dependency is required for correctness.
-  - New models still appear via model catalog endpoint.
+- Ranking fetch timeout/failure: log + fallback to base catalog order.
+- Ranking payload drift: parser validation filters non-model captures.
+- Model churn: catalog remains source of truth; new models still appear.
 
 ## Pricing and Cost Telemetry
 
 ### Live Cost Source
 - File: `web/src/app/api/chat/route.ts`
-- OpenRouter SSE stream parsing now reads usage payload cost fields:
+- OpenRouter SSE stream parsing reads usage payload cost fields:
   - `usage.cost`
   - `usage.total_cost` (fallback if `cost` is absent)
 - Values are normalized through `parseUsdToMicrousd(...)` in:
@@ -72,7 +53,8 @@ The implementation intentionally never blocks chat model loading:
 - Preferred source: provider-reported OpenRouter live cost from stream usage payload.
 - Fallback source: internal estimator (`estimateCostMicrousd`).
 - Current estimator policy for OpenRouter:
-  - returns `0` when tokens exist (acts as safe fallback, not billing source of truth).
+  - free models resolve to `0`
+  - paid-model fallback remains nullable when no live provider cost is available
 
 ### Persistence Path
 - Cost and token usage are emitted in final SSE `usage` frame.
@@ -98,14 +80,9 @@ flowchart TD
   HOOK --> DROPDOWN["ChatControls model dropdown"]
 ```
 
-## Testing
-Added and updated unit coverage:
-- `web/src/lib/openrouter-ranking-utils.test.mts`
-  - validates extraction across payload shapes.
-- Existing tests pass with dynamic-only ordering path.
+## Tests
 
-## Operational Notes
-- Recommended observability follow-up:
-  - metric/log count for ranking extraction success vs failure.
-  - optional cache hit ratio for ranking fetch path.
-- If OpenRouter exposes a stable rankings JSON API, fetch path can be swapped with minimal UI changes.
+- `web/src/lib/openrouter-ranking-utils.test.mts`
+- `web/src/lib/provider-catalog.test.mts`
+
+Coverage includes extraction behavior, ranking fallback paths, free alias handling (`openrouter/free`), and limit/ordering behavior.
