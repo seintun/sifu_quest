@@ -41,7 +41,7 @@ It contains **7 tables**:
 | `avatar_url`       | TEXT          | —                                           |
 | `is_guest`         | BOOLEAN       | Default `false`                             |
 | `guest_expires_at` | TIMESTAMPTZ   | Legacy guest field                          |
-| `api_key_enc`      | TEXT          | Server-encrypted Anthropic API key (`sk-ant-...`) |
+| `api_key_enc`      | TEXT          | Legacy encrypted API key column (migrated to provider-key records) |
 | `trial_started_at` | TIMESTAMPTZ   | Trial window start timestamp                |
 | `trial_messages_used` | INT        | Number of user messages consumed in trial   |
 | `created_at`       | TIMESTAMPTZ   | —                                           |
@@ -117,7 +117,7 @@ RLS is **enabled on all tables** except `audit_log`. Each policy enforces `auth.
 | Concern                | Implementation                                                       |
 | ---------------------- | --------------------------------------------------------------------- |
 | **Data isolation**     | Supabase RLS on all user-facing tables (`auth.uid() = user_id`)       |
-| **API key storage**    | Users provide only `sk-ant-...`. The app encrypts keys server-side with AES-256-CBC and a random 16-byte IV per key. `API_KEY_ENCRYPTION_SECRET` is env-only and operator-managed. Plaintext is **never stored or logged**. |
+| **API key storage**    | Users provide provider keys (for example `sk-ant-...`, `sk-or-...`). The app encrypts keys server-side with AES-256-CBC and a random 16-byte IV per key. `API_KEY_ENCRYPTION_SECRET` is env-only and operator-managed. Plaintext is **never stored or logged**. |
 | **Trial limits**       | 30-min window + 5 user-message cap for users without personal keys, enforced **server-side** in `/api/chat` |
 | **GDPR compliance**    | `DELETE /api/account` wipes all 7 tables + the `auth.users` row via Supabase Admin |
 | **Session management** | JWT-based via NextAuth. Tokens carry only the user UUID.              |

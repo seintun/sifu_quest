@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { estimateCostMicrousd, normalizeTokenUsage } from './chat-usage.ts'
+import { estimateCostMicrousd, normalizeTokenUsage, parseUsdToMicrousd } from './chat-usage.ts'
 
 test('normalizeTokenUsage derives total from input/output when total is missing', () => {
   const usage = normalizeTokenUsage(120, 80, null)
@@ -21,7 +21,7 @@ test('normalizeTokenUsage keeps explicit total when provided', () => {
   })
 })
 
-test('estimateCostMicrousd returns zero for OpenRouter usage', () => {
+test('estimateCostMicrousd returns zero for OpenRouter free usage', () => {
   const cost = estimateCostMicrousd('openrouter', 'openai/gpt-oss-20b:free', {
     inputTokens: 1000,
     outputTokens: 1000,
@@ -30,13 +30,40 @@ test('estimateCostMicrousd returns zero for OpenRouter usage', () => {
   assert.equal(cost, 0)
 })
 
-test('estimateCostMicrousd returns non-zero for Anthropic Sonnet usage', () => {
+test('estimateCostMicrousd returns zero for OpenRouter paid usage', () => {
+  const cost = estimateCostMicrousd('openrouter', 'openai/gpt-4o', {
+    inputTokens: 1000,
+    outputTokens: 1000,
+    totalTokens: 2000,
+  })
+  assert.equal(cost, 0)
+})
+
+test('estimateCostMicrousd uses Anthropic Sonnet 4.6 pricing', () => {
   const cost = estimateCostMicrousd('anthropic', 'claude-sonnet-4-6', {
     inputTokens: 1000,
     outputTokens: 1000,
     totalTokens: 2000,
   })
-  assert.ok(typeof cost === 'number' && cost > 0)
+  assert.equal(cost, 18_000)
+})
+
+test('estimateCostMicrousd uses Anthropic Opus 4.6 pricing', () => {
+  const cost = estimateCostMicrousd('anthropic', 'claude-opus-4-6', {
+    inputTokens: 1000,
+    outputTokens: 1000,
+    totalTokens: 2000,
+  })
+  assert.equal(cost, 30_000)
+})
+
+test('estimateCostMicrousd uses Anthropic Haiku 4.5 pricing', () => {
+  const cost = estimateCostMicrousd('anthropic', 'claude-haiku-4-5', {
+    inputTokens: 1000,
+    outputTokens: 1000,
+    totalTokens: 2000,
+  })
+  assert.equal(cost, 6_000)
 })
 
 test('estimateCostMicrousd returns null for unknown anthropic model', () => {
@@ -46,4 +73,17 @@ test('estimateCostMicrousd returns null for unknown anthropic model', () => {
     totalTokens: 200,
   })
   assert.equal(cost, null)
+})
+
+test('parseUsdToMicrousd converts USD number and string payloads', () => {
+  assert.equal(parseUsdToMicrousd(0.123456), 123_456)
+  assert.equal(parseUsdToMicrousd('0.5'), 500_000)
+  assert.equal(parseUsdToMicrousd(' 0.000001 '), 1)
+})
+
+test('parseUsdToMicrousd returns null for invalid or negative values', () => {
+  assert.equal(parseUsdToMicrousd(null), null)
+  assert.equal(parseUsdToMicrousd(''), null)
+  assert.equal(parseUsdToMicrousd('abc'), null)
+  assert.equal(parseUsdToMicrousd(-1), null)
 })

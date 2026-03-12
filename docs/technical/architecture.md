@@ -28,10 +28,10 @@
          │   │  └─────────┘  └─────────────┘ │
          │   └────────────────────────────────┘
          │
-    ┌────┴──────────┐
-    │  Anthropic API │
-    │  (Claude LLM)  │
-    └────────────────┘
+    ┌────┴────────────────────────────────────────────┐
+    │              LLM Provider Layer                │
+    │      OpenRouter, Anthropic, future providers   │
+    └─────────────────────────────────────────────────┘
 ```
 
 **Request lifecycle:**
@@ -40,7 +40,7 @@
 2. Client-side actions hit `/api/*` routes running on Node.js serverless functions.
 3. Each API route authenticates the user via **NextAuth** (`web/src/auth.ts`).
 4. Authenticated routes read/write data to **Supabase PostgreSQL** via `@supabase/ssr`.
-5. Chat routes stream responses from the **Anthropic Claude API**.
+5. Chat routes stream responses from the selected provider (OpenRouter or Anthropic).
 6. Errors across all runtimes are captured by **Sentry**.
 
 ---
@@ -54,7 +54,7 @@
 | UI               | React + Tailwind CSS                    | 19.x / 4.x |
 | Auth             | NextAuth.js (v5 beta) + Supabase Auth   | 5.0-beta   |
 | Database         | Supabase (PostgreSQL)                   | —          |
-| LLM              | Anthropic Claude (via `@anthropic-ai/sdk`) | —       |
+| LLM              | Multi-provider chat (OpenRouter + Anthropic; extensible) | —       |
 | Monitoring       | Sentry (`@sentry/nextjs`)               | 10.x       |
 | Hosting          | Vercel                                  | —          |
 | Encryption       | Node.js `crypto` (AES-256-CBC)          | built-in   |
@@ -67,9 +67,9 @@ All routes live under `src/app/api/` and require authentication via `auth()` fro
 | Route                            | Method | Purpose                                        |
 | -------------------------------- | ------ | ---------------------------------------------- |
 | `/api/auth/[...nextauth]`        | *      | NextAuth handler (Google + Anonymous login)    |
-| `/api/auth/apikey`               | POST/DELETE | Save or delete encrypted Anthropic API key |
+| `/api/auth/apikey`               | POST/DELETE | Save or delete encrypted provider API keys (OpenRouter/Anthropic) |
 | `/api/account`                   | DELETE | GDPR-compliant full account wipe               |
-| `/api/chat`                      | POST   | Stream Claude responses (SSE)                  |
+| `/api/chat`                      | POST   | Stream provider responses (SSE)                 |
 | `/api/chat/session`              | GET/POST | Fetch or create chat sessions               |
 | `/api/dsa/log`                   | POST   | Log a DSA problem to memory + progress         |
 | `/api/encrypt-key`               | POST   | Utility: encrypt an API key                    |
@@ -166,7 +166,7 @@ Located in `src/lib/`:
 | `supabase.ts`        | Creates a **server-side** Supabase client using `@supabase/ssr` with cookie-based auth. Only usable in Server Components and API routes. |
 | `supabase-browser.ts`| Creates a **browser-side** Supabase client using `createBrowserClient`. Used in Client Components (e.g., Settings page for `linkIdentity`). |
 | `memory.ts`          | Reads/writes memory files from Supabase. Reads mode files from the filesystem (`src/modes/`). |
-| `apikey.ts`          | Encrypts user-provided Anthropic keys (`sk-ant-...`) with **AES-256-CBC** before storage. Decrypts only at chat-time to call Anthropic. Uses a `randomBytes(16)` IV per encryption. |
+| `apikey.ts`          | Encrypts user-provided provider keys (for example `sk-ant-...`, `sk-or-...`) with **AES-256-CBC** before storage. Decrypts only at request-time. Uses a `randomBytes(16)` IV per encryption. |
 | `progress.ts`        | Helper functions `logProgressEvent()` and `logAuditEvent()` for inserting rows into `progress_events` and `audit_log`. |
 | `metrics.ts`         | Computes dashboard metrics (current streak, total activity days) by querying `progress_events` from Supabase. |
 

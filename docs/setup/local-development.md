@@ -124,7 +124,7 @@ OpenRouter powers shared free-tier chat. Anthropic is optional for server-side A
 | **OpenRouter API Key** | `OPENROUTER_API_KEY` |
 | **Anthropic API Key** *(optional for local dev)* | `ANTHROPIC_API_KEY` |
 
-> 💡 **Note:** `OPENROUTER_API_KEY` powers shared free-tier chat for guests and signed-in free users (current rollout limit: **10 user messages**). Users can add a personal Anthropic key in Settings to use Anthropic models.
+> 💡 **Note:** `OPENROUTER_API_KEY` powers shared free-tier chat for guests and signed-in free users (current rollout limit: **10 user messages**). Users can add personal provider keys (OpenRouter and/or Anthropic) in Settings to access more models.
 
 ---
 
@@ -153,8 +153,8 @@ These are cryptographic secrets generated locally — they don't come from any e
 
 #### `API_KEY_ENCRYPTION_SECRET`
 
-A server-only 32-byte hex string used to encrypt/decrypt user Anthropic API keys at rest.
-End users do not provide this value; they only paste their Anthropic key (`sk-ant-...`) in Settings.
+A server-only 32-byte hex string used to encrypt/decrypt user provider API keys at rest.
+End users do not provide this value; they only paste provider keys (for example `sk-ant-...`, `sk-or-...`) in Settings.
 
 ```bash
 openssl rand -hex 32
@@ -242,7 +242,7 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000). You should be able to:
 - Log in with Google or start an anonymous guest session
 - Complete onboarding
-- Chat in free-tier mode using `OPENROUTER_API_KEY` until quota is exhausted or a personal Anthropic key is added
+- Chat in free-tier mode using `OPENROUTER_API_KEY` until quota is exhausted or a personal provider key is added
 - View your dashboard and calendar
 
 ### Guest Sessions & Account Conversion

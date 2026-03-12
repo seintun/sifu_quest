@@ -620,9 +620,9 @@ function SettingsPageContent() {
                   Anthropic API Key
                 </CardTitle>
                 <CardDescription>
-                  Add your own Anthropic key to use Claude. Your key is locked
-                  before storage, never shown in plain text, and used only for
-                  your requests.
+                  Add your own Anthropic key to use Anthropic models in the
+                  multi-provider chat stack. Your key is locked before storage,
+                  never shown in plain text, and used only for your requests.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">

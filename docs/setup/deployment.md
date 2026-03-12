@@ -90,7 +90,7 @@ After deploy, verify the following end-to-end:
    - The 11th user message is blocked by free-tier quota.
 2. Verify guest sessions enforce expiry independently of free-tier quota.
 3. Open **Settings**:
-   - Save personal Anthropic key and verify chat unblocks.
+   - Save personal provider key(s) and verify chat unblocks.
    - Remove key and verify trial status is shown again.
    - Confirm infra env status list shows configured/missing key names only (no secret values).
 4. Open Memory pages and verify data is loaded from Supabase `memory_files`.
