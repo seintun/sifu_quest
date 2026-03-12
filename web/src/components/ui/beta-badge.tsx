@@ -6,7 +6,6 @@ export function BetaBadge({ className }: { className?: string }) {
         animation: "beta-glow 2s ease-in-out infinite",
       }}
     >
-      <span className="mr-1.5 w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
       Beta
       <style>{`
         @keyframes beta-glow {
@@ -19,5 +18,5 @@ export function BetaBadge({ className }: { className?: string }) {
         }
       `}</style>
     </span>
-  )
+  );
 }
