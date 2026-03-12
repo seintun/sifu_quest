@@ -843,7 +843,6 @@ export async function POST(request: NextRequest) {
           streamClosed = true
 
           if (sessionId && lastUserMessage && assistantResult) {
-            const usageForPersistence = assistantResult.usage
             const persistInput: PersistTurnInput = {
               supabase,
               sessionId,
@@ -852,14 +851,9 @@ export async function POST(request: NextRequest) {
               assistantContent: assistantResult.assistantContent,
               provider: resolvedProvider,
               model: assistantResult.modelUsed,
-              usage: usageForPersistence,
+              usage,
               latencyMs: assistantResult.latencyMs,
-              estimatedCostMicrousd: resolveCostMicrousd(
-                resolvedProvider,
-                assistantResult.modelUsed,
-                usageForPersistence,
-                assistantResult.providerReportedCostMicrousd,
-              ),
+              estimatedCostMicrousd, // Reuse from SSE frame
               requestId: assistantResult.requestId,
               enforceQuota,
             }

@@ -1,8 +1,8 @@
-# OpenRouter Dynamic Programming Ranking: Technical Design
+# OpenRouter Model Rankings: Technical Design
 
 ## Summary
 
-OpenRouter programming ranking data is used to order model recommendations, with resilient fallback when ranking data is unavailable or malformed. This implementation uses a single source of truth (`view=week` JSON endpoint) for faster, more reliable ranking data.
+OpenRouter weekly ranking data is used to order model recommendations, with resilient fallback when ranking data is unavailable or malformed. This implementation uses a single source of truth (`view=week` JSON endpoint) for faster, more reliable ranking data.
 
 This path also records OpenRouter usage/cost telemetry using provider-reported stream metadata when available.
 
