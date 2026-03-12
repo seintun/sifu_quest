@@ -141,6 +141,66 @@ export function sanitizeModelLabel(modelId: string): string {
     .join(" / ");
 }
 
+// =============================================================================
+// Shared Utilities for OpenRouter Model Processing
+// =============================================================================
+
+const DATE_SUFFIX_PATTERN = /-\d{8}$/i
+const DATE_SUFFIX_PATTERN_LONG = /-\d{4}-\d{2}-\d{2}$/i
+const DATE_SUFFIX_PATTERN_SHORT = /-\d{2}-\d{2}$/i
+
+/**
+ * Strip date suffixes from model IDs for consistent matching.
+ * e.g., "minimax-m2.5-20260211" -> "minimax-m2.5"
+ * e.g., "model-2026-02-11" -> "model"
+ */
+export function stripModelDateSuffix(modelId: string): string {
+  return modelId
+    .replace(DATE_SUFFIX_PATTERN, '')
+    .replace(DATE_SUFFIX_PATTERN_LONG, '')
+    .replace(DATE_SUFFIX_PATTERN_SHORT, '')
+}
+
+/**
+ * Generate all possible lookup keys for matching a model ID against ranking data.
+ * Handles :free suffixes and date suffixes.
+ */
+export function getRankingLookupKeys(modelId: string): string[] {
+  const normalized = modelId.trim().toLowerCase()
+  if (!normalized) return []
+
+  const withoutFree = normalized.endsWith(':free')
+    ? normalized.slice(0, -5) // remove :free
+    : normalized
+
+  const dateStripped = stripModelDateSuffix(withoutFree)
+
+  // Generate unique keys
+  const keys = new Set<string>([
+    normalized,
+    withoutFree,
+    dateStripped,
+    `${normalized}:free`,
+    `${withoutFree}:free`,
+    `${dateStripped}:free`,
+  ])
+
+  // Clean up any empty strings and return
+  return [...keys].filter(Boolean)
+}
+
+/**
+ * Resolve a model's rank from a ranking map using all possible lookup keys.
+ * Returns null if no rank found.
+ */
+export function resolveModelRank(rankById: Map<string, number>, modelId: string): number | null {
+  for (const key of getRankingLookupKeys(modelId)) {
+    const rank = rankById.get(key)
+    if (rank) return rank
+  }
+  return null
+}
+
 // Generate a slug-friendly modelId for UI elements (e.g., "openai/gpt-oss-120b:free" -> "openai-gpt-oss-120b-free")
 export function generateModelId(modelId: string): string {
   return modelId.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");

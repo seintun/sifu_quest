@@ -14,6 +14,7 @@ import {
   OPENROUTER_RECOMMENDED_MODELS_LIMIT,
   OPENROUTER_STATIC_FREE_MODEL_FALLBACKS,
   sanitizeModelLabel,
+  stripModelDateSuffix,
   type OpenRouterModelScope,
   type ProviderKeyMap,
 } from './chat-provider-config.ts'
@@ -23,19 +24,18 @@ import {
   sortAndAnnotateOpenRouterModelsByRanking,
   type OpenRouterModelRecord,
 } from './openrouter-model-catalog-utils.ts'
-import { extractRankingModelIdsFromPayload, mergeRankingModelOrders } from './openrouter-ranking-utils.ts'
+import { extractRankingModelIdsFromPayload } from './openrouter-ranking-utils.ts'
 
 const OPENROUTER_MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models'
 
-// Weekly usage rankings from OpenRouter leaderboard
-// Using view=week for latest weekly data (avoids client-side rendering issue with #leaderboard)
-const OPENROUTER_PROGRAMMING_RANKINGS_FETCH_URLS = [
-  'https://openrouter.ai/rankings?view=week',
-] as const
-const OPENROUTER_CATALOG_TTL_MS = 5 * 60 * 1000
-const OPENROUTER_RANKINGS_TTL_MS = 30 * 60 * 1000
-const OPENROUTER_USER_CATALOG_TTL_MS = 2 * 60 * 1000
+// Single source of truth: weekly rankings JSON endpoint
+const OPENROUTER_RANKING_URL = 'https://openrouter.ai/rankings?view=week'
+
+const OPENROUTER_CATALOG_TTL_MS = 5 * 60 * 1000          // 5 min
+const OPENROUTER_RANKINGS_TTL_MS = 30 * 60 * 1000       // 30 min
+const OPENROUTER_USER_CATALOG_TTL_MS = 2 * 60 * 1000    // 2 min
 const OPENROUTER_USER_CACHE_MAX_ENTRIES = 120
+const RANKING_FETCH_TIMEOUT_MS = 2500
 
 type OpenRouterCatalogResponse = {
   data?: OpenRouterModelRecord[]
@@ -75,22 +75,26 @@ export type BuildProviderCatalogInput = {
   openRouterApiKey?: string | null
 }
 
+// In-memory caches (for non-cache API calls)
 let openRouterCache: OpenRouterCache | null = null
 let openRouterRankingsCache: OpenRouterRankingsCache | null = null
 const openRouterUserCache = new Map<string, OpenRouterUserCache>()
+
+// In-flight request deduplication
 let openRouterFreeModelsInFlight: Promise<ChatModelDescriptor[]> | null = null
 let openRouterRankingsInFlight: Promise<string[]> | null = null
 const openRouterUserInFlight = new Map<string, Promise<ChatModelDescriptor[]>>()
 
+// Next.js cache wrapper for production
 const getCachedOpenRouterFreeModels = unstable_cache(
   async () => fetchOpenRouterFreeModels(fetch),
   ['openrouter-free-models'],
   { revalidate: 300, tags: ['openrouter-model-catalog'] },
 )
 
-const getCachedOpenRouterProgrammingRanking = unstable_cache(
-  async () => fetchOpenRouterProgrammingRanking(fetch),
-  ['openrouter-programming-ranking'],
+const getCachedOpenRouterRanking = unstable_cache(
+  async () => fetchOpenRouterRanking(fetch),
+  ['openrouter-ranking'],
   { revalidate: 1800, tags: ['openrouter-model-catalog'] },
 )
 
@@ -109,6 +113,9 @@ function hashUserCacheKey(userCacheKey: string): string {
   return createHash('sha256').update(userCacheKey).digest('hex').slice(0, 24)
 }
 
+/**
+ * Parse model IDs from JSON ranking response (handles various payload shapes)
+ */
 function parseRankingIdsFromJsonPayload(payload: unknown): string[] {
   if (!payload || typeof payload !== 'object') return []
 
@@ -126,18 +133,16 @@ function parseRankingIdsFromJsonPayload(payload: unknown): string[] {
     const record = value as Record<string, unknown>
     const modelId = [record.variant_permaslug, record.model, record.model_id, record.id]
       .find((candidate) => typeof candidate === 'string')
-    if (typeof modelId === 'string') {
-      const normalized = modelId.trim().toLowerCase()
-        .replace(/-\d{8}$/i, '')
-        .replace(/-\d{4}-\d{2}-\d{2}$/i, '')
-        .replace(/-\d{2}-\d{2}$/i, '')
 
+    if (typeof modelId === 'string') {
+      const normalized = stripModelDateSuffix(modelId.trim().toLowerCase())
       if (normalized && !seen.has(normalized)) {
         seen.add(normalized)
         result.push(normalized)
       }
     }
 
+    // Recursively visit nested objects/arrays
     for (const nested of Object.values(record)) {
       if (Array.isArray(nested) || (nested && typeof nested === 'object')) {
         visit(nested)
@@ -149,45 +154,54 @@ function parseRankingIdsFromJsonPayload(payload: unknown): string[] {
   return result
 }
 
-async function fetchRankingModelOrderFromUrl(
-  url: string,
-  fetchImpl: typeof fetch = fetch,
-): Promise<string[]> {
+/**
+ * Fetch ranking from OpenRouter (single source of truth)
+ */
+async function fetchOpenRouterRanking(fetchImpl: typeof fetch = fetch): Promise<string[]> {
   try {
-    const response = await fetchImpl(url, {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), RANKING_FETCH_TIMEOUT_MS)
+
+    const response = await fetchImpl(OPENROUTER_RANKING_URL, {
       method: 'GET',
       cache: 'no-store',
       headers: { accept: 'application/json, text/html;q=0.9' },
-      signal: AbortSignal.timeout(3000),
+      signal: controller.signal as AbortSignal,
     })
-    if (!response.ok) return []
+
+    clearTimeout(timeoutId)
+    if (!response.ok) {
+      console.warn('OpenRouter ranking fetch failed', { status: response.status })
+      return []
+    }
 
     const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+
+    // Prefer JSON response
     if (contentType.includes('application/json')) {
       const payload = await response.json().catch(() => null)
       return parseRankingIdsFromJsonPayload(payload)
     }
 
+    // Fallback to HTML parsing
     const payload = await response.text()
     return extractRankingModelIdsFromPayload(payload)
   } catch (error) {
-    console.warn('OpenRouter ranking fetch failed for url; continuing with remaining ranking sources', { url, error })
+    console.warn('OpenRouter ranking fetch failed', error)
     return []
   }
 }
 
-async function fetchOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch): Promise<string[]> {
-  const rankingOrders = await Promise.all(
-    OPENROUTER_PROGRAMMING_RANKINGS_FETCH_URLS.map((url) => fetchRankingModelOrderFromUrl(url, fetchImpl)),
-  )
-  return mergeRankingModelOrders(rankingOrders)
-}
-
-async function getOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch): Promise<string[]> {
+/**
+ * Get rankings with in-memory cache fallback
+ */
+async function getOpenRouterRanking(fetchImpl: typeof fetch = fetch): Promise<string[]> {
+  // Use Next.js cache in production
   if (fetchImpl === fetch) {
-    return getCachedOpenRouterProgrammingRanking()
+    return getCachedOpenRouterRanking()
   }
 
+  // Manual cache for testing/custom fetch
   const now = Date.now()
   if (openRouterRankingsCache && openRouterRankingsCache.expiresAt > now) {
     return openRouterRankingsCache.modelOrder
@@ -197,7 +211,8 @@ async function getOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch):
     return openRouterRankingsInFlight
   }
 
-  openRouterRankingsInFlight = fetchOpenRouterProgrammingRanking(fetchImpl)
+  openRouterRankingsInFlight = fetchOpenRouterRanking(fetchImpl)
+
   let modelOrder: string[]
   try {
     modelOrder = await openRouterRankingsInFlight
@@ -212,7 +227,10 @@ async function getOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch):
   return modelOrder
 }
 
-function pruneExpiredOpenRouterUserCache(now: number): void {
+/**
+ * Prune expired entries from user cache to prevent memory bloat
+ */
+function pruneExpiredUserCache(now: number): void {
   for (const [key, entry] of openRouterUserCache.entries()) {
     if (entry.expiresAt <= now) {
       openRouterUserCache.delete(key)
@@ -221,13 +239,13 @@ function pruneExpiredOpenRouterUserCache(now: number): void {
 
   if (openRouterUserCache.size <= OPENROUTER_USER_CACHE_MAX_ENTRIES) return
 
+  // Remove oldest entries
   const entries = [...openRouterUserCache.entries()]
     .sort((a, b) => a[1].expiresAt - b[1].expiresAt)
 
   const toDelete = openRouterUserCache.size - OPENROUTER_USER_CACHE_MAX_ENTRIES
-  for (let index = 0; index < toDelete; index += 1) {
-    const [key] = entries[index]
-    openRouterUserCache.delete(key)
+  for (let i = 0; i < toDelete; i++) {
+    openRouterUserCache.delete(entries[i][0])
   }
 }
 
@@ -281,6 +299,7 @@ export async function getOpenRouterFreeModels(fetchImpl: typeof fetch = fetch): 
   }
 
   openRouterFreeModelsInFlight = fetchOpenRouterFreeModels(fetchImpl)
+
   let models: ChatModelDescriptor[]
   try {
     models = await openRouterFreeModelsInFlight
@@ -301,7 +320,7 @@ async function getOpenRouterFullModelsForUser(
   fetchImpl: typeof fetch = fetch,
 ): Promise<ChatModelDescriptor[]> {
   const now = Date.now()
-  pruneExpiredOpenRouterUserCache(now)
+  pruneExpiredUserCache(now)
 
   const hashedKey = hashUserCacheKey(userCacheKey)
   const cached = openRouterUserCache.get(hashedKey)
@@ -316,6 +335,7 @@ async function getOpenRouterFullModelsForUser(
 
   const nextFetch = fetchOpenRouterModels(fetchImpl, openRouterApiKey)
   openRouterUserInFlight.set(hashedKey, nextFetch)
+
   let models: ChatModelDescriptor[]
   try {
     models = await nextFetch
@@ -330,70 +350,81 @@ async function getOpenRouterFullModelsForUser(
   return models
 }
 
+/**
+ * Build the complete provider catalog with rankings
+ */
 export async function buildProviderCatalog(
   input: BuildProviderCatalogInput,
   fetchImpl: typeof fetch = fetch,
 ): Promise<ProviderCatalogResult> {
-  const [freeOpenRouterModels, dynamicProgrammingOrder] = await Promise.all([
+  // Parallel fetch: free models + rankings (both can load simultaneously)
+  const [freeOpenRouterModels, dynamicOrder] = await Promise.all([
     getOpenRouterFreeModels(fetchImpl),
-    getOpenRouterProgrammingRanking(fetchImpl),
+    getOpenRouterRanking(fetchImpl),
   ])
 
+  // Get user-specific full catalog if needed
   let openRouterModels = freeOpenRouterModels
   if (input.openRouterModelScope === 'full_catalog' && input.userCacheKey && input.openRouterApiKey) {
     try {
-      const fullModels = await getOpenRouterFullModelsForUser(input.userCacheKey, input.openRouterApiKey, fetchImpl)
+      const fullModels = await getOpenRouterFullModelsForUser(
+        input.userCacheKey,
+        input.openRouterApiKey,
+        fetchImpl,
+      )
       if (fullModels.length > 0) {
         openRouterModels = fullModels
       }
     } catch (error) {
-      console.warn('Falling back to free OpenRouter model catalog for user-scoped query', error)
+      console.warn('Falling back to free OpenRouter model catalog', error)
     }
   }
 
+  // Filter by query if provided
   const query = input.openRouterQuery?.trim().toLowerCase()
-  const filteredOpenRouterModels = query
-    ? openRouterModels.filter((model) => model.id.toLowerCase().includes(query) || model.label.toLowerCase().includes(query))
+  const filteredModels = query
+    ? openRouterModels.filter(
+        (m) => m.id.toLowerCase().includes(query) || m.label.toLowerCase().includes(query),
+      )
     : openRouterModels
 
-  const rankedOpenRouterModels = sortAndAnnotateOpenRouterModelsByRanking(
-    filteredOpenRouterModels,
-    dynamicProgrammingOrder,
-  )
+  // Sort and annotate with rankings
+  const rankedModels = sortAndAnnotateOpenRouterModelsByRanking(filteredModels, dynamicOrder)
+
+  // Prepare model lists
   const includeAll = Boolean(input.includeAllOpenRouterModels)
-  const openRouterModelsForDropdown = includeAll
-    ? rankedOpenRouterModels
-    : rankedOpenRouterModels.slice(0, OPENROUTER_ALL_MODELS_INITIAL_LIMIT)
-  const recommendedOpenRouterModels = buildRecommendedOpenRouterModels(
-    rankedOpenRouterModels,
-    dynamicProgrammingOrder,
+  const allModelsForDropdown = includeAll
+    ? rankedModels
+    : rankedModels.slice(0, OPENROUTER_ALL_MODELS_INITIAL_LIMIT)
+
+  const recommendedModels = buildRecommendedOpenRouterModels(
+    rankedModels,
+    dynamicOrder,
     Math.min(OPENROUTER_RANKING_TOP_MODELS_LIMIT, OPENROUTER_RECOMMENDED_MODELS_LIMIT),
   )
-  // Get list of base model IDs that have a free version available
-  // This helps filter out confusing duplicates like "openai/gpt-oss-120b" when "openai/gpt-oss-120b:free" exists
+
+  // Build free models list (deduplicate: prefer :free variants)
   const freeModelIds = new Set(
-    rankedOpenRouterModels
+    rankedModels
       .filter((m) => m.isFree)
-      .map((m) => m.id.toLowerCase())
+      .map((m) => m.id.toLowerCase()),
   )
 
-  // Filter free models: exclude base model if a :free version exists
-  // e.g., exclude "openai/gpt-oss-120b" if "openai/gpt-oss-120b:free" exists
-  const openRouterFreeModelsForDropdown = rankedOpenRouterModels
+  const freeModelsForDropdown = rankedModels
     .filter((model) => {
       if (!model.isFree) return false
+      const idLower = model.id.toLowerCase()
 
-      // If this IS a free model (ends with :free), include it
-      if (model.id.toLowerCase().endsWith(':free')) return true
+      // Always include :free variants
+      if (idLower.endsWith(':free')) return true
 
-      // If there's a :free version of this model, exclude this one
-      const freeVersionId = `${model.id.toLowerCase()}:free`
-      if (freeModelIds.has(freeVersionId)) return false
-
-      return true
+      // Exclude base model if :free version exists
+      const freeVersionId = `${idLower}:free`
+      return !freeModelIds.has(freeVersionId)
     })
     .slice(0, OPENROUTER_RANKING_TOP_MODELS_LIMIT)
 
+  // Build Anthropic models
   const anthropicModels = ANTHROPIC_MODEL_CATALOG.map<ChatModelDescriptor>((model) => ({
     id: model.id,
     label: model.label,
@@ -404,13 +435,13 @@ export async function buildProviderCatalog(
     reason: input.providerKeys.anthropic ? undefined : 'Add Anthropic BYOK in Settings for unlimited AI chat.',
   }))
 
+  const defaultModelId = recommendedModels[0]?.id
+    ?? allModelsForDropdown[0]?.id
+    ?? DEFAULT_OPENROUTER_MODEL
+
   return {
     providers: [
-      {
-        id: 'openrouter',
-        label: 'OpenRouter',
-        availability: 'available',
-      },
+      { id: 'openrouter', label: 'OpenRouter', availability: 'available' },
       {
         id: 'anthropic',
         label: 'Anthropic',
@@ -419,39 +450,27 @@ export async function buildProviderCatalog(
       },
     ],
     modelsByProvider: {
-      openrouter: openRouterModelsForDropdown,
+      openrouter: allModelsForDropdown,
       anthropic: anthropicModels,
     },
     modelGroupsByProvider: {
       openrouter: [
-        {
-          id: 'recommended',
-          label: 'Recommended for Coding',
-          models: recommendedOpenRouterModels,
-        },
-        {
-          id: 'free',
-          label: 'Free Models',
-          models: openRouterFreeModelsForDropdown,
-        },
+        { id: 'recommended', label: 'Recommended for Coding', models: recommendedModels },
+        { id: 'free', label: 'Free Models', models: freeModelsForDropdown },
         {
           id: 'all',
           label: 'All OpenRouter Models',
-          models: openRouterModelsForDropdown,
-          hasMore: !includeAll && rankedOpenRouterModels.length > openRouterModelsForDropdown.length,
+          models: allModelsForDropdown,
+          hasMore: !includeAll && rankedModels.length > allModelsForDropdown.length,
         },
       ],
       anthropic: [
-        {
-          id: 'all',
-          label: 'Anthropic Models',
-          models: anthropicModels,
-        },
+        { id: 'all', label: 'Anthropic Models', models: anthropicModels },
       ],
     },
     defaults: {
       provider: 'openrouter',
-      model: recommendedOpenRouterModels[0]?.id ?? openRouterModelsForDropdown[0]?.id ?? DEFAULT_OPENROUTER_MODEL,
+      model: defaultModelId,
     },
   }
 }

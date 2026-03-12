@@ -4,7 +4,6 @@ import test from 'node:test'
 import {
   extractFreeModelIdsFromRankingPayload,
   extractRankingModelIdsFromPayload,
-  mergeRankingModelOrders,
 } from './openrouter-ranking-utils.ts'
 
 test('extractFreeModelIdsFromRankingPayload supports multiple payload shapes', () => {
@@ -67,18 +66,3 @@ test('extractRankingModelIdsFromPayload prefers variant_permaslug over noisy hre
   ])
 })
 
-test('mergeRankingModelOrders prioritizes models appearing across multiple rankings', () => {
-  const merged = mergeRankingModelOrders([
-    ['vendor/a', 'vendor/b', 'vendor/c'],
-    ['vendor/b', 'vendor/a', 'vendor/d'],
-    ['vendor/b', 'vendor/e', 'vendor/a'],
-  ])
-
-  assert.deepEqual(merged.slice(0, 5), [
-    'vendor/b',
-    'vendor/a',
-    'vendor/e',
-    'vendor/c',
-    'vendor/d',
-  ])
-})
