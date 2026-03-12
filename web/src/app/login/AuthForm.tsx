@@ -1,39 +1,39 @@
-'use client'
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { User } from "lucide-react"
-import { signIn } from "next-auth/react"
-import { useState } from "react"
+import { Button } from "@/components/ui/button";
+import { User } from "lucide-react";
+import { signIn } from "next-auth/react";
+import { useState } from "react";
 
 export function AuthForm() {
-  const [isLoadingGoogle, setIsLoadingGoogle] = useState(false)
-  const [isLoadingGuest, setIsLoadingGuest] = useState(false)
+  const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
+  const [isLoadingGuest, setIsLoadingGuest] = useState(false);
 
   const handleGoogleSignIn = async () => {
-    setIsLoadingGoogle(true)
+    setIsLoadingGoogle(true);
     try {
-      await signIn('google', { callbackUrl: '/' })
+      await signIn("google", { callbackUrl: "/" });
     } catch (error) {
-      console.error(error)
-      setIsLoadingGoogle(false)
+      console.error(error);
+      setIsLoadingGoogle(false);
     }
-  }
+  };
 
   const handleGuestSignIn = async () => {
-    setIsLoadingGuest(true)
+    setIsLoadingGuest(true);
     try {
-      await signIn('anonymous', { callbackUrl: '/' })
+      await signIn("anonymous", { callbackUrl: "/" });
     } catch (error) {
-      console.error(error)
-      setIsLoadingGuest(false)
+      console.error(error);
+      setIsLoadingGuest(false);
     }
-  }
+  };
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      <Button 
+      <Button
         data-testid="auth-google-button"
-        variant="outline" 
+        variant="outline"
         className="w-full h-11 sm:h-12 text-sm relative group overflow-hidden border-border bg-transparent hover:bg-surface transition-all"
         onClick={handleGoogleSignIn}
         disabled={isLoadingGoogle || isLoadingGuest}
@@ -75,9 +75,9 @@ export function AuthForm() {
         </div>
       </div>
 
-      <Button 
+      <Button
         data-testid="auth-guest-button"
-        variant="secondary" 
+        variant="secondary"
         className="w-full h-11 sm:h-12 text-sm group hover:bg-elevated text-foreground"
         onClick={handleGuestSignIn}
         disabled={isLoadingGoogle || isLoadingGuest}
@@ -87,10 +87,10 @@ export function AuthForm() {
         ) : (
           <>
             <User className="w-4 h-4 sm:w-5 sm:h-5 mr-3 text-muted-foreground group-hover:text-foreground transition-colors" />
-            Sign in as Guest
+            Explore as Honorable Guest
           </>
         )}
       </Button>
     </div>
-  )
+  );
 }
