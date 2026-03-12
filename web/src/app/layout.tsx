@@ -2,6 +2,7 @@ import { OnboardingGuard } from "@/components/layout/OnboardingGuard";
 import { OfflineBanner } from "@/components/pwa/OfflineBanner";
 import { ServiceWorkerRegistration } from "@/components/pwa/ServiceWorkerRegistration";
 import { Toaster } from "@/components/ui/sonner";
+import { Analytics } from "@vercel/analytics/react";
 import { APP_KEYWORDS, BRAND_DESCRIPTION, BRAND_NAME, BRAND_TAGLINE, getCanonicalSiteUrl } from "@/lib/brand";
 
 import type { Metadata, Viewport } from "next";
@@ -72,6 +73,7 @@ export default function RootLayout({
       <body
         className={`${geist.variable} ${geistMono.variable} antialiased`}
       >
+        <Analytics />
         <ServiceWorkerRegistration />
         <OfflineBanner />
         <OnboardingGuard>
