@@ -16,7 +16,7 @@ import { useChat } from "@/hooks/useChat";
 import { BRAND_NAME, MODE_LABELS, NAV_COPY } from "@/lib/brand";
 import { buildSystemMeta, getSystemMessage } from "@/lib/chat-system-messages";
 import { fetcher } from "@/lib/fetcher";
-import { KeyRound, MessageCircle, RotateCcw } from "lucide-react";
+import { ArrowDown, KeyRound, MessageCircle, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import {
   useCallback,
@@ -68,6 +68,9 @@ const MODES: ModeOption[] = [
   { value: "job-search", label: MODE_LABELS["job-search"] },
   { value: "business-ideas", label: MODE_LABELS["business-ideas"] },
 ];
+
+const BYOK_NOTICE = "BYOK in Settings for unlimited chat.";
+const SCROLL_FOLLOW_THRESHOLD_PX = 80;
 
 function ChatSkeleton() {
   return (
@@ -131,6 +134,7 @@ export default function CoachPage() {
   const [dismissedPrompt, setDismissedPrompt] = useState(false);
   const [statusExpanded, setStatusExpanded] = useState(false);
   const [input, setInput] = useState("");
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
 
   const hasGreetedRef = useRef<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -196,6 +200,19 @@ export default function CoachPage() {
     isGuest,
   ]);
 
+  const syncScrollState = useCallback(() => {
+    if (!scrollContainerRef.current) return;
+    const container = scrollContainerRef.current;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    const nearBottom = distanceFromBottom < SCROLL_FOLLOW_THRESHOLD_PX;
+
+    if (!isStreaming) {
+      shouldAutoScrollRef.current = nearBottom;
+    }
+    setShowJumpToBottom(!nearBottom);
+  }, [isStreaming]);
+
   const scrollToBottom = useCallback(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop =
@@ -204,10 +221,30 @@ export default function CoachPage() {
   }, []);
 
   useEffect(() => {
+    if (isStreaming) {
+      // Follow assistant output as it grows.
+      shouldAutoScrollRef.current = true;
+      const rafId = window.requestAnimationFrame(() => {
+        setShowJumpToBottom(false);
+      });
+      return () => window.cancelAnimationFrame(rafId);
+    }
+    const rafId = window.requestAnimationFrame(() => {
+      syncScrollState();
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [isStreaming, syncScrollState]);
+
+  useEffect(() => {
     if (shouldAutoScrollRef.current) {
       scrollToBottom();
+      return;
     }
-  }, [messages, scrollToBottom]);
+    const rafId = window.requestAnimationFrame(() => {
+      syncScrollState();
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [messages, scrollToBottom, syncScrollState]);
 
   useEffect(() => {
     if (
@@ -247,13 +284,8 @@ export default function CoachPage() {
   }, [isStreaming, isQuotaBlocked, messages, setMessages, isGuest]);
 
   const handleScroll = useCallback(() => {
-    if (!scrollContainerRef.current) return;
-
-    const container = scrollContainerRef.current;
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    shouldAutoScrollRef.current = distanceFromBottom < 80;
-  }, []);
+    syncScrollState();
+  }, [syncScrollState]);
 
   const handleClearHistory = () => {
     hasGreetedRef.current = null;
@@ -266,9 +298,20 @@ export default function CoachPage() {
     setStatusExpanded(false);
   };
 
+  const handleStatusToggle = useCallback(() => {
+    setStatusExpanded((prev) => !prev);
+  }, []);
+
+  const handleJumpToBottom = useCallback(() => {
+    scrollToBottom();
+    setShowJumpToBottom(false);
+  }, [scrollToBottom]);
+
   const handleSend = () => {
     const text = input.trim();
     if (!text || isStreaming) return;
+    shouldAutoScrollRef.current = true;
+    setShowJumpToBottom(false);
     setInput("");
     sendMessage(text);
   };
@@ -292,6 +335,27 @@ export default function CoachPage() {
   const isAnthropicLocked = Boolean(
     anthropicProvider && anthropicProvider.availability !== "available",
   );
+  const byokNotice = isAnthropicLocked ? BYOK_NOTICE : null;
+  const isComposerDisabled =
+    isQuotaBlocked || selectedProviderInfo?.availability !== "available";
+  const composerPlaceholder = isQuotaBlocked
+    ? isGuest
+      ? "Guest limit reached"
+      : "Free limit reached"
+    : "Type a message...";
+  const responsiveControlsProps = {
+    providers,
+    selectedProvider,
+    onProviderChange: updateProviderSelection,
+    models: availableModelsForSelectedProvider,
+    selectedModel,
+    onModelChange: updateModelSelection,
+    modes: MODES,
+    selectedMode: mode,
+    onModeChange: handleModeChange,
+    onClear: handleClearHistory,
+    byokNotice,
+  };
 
   return (
     <div
@@ -311,21 +375,7 @@ export default function CoachPage() {
             {NAV_COPY.askSifu}
           </p>
           <div className="ml-auto">
-            <ResponsiveChatControls
-              providers={providers}
-              selectedProvider={selectedProvider}
-              onProviderChange={updateProviderSelection}
-              models={availableModelsForSelectedProvider}
-              selectedModel={selectedModel}
-              onModelChange={updateModelSelection}
-              modes={MODES}
-              selectedMode={mode}
-              onModeChange={handleModeChange}
-              onClear={handleClearHistory}
-              byokNotice={
-                isAnthropicLocked ? `BYOK in Settings for unlimited chat.` : null
-              }
-            />
+            <ResponsiveChatControls {...responsiveControlsProps} />
           </div>
         </div>
       </div>
@@ -345,21 +395,7 @@ export default function CoachPage() {
 
         <div className="flex items-center gap-2">
           <div className="lg:hidden">
-            <ResponsiveChatControls
-              providers={providers}
-              selectedProvider={selectedProvider}
-              onProviderChange={updateProviderSelection}
-              models={availableModelsForSelectedProvider}
-              selectedModel={selectedModel}
-              onModelChange={updateModelSelection}
-              modes={MODES}
-              selectedMode={mode}
-              onModeChange={handleModeChange}
-              onClear={handleClearHistory}
-              byokNotice={
-                isAnthropicLocked ? `BYOK in Settings for unlimited chat.` : null
-              }
-            />
+            <ResponsiveChatControls {...responsiveControlsProps} />
           </div>
           <DesktopChatControls
             providers={providers}
@@ -381,7 +417,7 @@ export default function CoachPage() {
           <span className="inline-flex items-center gap-1.5 flex-1 min-w-0 whitespace-nowrap">
             <KeyRound className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">
-              BYOK in Settings for unlimited chat.
+              {BYOK_NOTICE}
             </span>
           </span>
           <Link
@@ -422,7 +458,7 @@ export default function CoachPage() {
           ) : (
             <>
               {isQuotaBlocked && !isStreaming && !dismissedPrompt && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
                   {isGuest ? (
                     <UpgradePrompt onClose={() => setDismissedPrompt(true)} />
                   ) : (
@@ -435,7 +471,7 @@ export default function CoachPage() {
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
                 data-testid="conversation-scroll"
-                className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-3 pb-36 md:p-4 md:pb-42"
+                className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-3 pb-28 md:p-4 md:pb-32"
               >
                 <ConversationList
                   messages={messages}
@@ -460,7 +496,7 @@ export default function CoachPage() {
                       sessionMetrics={sessionMetrics}
                       formatMicrousd={formatMicrousd}
                       isExpanded={statusExpanded}
-                      onToggle={() => setStatusExpanded((prev) => !prev)}
+                      onToggle={handleStatusToggle}
                     />
                   </div>
 
@@ -471,21 +507,23 @@ export default function CoachPage() {
                     onSend={handleSend}
                     isStreaming={isStreaming}
                     onStop={stopStreaming}
-                    isDisabled={
-                      isQuotaBlocked ||
-                      selectedProviderInfo?.availability !== "available"
-                    }
-                    placeholder={
-                      isQuotaBlocked
-                        ? isGuest
-                          ? "Guest limit reached"
-                          : "Free limit reached"
-                        : "Type a message..."
-                    }
+                    isDisabled={isComposerDisabled}
+                    placeholder={composerPlaceholder}
                     textareaRef={textareaRef}
                   />
                 </div>
               </div>
+
+              {showJumpToBottom && (
+                <button
+                  type="button"
+                  onClick={handleJumpToBottom}
+                  aria-label="Jump to latest message"
+                  className="absolute left-1/2 -translate-x-1/2 z-20 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-background/25 text-foreground/90 shadow-[0_8px_20px_rgb(2_6_23_/_0.4)] backdrop-blur-xl transition-all duration-150 hover:bg-background/35 active:scale-95 bottom-[5.5rem] md:bottom-24"
+                >
+                  <ArrowDown className="h-4 w-4" />
+                </button>
+              )}
             </>
           )}
         </CardContent>
