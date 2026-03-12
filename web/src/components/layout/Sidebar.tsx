@@ -38,7 +38,9 @@ function NavLinks({
 }) {
   const pathname = usePathname()
   const trackerIds = new Set<DashboardNavItem['id']>(['dsa', 'jobs', 'system-design', 'calendar'])
+  const workspaceIds = new Set<DashboardNavItem['id']>(['memory', 'settings'])
   const firstTrackerIndex = items.findIndex((item) => trackerIds.has(item.id))
+  const firstWorkspaceIndex = items.findIndex((item) => workspaceIds.has(item.id))
 
   return (
     <nav className="flex flex-col gap-1" aria-label="Main navigation">
@@ -53,6 +55,13 @@ function NavLinks({
               <div className="px-3 pt-3 pb-1">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80">
                   Trackers
+                </p>
+              </div>
+            )}
+            {index === firstWorkspaceIndex && (
+              <div className="px-3 pt-3 pb-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80">
+                  Workspace
                 </p>
               </div>
             )}
