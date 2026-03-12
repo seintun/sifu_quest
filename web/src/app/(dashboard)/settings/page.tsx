@@ -77,7 +77,7 @@ type UsageTotals = {
 
 type AccountUsage = {
   lifetime: UsageTotals;
-  trailing30Days: UsageTotals;
+  trailing7Days: UsageTotals;
   providerBreakdown: Array<UsageTotals & { provider: string }>;
   modelBreakdown: Array<UsageTotals & { provider: string; model: string }>;
 };
@@ -628,7 +628,7 @@ function SettingsPageContent() {
               <CardContent className="space-y-3">
                 <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-3 text-xs text-emerald-100">
                   <p className="font-medium text-emerald-200">
-                    How we protect your key?
+                    How do we protect your key?
                   </p>
                   <p className="mt-1">
                     We encrypt it with AES-256-CBC before saving, never print it
@@ -725,7 +725,7 @@ function SettingsPageContent() {
                           Last 7 days
                         </p>
                         <p className="mt-2 text-lg font-semibold">
-                          {usage.trailing30Days.totalTokens.toLocaleString()}{" "}
+                          {usage.trailing7Days.totalTokens.toLocaleString()}{" "}
                           tokens
                         </p>
                         <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
@@ -734,7 +734,7 @@ function SettingsPageContent() {
                               Input
                             </p>
                             <p className="mt-0.5 font-semibold text-sky-100">
-                              {usage.trailing30Days.inputTokens.toLocaleString()}
+                              {usage.trailing7Days.inputTokens.toLocaleString()}
                             </p>
                           </div>
                           <div className="rounded-md border border-amber-400/25 bg-amber-500/10 px-2 py-1.5">
@@ -742,7 +742,7 @@ function SettingsPageContent() {
                               Output
                             </p>
                             <p className="mt-0.5 font-semibold text-amber-100">
-                              {usage.trailing30Days.outputTokens.toLocaleString()}
+                              {usage.trailing7Days.outputTokens.toLocaleString()}
                             </p>
                           </div>
                           <div className="rounded-md border border-emerald-400/25 bg-emerald-500/10 px-2 py-1.5">
@@ -750,14 +750,14 @@ function SettingsPageContent() {
                               Total Tokens
                             </p>
                             <p className="mt-0.5 font-semibold text-emerald-100">
-                              {usage.trailing30Days.totalTokens.toLocaleString()}
+                              {usage.trailing7Days.totalTokens.toLocaleString()}
                             </p>
                           </div>
                         </div>
                         <p className="mt-1">
                           Estimated cost:{" "}
                           {formatMicrousd(
-                            usage.trailing30Days.estimatedCostMicrousd,
+                            usage.trailing7Days.estimatedCostMicrousd,
                           )}
                         </p>
                       </div>
