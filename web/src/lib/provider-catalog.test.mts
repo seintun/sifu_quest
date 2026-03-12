@@ -25,6 +25,18 @@ test('normalizeOpenRouterModelRecords sorts by newest created timestamp and dedu
   ])
 })
 
+test('normalizeOpenRouterModelRecords marks openrouter/free alias as free', () => {
+  const models = normalizeOpenRouterModelRecords([
+    { id: 'openrouter/free', created: 100 },
+    { id: 'openai/gpt-4o', created: 90 },
+  ])
+
+  const freeAlias = models.find((model) => model.id === 'openrouter/free')
+  const paidModel = models.find((model) => model.id === 'openai/gpt-4o')
+  assert.equal(freeAlias?.isFree, true)
+  assert.equal(paidModel?.isFree, false)
+})
+
 test('sortAndAnnotateOpenRouterModelsByRanking preserves input order when ranking is unavailable', () => {
   const models = normalizeOpenRouterModelRecords([
     { id: 'vendor/newest:free', created: 300 },
@@ -85,5 +97,19 @@ test('buildRecommendedOpenRouterModels falls back to newest models when ranking 
     'vendor/newest:free',
     'vendor/middle:free',
     'vendor/oldest:free',
+  ])
+})
+
+test('buildRecommendedOpenRouterModels fallback honors requested limit', () => {
+  const models = normalizeOpenRouterModelRecords([
+    { id: 'vendor/newest:free', created: 300 },
+    { id: 'vendor/middle:free', created: 200 },
+    { id: 'vendor/oldest:free', created: 100 },
+  ])
+
+  const recommended = buildRecommendedOpenRouterModels(models, [], 2)
+  assert.deepEqual(recommended.map((model) => model.id), [
+    'vendor/newest:free',
+    'vendor/middle:free',
   ])
 })

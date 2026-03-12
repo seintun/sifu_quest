@@ -323,6 +323,7 @@ function ControlsBody({
                     onKeyDown={stopSelectTypeaheadEvent}
                     onKeyUp={stopSelectTypeaheadEvent}
                     placeholder="Search OpenRouter models"
+                    aria-label="Search OpenRouter models"
                     className="h-8 text-xs"
                   />
                 </div>
@@ -502,6 +503,7 @@ export function DesktopChatControls(props: SharedControlProps) {
                     onKeyDown={stopSelectTypeaheadEvent}
                     onKeyUp={stopSelectTypeaheadEvent}
                     placeholder="Search OpenRouter models"
+                    aria-label="Search OpenRouter models"
                     className="h-8 text-xs"
                   />
                 </div>

@@ -29,3 +29,18 @@ test('extractRankingModelIdsFromPayload captures free and paid model identifiers
     'openai/gpt-oss-20b:free',
   ])
 })
+
+test('extractRankingModelIdsFromPayload ignores non-model ranking links and URL fragments', () => {
+  const payload = [
+    '... href="/rankings?category=programming#categories" ...',
+    '... href="/pricing" ...',
+    '... href="/openai/gpt-oss-20b:free?tab=details" ...',
+    '... href="/meta-llama/llama-3.3-70b-instruct:free" ...',
+    '... "variant_permaslug":"openai/gpt-4o" ...',
+  ].join('\n')
+
+  assert.deepEqual(extractRankingModelIdsFromPayload(payload), [
+    'openai/gpt-4o',
+    'meta-llama/llama-3.3-70b-instruct:free',
+  ])
+})

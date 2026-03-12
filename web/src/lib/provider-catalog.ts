@@ -292,16 +292,15 @@ export async function buildProviderCatalog(
     ? openRouterModels.filter((model) => model.id.toLowerCase().includes(query) || model.label.toLowerCase().includes(query))
     : openRouterModels
 
-  const recommendedOpenRouterModels = buildRecommendedOpenRouterModels(
-    filteredOpenRouterModels,
-    dynamicProgrammingOrder,
-    OPENROUTER_RECOMMENDED_MODELS_LIMIT,
-  )
-
   const includeAll = Boolean(input.includeAllOpenRouterModels)
   const openRouterModelsForDropdown = includeAll
     ? filteredOpenRouterModels
     : filteredOpenRouterModels.slice(0, OPENROUTER_ALL_MODELS_INITIAL_LIMIT)
+  const recommendedOpenRouterModels = buildRecommendedOpenRouterModels(
+    openRouterModelsForDropdown,
+    dynamicProgrammingOrder,
+    OPENROUTER_RECOMMENDED_MODELS_LIMIT,
+  )
   const openRouterFreeModelsForDropdown = openRouterModelsForDropdown.filter((model) => model.isFree)
 
   const anthropicModels = ANTHROPIC_MODEL_CATALOG.map<ChatModelDescriptor>((model) => ({
@@ -360,7 +359,7 @@ export async function buildProviderCatalog(
     },
     defaults: {
       provider: 'openrouter',
-      model: openRouterModelsForDropdown[0]?.id ?? DEFAULT_OPENROUTER_MODEL,
+      model: recommendedOpenRouterModels[0]?.id ?? openRouterModelsForDropdown[0]?.id ?? DEFAULT_OPENROUTER_MODEL,
     },
   }
 }

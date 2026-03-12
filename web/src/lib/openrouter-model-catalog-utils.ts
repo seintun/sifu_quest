@@ -1,4 +1,4 @@
-import { sanitizeModelLabel, type ChatModelDescriptor } from './chat-provider-config.ts'
+import { isOpenRouterFreeModel, sanitizeModelLabel, type ChatModelDescriptor } from './chat-provider-config.ts'
 
 export type OpenRouterModelRecord = {
   id?: string
@@ -47,7 +47,7 @@ export function normalizeOpenRouterModelRecords(records: OpenRouterModelRecord[]
       id,
       label: sanitizeModelLabel(id),
       provider: 'openrouter',
-      isFree: id.endsWith(':free'),
+      isFree: isOpenRouterFreeModel(id),
       availability: 'available',
     }))
 }
@@ -83,7 +83,7 @@ export function buildRecommendedOpenRouterModels(
   if (models.length === 0 || limit <= 0) return []
 
   if (dynamicOrder.length === 0) {
-    return models.slice(0, Math.min(10, models.length, limit))
+    return models.slice(0, Math.min(models.length, limit))
   }
 
   const rankById = new Map<string, number>(dynamicOrder.map((id, index) => [id.toLowerCase(), index + 1]))
@@ -105,5 +105,5 @@ export function buildRecommendedOpenRouterModels(
     return ranked.slice(0, limit)
   }
 
-  return models.slice(0, Math.min(10, models.length, limit))
+  return models.slice(0, Math.min(models.length, limit))
 }

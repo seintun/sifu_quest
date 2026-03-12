@@ -3,7 +3,6 @@ import { decryptKey } from '@/lib/apikey'
 import { ensureUserProfile } from '@/lib/account-state'
 import { DEFAULT_CHAT_PROVIDER, type ChatProvider } from '@/lib/chat-provider-config'
 import { loadChatEntitlements } from '@/lib/chat-entitlements'
-import { resolveProviderSelection } from '@/lib/chat-selection'
 import { buildProviderCatalog } from '@/lib/provider-catalog'
 import { getEncryptedProviderApiKey } from '@/lib/provider-api-keys'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
@@ -20,6 +19,21 @@ function resolveDefaultProvider(preferredProvider: ChatProvider, hasAnthropicKey
     return DEFAULT_CHAT_PROVIDER
   }
   return preferredProvider
+}
+
+function resolveDefaultModel(
+  provider: ChatProvider,
+  preferredModel: string | null,
+  catalog: Awaited<ReturnType<typeof buildProviderCatalog>>,
+): string {
+  const providerModels = catalog.modelsByProvider[provider] ?? []
+  const preferred = typeof preferredModel === 'string' ? preferredModel.trim() : ''
+  if (preferred.length > 0 && providerModels.some((model) => model.id === preferred && model.availability === 'available')) {
+    return preferred
+  }
+  return providerModels.find((model) => model.availability === 'available')?.id
+    ?? providerModels[0]?.id
+    ?? catalog.defaults.model
 }
 
 export async function GET(request: NextRequest) {
@@ -51,17 +65,7 @@ export async function GET(request: NextRequest) {
 
     const preferredProvider = profile.default_provider ?? DEFAULT_CHAT_PROVIDER
     const defaultProvider = resolveDefaultProvider(preferredProvider, entitlements.providerKeys.anthropic)
-    const defaultSelection = await resolveProviderSelection({
-      preferredProvider: defaultProvider,
-      preferredModel: profile.default_model,
-      providerKeys: entitlements.providerKeys,
-      openRouterModelScope: entitlements.openRouterModelScope,
-      userCacheKey: userId,
-      openRouterApiKey,
-    })
-    const defaultModel = defaultSelection.ok
-      ? defaultSelection.selection.model
-      : (catalog.modelsByProvider.openrouter[0]?.id ?? catalog.defaults.model)
+    const defaultModel = resolveDefaultModel(defaultProvider, profile.default_model, catalog)
 
     return NextResponse.json({
       providers: catalog.providers,

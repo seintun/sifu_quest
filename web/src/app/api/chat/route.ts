@@ -739,13 +739,16 @@ export async function POST(request: NextRequest) {
       }
       providerApiKey = decrypted
     } else {
-      if (encryptedOpenRouterKey && !decryptedOpenRouterKey) {
+      const sharedOpenRouterKey = process.env.OPENROUTER_API_KEY?.trim() ?? ''
+      const canFallbackToSharedFreeModel = sharedOpenRouterKey.length > 0 && isOpenRouterFreeModel(resolvedModel)
+
+      if (encryptedOpenRouterKey && !decryptedOpenRouterKey && !canFallbackToSharedFreeModel) {
         return new Response(JSON.stringify({
           error: 'invalid_api_key',
           message: 'Your saved OpenRouter API key could not be decrypted. Please re-add it in Settings to continue.',
         }), { status: 403 })
       }
-      providerApiKey = decryptedOpenRouterKey?.trim() ?? process.env.OPENROUTER_API_KEY?.trim() ?? ''
+      providerApiKey = decryptedOpenRouterKey?.trim() ?? sharedOpenRouterKey
       if (!providerApiKey) {
         return new Response(JSON.stringify({
           error: 'provider_unavailable',

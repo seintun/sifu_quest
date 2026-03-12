@@ -173,7 +173,6 @@ export function useChat(mode: string) {
     openrouter: false,
     anthropic: false,
   })
-  const [openRouterSearchQuery, setOpenRouterSearchQuery] = useState('')
   const [isLoadingOpenRouterAllModels, setIsLoadingOpenRouterAllModels] = useState(false)
   const [streamPhase, setStreamPhase] = useState<StreamPhase>('idle')
   const [hasOlderMessages, setHasOlderMessages] = useState(false)
@@ -184,10 +183,6 @@ export function useChat(mode: string) {
   const bootstrapAbortRef = useRef<AbortController | null>(null)
   const olderAbortRef = useRef<AbortController | null>(null)
   const openRouterCatalogAbortRef = useRef<AbortController | null>(null)
-  const openRouterCatalogCacheRef = useRef<Map<string, {
-    modelsByProvider: Record<ChatProvider, ChatModelOption[]>
-    modelGroupsByProvider: Record<ChatProvider, ChatModelGroupOption[]>
-  }>>(new Map())
   const storedSelectionRef = useRef<ChatSelection | null | undefined>(undefined)
 
   const applySelection = useCallback((provider: ChatProvider, model: string) => {
@@ -206,18 +201,6 @@ export function useChat(mode: string) {
     setHasOlderMessages(Boolean(paging?.hasOlder))
     setNextBefore(paging?.nextBefore ?? null)
     setNextBeforeId(paging?.nextBeforeId ?? null)
-  }, [])
-
-  const applyProviderCatalogPayload = useCallback((payload: {
-    modelsByProvider?: Record<ChatProvider, ChatModelOption[]>
-    modelGroupsByProvider?: Record<ChatProvider, ChatModelGroupOption[]>
-  }) => {
-    if (payload.modelsByProvider) {
-      setModelsByProvider(payload.modelsByProvider)
-    }
-    if (payload.modelGroupsByProvider) {
-      setModelGroupsByProvider(payload.modelGroupsByProvider)
-    }
   }, [])
 
   const loadBootstrap = useCallback(async () => {
@@ -306,8 +289,6 @@ export function useChat(mode: string) {
     setSessionMetrics(null)
     setHasProviderKey({ openrouter: false, anthropic: false })
     setModelGroupsByProvider({ openrouter: [], anthropic: [] })
-    setOpenRouterSearchQuery('')
-    openRouterCatalogCacheRef.current.clear()
     setIsLoadingOpenRouterAllModels(false)
     setStreamPhase('idle')
     setHasOlderMessages(false)
@@ -346,13 +327,17 @@ export function useChat(mode: string) {
 
   const loadAllOpenRouterModels = useCallback(async () => {
     if (isLoadingOpenRouterAllModels) return
+    openRouterCatalogAbortRef.current?.abort()
+    const controller = new AbortController()
+    openRouterCatalogAbortRef.current = controller
     setIsLoadingOpenRouterAllModels(true)
     try {
-      const res = await fetch('/api/chat/providers?openrouterAll=1')
+      const res = await fetch('/api/chat/providers?openrouterAll=1', { signal: controller.signal })
       const data = await res.json().catch(() => ({})) as {
         modelsByProvider?: Record<ChatProvider, ChatModelOption[]>
         modelGroupsByProvider?: Record<ChatProvider, ChatModelGroupOption[]>
       }
+      if (openRouterCatalogAbortRef.current !== controller) return
       if (!res.ok) {
         console.error('Failed to load full OpenRouter model catalog', data)
         setBootstrapError('Unable to load full OpenRouter catalog right now. Please retry.')
@@ -366,10 +351,16 @@ export function useChat(mode: string) {
       }
       setBootstrapError(null)
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return
+      }
       console.error('Failed to load full OpenRouter model catalog', error)
       setBootstrapError('Unable to load full OpenRouter catalog right now. Please retry.')
     } finally {
-      setIsLoadingOpenRouterAllModels(false)
+      if (openRouterCatalogAbortRef.current === controller) {
+        openRouterCatalogAbortRef.current = null
+        setIsLoadingOpenRouterAllModels(false)
+      }
     }
   }, [isLoadingOpenRouterAllModels])
 
