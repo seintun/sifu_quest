@@ -864,8 +864,9 @@ export async function POST(request: NextRequest) {
               enforceQuota,
             }
 
-            // Persistence is intentionally fire-and-forget after stream close to keep response path non-blocking.
-            void persistChatTurn(persistInput).catch((persistError) => {
+            try {
+              await persistChatTurn(persistInput)
+            } catch (persistError) {
               console.error('Post-stream persistence failed', {
                 sessionId,
                 userId,
@@ -874,7 +875,7 @@ export async function POST(request: NextRequest) {
                 requestId: assistantResult?.requestId,
                 error: persistError,
               })
-            })
+            }
           }
         } catch (error) {
           if (error instanceof ClientStreamClosedError) {
