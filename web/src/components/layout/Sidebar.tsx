@@ -208,8 +208,8 @@ export function MobileCoachFloatingCta() {
       data-testid="mobile-coach-floating-cta"
       aria-label={NAV_COPY.askSifu}
       className={cn(
-        'md:hidden group fixed right-3 z-50 inline-flex items-center gap-2 rounded-full border border-coach/35 px-3 py-2',
-        'bottom-[calc(env(safe-area-inset-bottom)+4.25rem)] bg-gradient-to-r from-coach/20 via-coach/10 to-coach/5 backdrop-blur shadow-[0_10px_30px_rgb(14_165_233_/_0.22)]',
+        'md:hidden group fixed right-3 z-40 inline-flex items-center gap-2 rounded-full border border-coach/35 px-3 py-2',
+        'bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] bg-gradient-to-r from-coach/20 via-coach/10 to-coach/5 backdrop-blur shadow-[0_10px_30px_rgb(14_165_233_/_0.22)]',
         'text-coach hover:border-coach/55 hover:shadow-[0_12px_34px_rgb(14_165_233_/_0.3)] active:scale-[0.98]',
         'motion-safe:transition-all motion-safe:duration-200',
       )}

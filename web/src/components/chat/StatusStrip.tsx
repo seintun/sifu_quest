@@ -104,7 +104,7 @@ export function StatusStrip({
                 <span>Input tokens: {sessionMetrics.inputTokens}</span>
                 <span>Output tokens: {sessionMetrics.outputTokens}</span>
                 <span>Total tokens: {sessionMetrics.totalTokens}</span>
-                <span>{formatMicrousd(sessionMetrics.estimatedCostMicrousd)}</span>
+                <span>Est. cost: {formatMicrousd(sessionMetrics.estimatedCostMicrousd)}</span>
               </div>
             </div>
           )}
