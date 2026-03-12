@@ -1,5 +1,29 @@
 "use client";
 
+const SIFU_MODE_STORAGE_KEY = 'sifu-mode-v1'
+
+function getStoredMode(): string {
+  if (typeof window === 'undefined') return 'dsa'
+  try {
+    const stored = window.localStorage.getItem(SIFU_MODE_STORAGE_KEY)
+    if (stored && MODE_LABELS[stored as keyof typeof MODE_LABELS]) {
+      return stored
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return 'dsa'
+}
+
+function persistMode(mode: string): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(SIFU_MODE_STORAGE_KEY, mode)
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 import { ApiKeyPrompt } from "@/components/ApiKeyPrompt";
 import {
   DesktopChatControls,
@@ -111,7 +135,12 @@ function ChatSkeleton() {
 }
 
 export default function CoachPage() {
-  const [mode, setMode] = useState("dsa");
+  const [mode, setMode] = useState(getStoredMode)
+
+  // Persist mode to localStorage when it changes
+  useEffect(() => {
+    persistMode(mode)
+  }, [mode])
   const {
     messages,
     setMessages,
