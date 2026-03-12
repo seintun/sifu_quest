@@ -1,37 +1,73 @@
-'use client'
+"use client";
 
-import { ApiKeyPrompt } from '@/components/ApiKeyPrompt'
-import { ComposerBar } from '@/components/chat/ComposerBar'
-import { ConversationList } from '@/components/chat/ConversationList'
-import { DesktopChatControls, ResponsiveChatControls, type ModeOption } from '@/components/chat/ChatControls'
-import { StatusStrip } from '@/components/chat/StatusStrip'
-import { UpgradePrompt } from '@/components/UpgradePrompt'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { useChat } from '@/hooks/useChat'
-import { BRAND_EMOJIS, MODE_LABELS, NAV_COPY } from '@/lib/brand'
-import { buildSystemMeta, getSystemMessage } from '@/lib/chat-system-messages'
-import { KeyRound, MessageCircle, RotateCcw } from 'lucide-react'
-import Link from 'next/link'
-import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import useSWR from 'swr'
-import { fetcher } from '@/lib/fetcher'
+import { ApiKeyPrompt } from "@/components/ApiKeyPrompt";
+import {
+  DesktopChatControls,
+  ResponsiveChatControls,
+  type ModeOption,
+} from "@/components/chat/ChatControls";
+import { ComposerBar } from "@/components/chat/ComposerBar";
+import { ConversationList } from "@/components/chat/ConversationList";
+import { StatusStrip } from "@/components/chat/StatusStrip";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
+import { useChat } from "@/hooks/useChat";
+import { MODE_LABELS, NAV_COPY } from "@/lib/brand";
+import { buildSystemMeta, getSystemMessage } from "@/lib/chat-system-messages";
+import { fetcher } from "@/lib/fetcher";
+import { KeyRound, MessageCircle, RotateCcw } from "lucide-react";
+import Link from "next/link";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
+import useSWR from "swr";
 
 const MODE_STARTERS: Record<string, string[]> = {
-  dsa: ['Give me a medium array problem', 'Practice dynamic programming', 'Quiz me on graphs', 'Review sliding window'],
-  'system-design': ['Design a URL shortener', 'Scale a newsfeed', 'Explain consistent hashing', 'Rate limiter design'],
-  'interview-prep': ['Start a mock interview', 'Give me a behavioral question', 'Ask a system design question', 'Test me on React'],
-  'job-search': ['Help me write a resume bullet', 'Review a job description', 'Prep behavioral questions', 'Analyze my pipeline'],
-  'business-ideas': ['Explore an idea I have', 'Validate a startup concept', 'Stress-test an idea', 'Find a niche problem'],
-}
+  dsa: [
+    "Give me a medium array problem",
+    "Practice dynamic programming",
+    "Quiz me on graphs",
+    "Review sliding window",
+  ],
+  "system-design": [
+    "Design a URL shortener",
+    "Scale a newsfeed",
+    "Explain consistent hashing",
+    "Rate limiter design",
+  ],
+  "interview-prep": [
+    "Start a mock interview",
+    "Give me a behavioral question",
+    "Ask a system design question",
+    "Test me on React",
+  ],
+  "job-search": [
+    "Help me write a resume bullet",
+    "Review a job description",
+    "Prep behavioral questions",
+    "Analyze my pipeline",
+  ],
+  "business-ideas": [
+    "Explore an idea I have",
+    "Validate a startup concept",
+    "Stress-test an idea",
+    "Find a niche problem",
+  ],
+};
 
 const MODES: ModeOption[] = [
-  { value: 'dsa', label: MODE_LABELS.dsa },
-  { value: 'system-design', label: MODE_LABELS['system-design'] },
-  { value: 'interview-prep', label: MODE_LABELS['interview-prep'] },
-  { value: 'job-search', label: MODE_LABELS['job-search'] },
-  { value: 'business-ideas', label: MODE_LABELS['business-ideas'] },
-]
+  { value: "dsa", label: MODE_LABELS.dsa },
+  { value: "system-design", label: MODE_LABELS["system-design"] },
+  { value: "interview-prep", label: MODE_LABELS["interview-prep"] },
+  { value: "job-search", label: MODE_LABELS["job-search"] },
+  { value: "business-ideas", label: MODE_LABELS["business-ideas"] },
+];
 
 function ChatSkeleton() {
   return (
@@ -58,11 +94,11 @@ function ChatSkeleton() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 export default function CoachPage() {
-  const [mode, setMode] = useState('dsa')
+  const [mode, setMode] = useState("dsa");
   const {
     messages,
     setMessages,
@@ -90,140 +126,183 @@ export default function CoachPage() {
     updateProviderSelection,
     updateModelSelection,
     formatMicrousd,
-  } = useChat(mode)
+  } = useChat(mode);
 
-  const [dismissedPrompt, setDismissedPrompt] = useState(false)
-  const [statusExpanded, setStatusExpanded] = useState(false)
-  const [input, setInput] = useState('')
+  const [dismissedPrompt, setDismissedPrompt] = useState(false);
+  const [statusExpanded, setStatusExpanded] = useState(false);
+  const [input, setInput] = useState("");
 
-  const hasGreetedRef = useRef<string | null>(null)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const shouldAutoScrollRef = useRef(true)
+  const hasGreetedRef = useRef<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const shouldAutoScrollRef = useRef(true);
 
-  const { data: accountStatusResponse } = useSWR('/api/account/status', fetcher)
-  const accountData = accountStatusResponse?.account
+  const { data: accountStatusResponse } = useSWR(
+    "/api/account/status",
+    fetcher,
+  );
+  const accountData = accountStatusResponse?.account;
 
-  const isGuest = accountData?.isAnonymousSession ?? (accountData?.isGuest ?? Boolean(freeQuota?.isGuest))
+  const isGuest =
+    accountData?.isAnonymousSession ??
+    accountData?.isGuest ??
+    Boolean(freeQuota?.isGuest);
 
   const isQuotaBlocked = Boolean(
     freeQuota?.isFreeTier &&
     freeQuota.remaining <= 0 &&
-    !(selectedProvider === 'anthropic' && hasAnthropicKey),
-  )
+    !(selectedProvider === "anthropic" && hasAnthropicKey),
+  );
 
-  const selectedModeLabel = useMemo(() => MODES.find((entry) => entry.value === mode)?.label ?? mode, [mode])
-
-
+  const selectedModeLabel = useMemo(
+    () => MODES.find((entry) => entry.value === mode)?.label ?? mode,
+    [mode],
+  );
 
   useEffect(() => {
-    if (!isLoaded) return
+    if (!isLoaded) return;
 
-    if (messages.length === 0 && hasGreetedRef.current !== mode && !upgradeRequired) {
+    if (
+      messages.length === 0 &&
+      hasGreetedRef.current !== mode &&
+      !upgradeRequired
+    ) {
       if (isQuotaBlocked) {
-        hasGreetedRef.current = mode
+        hasGreetedRef.current = mode;
         setMessages([
           {
-            role: 'assistant',
-            content: getSystemMessage(isGuest ? 'guest_limit_reached' : 'free_tier_exhausted'),
-            meta: buildSystemMeta(isGuest ? 'guest_limit_reached' : 'free_tier_exhausted'),
+            role: "assistant",
+            content: getSystemMessage(
+              isGuest ? "guest_limit_reached" : "free_tier_exhausted",
+            ),
+            meta: buildSystemMeta(
+              isGuest ? "guest_limit_reached" : "free_tier_exhausted",
+            ),
           },
-        ])
-        return
+        ]);
+        return;
       }
-      hasGreetedRef.current = mode
-      greet()
+      hasGreetedRef.current = mode;
+      greet();
     }
-  }, [mode, messages.length, greet, isLoaded, upgradeRequired, isQuotaBlocked, setMessages, isGuest])
+  }, [
+    mode,
+    messages.length,
+    greet,
+    isLoaded,
+    upgradeRequired,
+    isQuotaBlocked,
+    setMessages,
+    isGuest,
+  ]);
 
   const scrollToBottom = useCallback(() => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight
+      scrollContainerRef.current.scrollTop =
+        scrollContainerRef.current.scrollHeight;
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
     if (shouldAutoScrollRef.current) {
-      scrollToBottom()
+      scrollToBottom();
     }
-  }, [messages, scrollToBottom])
+  }, [messages, scrollToBottom]);
 
   useEffect(() => {
     if (!isStreaming && textareaRef.current && !isQuotaBlocked) {
-      textareaRef.current.focus()
+      textareaRef.current.focus();
     }
-  }, [isStreaming, isQuotaBlocked])
+  }, [isStreaming, isQuotaBlocked]);
 
   useEffect(() => {
     if (!isStreaming && isQuotaBlocked && messages.length > 0) {
-      const lastMessage = messages[messages.length - 1]
+      const lastMessage = messages[messages.length - 1];
       const isLimitMessage =
-        lastMessage?.meta?.kind === 'system' &&
-        (lastMessage.meta.code === 'free_tier_exhausted' || lastMessage.meta.code === 'guest_limit_reached')
+        lastMessage?.meta?.kind === "system" &&
+        (lastMessage.meta.code === "free_tier_exhausted" ||
+          lastMessage.meta.code === "guest_limit_reached");
 
-      if (lastMessage && lastMessage.role === 'assistant' && !isLimitMessage) {
+      if (lastMessage && lastMessage.role === "assistant" && !isLimitMessage) {
         setMessages((prev) => [
           ...prev,
           {
-            role: 'assistant',
-            content: getSystemMessage(isGuest ? 'guest_limit_reached' : 'free_tier_exhausted'),
-            meta: buildSystemMeta(isGuest ? 'guest_limit_reached' : 'free_tier_exhausted'),
+            role: "assistant",
+            content: getSystemMessage(
+              isGuest ? "guest_limit_reached" : "free_tier_exhausted",
+            ),
+            meta: buildSystemMeta(
+              isGuest ? "guest_limit_reached" : "free_tier_exhausted",
+            ),
           },
-        ])
-        queueMicrotask(() => setDismissedPrompt(false))
+        ]);
+        queueMicrotask(() => setDismissedPrompt(false));
       }
     }
-  }, [isStreaming, isQuotaBlocked, messages, setMessages, isGuest])
+  }, [isStreaming, isQuotaBlocked, messages, setMessages, isGuest]);
 
   const handleScroll = useCallback(() => {
-    if (!scrollContainerRef.current) return
+    if (!scrollContainerRef.current) return;
 
-    const container = scrollContainerRef.current
-    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
-    shouldAutoScrollRef.current = distanceFromBottom < 80
-  }, [])
+    const container = scrollContainerRef.current;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    shouldAutoScrollRef.current = distanceFromBottom < 80;
+  }, []);
 
   const handleClearHistory = () => {
-    hasGreetedRef.current = null
-    clearHistory()
-  }
+    hasGreetedRef.current = null;
+    clearHistory();
+  };
 
   const handleModeChange = (nextMode: string) => {
-    setMode(nextMode)
-    setDismissedPrompt(false)
-    setStatusExpanded(false)
-  }
+    setMode(nextMode);
+    setDismissedPrompt(false);
+    setStatusExpanded(false);
+  };
 
   const handleSend = () => {
-    const text = input.trim()
-    if (!text || isStreaming) return
-    setInput('')
-    sendMessage(text)
-  }
+    const text = input.trim();
+    if (!text || isStreaming) return;
+    setInput("");
+    sendMessage(text);
+  };
 
   const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault()
-      handleSend()
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      handleSend();
     }
-  }
+  };
 
-  const lastMessage = messages[messages.length - 1]
+  const lastMessage = messages[messages.length - 1];
   const showThinkingIndicator =
     isStreaming &&
-    (streamPhase === 'thinking' || (streamPhase === 'typing' && (!lastMessage || lastMessage.role === 'user')))
+    (streamPhase === "thinking" ||
+      (streamPhase === "typing" &&
+        (!lastMessage || lastMessage.role === "user")));
 
-  const anthropicProvider = providers.find((provider) => provider.id === 'anthropic') ?? null
-  const isAnthropicLocked = Boolean(anthropicProvider && anthropicProvider.availability !== 'available')
+  const anthropicProvider =
+    providers.find((provider) => provider.id === "anthropic") ?? null;
+  const isAnthropicLocked = Boolean(
+    anthropicProvider && anthropicProvider.availability !== "available",
+  );
 
   return (
-    <div data-testid="coach-shell" className="flex flex-col h-[calc(100dvh-4.5rem)] md:h-[calc(100dvh-3rem)] overflow-hidden">
+    <div
+      data-testid="coach-shell"
+      className="flex flex-col h-[calc(100dvh-4.5rem)] md:h-[calc(100dvh-3rem)] overflow-hidden"
+    >
       <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <MessageCircle className="h-[18px] w-[18px] text-coach shrink-0" />
           <div className="min-w-0">
-            <h1 className="font-display text-xl md:text-2xl leading-tight font-bold truncate">{NAV_COPY.askSifu}</h1>
-            <p className="hidden sm:block text-xs text-muted-foreground truncate mt-0.5">{selectedModeLabel}</p>
+            <h1 className="font-display text-xl md:text-2xl leading-tight font-bold truncate">
+              {NAV_COPY.askSifu}
+            </h1>
+            <p className="hidden sm:block text-xs text-muted-foreground truncate mt-0.5">
+              {selectedModeLabel}
+            </p>
           </div>
         </div>
 
@@ -251,7 +330,9 @@ export default function CoachPage() {
             selectedMode={mode}
             onModeChange={handleModeChange}
             onClear={handleClearHistory}
-            byokNotice={isAnthropicLocked ? `${BRAND_EMOJIS.medal} BYOK in Settings for unlimited chat.` : null}
+            byokNotice={
+              isAnthropicLocked ? `BYOK in Settings for unlimited chat.` : null
+            }
           />
         </div>
       </div>
@@ -260,9 +341,14 @@ export default function CoachPage() {
         <div className="hidden md:flex mb-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] text-warning items-center justify-between gap-2 shrink-0">
           <span className="inline-flex items-center gap-1.5 flex-1 min-w-0 whitespace-nowrap">
             <KeyRound className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{BRAND_EMOJIS.medal} BYOK in Settings for unlimited chat.</span>
+            <span className="truncate">
+              BYOK in Settings for unlimited chat.
+            </span>
           </span>
-          <Link href="/settings" className="underline underline-offset-2 whitespace-nowrap hover:text-warning/90 shrink-0">
+          <Link
+            href="/settings"
+            className="underline underline-offset-2 whitespace-nowrap hover:text-warning/90 shrink-0"
+          >
             Settings
           </Link>
         </div>
@@ -275,7 +361,9 @@ export default function CoachPage() {
           ) : bootstrapError ? (
             <div className="flex-1 grid place-items-center px-4">
               <div className="max-w-sm text-center space-y-2">
-                <p className="text-sm text-muted-foreground">{bootstrapError}</p>
+                <p className="text-sm text-muted-foreground">
+                  {bootstrapError}
+                </p>
                 <Button type="button" variant="outline" onClick={reload}>
                   <RotateCcw className="h-4 w-4" />
                   Retry
@@ -284,7 +372,9 @@ export default function CoachPage() {
             </div>
           ) : upgradeRequired && !dismissedPrompt ? (
             <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-center min-h-0">
-              {upgradeRequired === 'missing_api_key' || upgradeRequired === 'provider_key_required' || (!isGuest && upgradeRequired === 'guest_limit_reached') ? (
+              {upgradeRequired === "missing_api_key" ||
+              upgradeRequired === "provider_key_required" ||
+              (!isGuest && upgradeRequired === "guest_limit_reached") ? (
                 <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />
               ) : (
                 <UpgradePrompt onClose={() => setDismissedPrompt(true)} />
@@ -294,7 +384,11 @@ export default function CoachPage() {
             <>
               {isQuotaBlocked && !isStreaming && !dismissedPrompt && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-                  {isGuest ? <UpgradePrompt onClose={() => setDismissedPrompt(true)} /> : <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />}
+                  {isGuest ? (
+                    <UpgradePrompt onClose={() => setDismissedPrompt(true)} />
+                  ) : (
+                    <ApiKeyPrompt onClose={() => setDismissedPrompt(true)} />
+                  )}
                 </div>
               )}
 
@@ -334,11 +428,16 @@ export default function CoachPage() {
                 onSend={handleSend}
                 isStreaming={isStreaming}
                 onStop={stopStreaming}
-                isDisabled={isQuotaBlocked || selectedProviderInfo?.availability !== 'available'}
+                isDisabled={
+                  isQuotaBlocked ||
+                  selectedProviderInfo?.availability !== "available"
+                }
                 placeholder={
                   isQuotaBlocked
-                    ? (isGuest ? 'Guest limit reached' : 'Free limit reached')
-                    : 'Type a message...'
+                    ? isGuest
+                      ? "Guest limit reached"
+                      : "Free limit reached"
+                    : "Type a message..."
                 }
                 textareaRef={textareaRef}
               />
@@ -347,5 +446,5 @@ export default function CoachPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
