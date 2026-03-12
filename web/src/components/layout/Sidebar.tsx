@@ -130,7 +130,7 @@ function LogoutFooter({ deferred, onDeferredLogout }: LogoutFooterProps) {
         type="button"
         onClick={handleSignOutClick}
         data-testid="sidebar-signout-button"
-        className="flex w-full items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-danger hover:bg-danger/5 transition-colors"
+        className="flex w-full items-center gap-3 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger transition-colors hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/40"
         aria-label="Sign out of your account"
       >
         <LogOut className="h-4 w-4" />
