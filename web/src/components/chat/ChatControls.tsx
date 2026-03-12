@@ -1,6 +1,7 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -20,8 +21,8 @@ import {
 } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getAnthropicModelCostTier, getProviderModelTips } from '@/lib/chat-provider-config'
-import type { ChatModelOption, ChatProviderOption } from '@/hooks/useChat'
-import { Briefcase, Coins, Lightbulb, LockKeyhole, Medal, MessageSquare, Network, Settings2, Sparkles, Trash2, Trophy } from 'lucide-react'
+import type { ChatModelGroupOption, ChatModelOption, ChatProviderOption } from '@/hooks/useChat'
+import { Briefcase, ChevronDown, ChevronRight, Coins, Lightbulb, LockKeyhole, Medal, MessageSquare, Network, Settings2, Sparkles, Trash2, Trophy } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
@@ -35,8 +36,11 @@ type SharedControlProps = {
   selectedProvider: 'openrouter' | 'anthropic'
   onProviderChange: (value: 'openrouter' | 'anthropic') => void
   models: ChatModelOption[]
+  modelGroups?: ChatModelGroupOption[]
   selectedModel: string
   onModelChange: (value: string) => void
+  onLoadAllOpenRouterModels?: () => void
+  isLoadingOpenRouterAllModels?: boolean
   modes: ModeOption[]
   selectedMode: string
   onModeChange: (value: string) => void
@@ -86,6 +90,15 @@ function RecommendationBadgeSlot({ rank }: { rank?: number }) {
   )
 }
 
+function FreeModelBadge({ isFree }: { isFree?: boolean }) {
+  if (!isFree) return null
+  return (
+    <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium leading-none text-emerald-200">
+      Free
+    </span>
+  )
+}
+
 function ModelProviderTips({ provider }: { provider: 'openrouter' | 'anthropic' }) {
   const tips = getProviderModelTips(provider)
 
@@ -120,26 +133,32 @@ function ModelOptionContent({
   label,
   recommendationRank,
   tier,
+  isFree,
   showRanking = true,
 }: {
   label: string
   recommendationRank?: number
   tier?: 1 | 2 | 3 | null
+  isFree?: boolean
   showRanking?: boolean
 }) {
+  const normalizedLabel = isFree ? label.replace(/\s*\(free\)\s*$/i, '') : label
+
   if (!showRanking) {
     return (
       <span className="inline-flex max-w-full items-center gap-2">
-        <span className="min-w-0 max-w-[14rem] truncate whitespace-nowrap leading-tight">{label}</span>
+        <span className="min-w-0 max-w-[14rem] truncate whitespace-nowrap leading-tight">{normalizedLabel}</span>
+        <FreeModelBadge isFree={isFree} />
         {tier ? <CostTierIcons tier={tier} /> : null}
       </span>
     )
   }
 
   return (
-    <span className="grid w-full grid-cols-[3.35rem_minmax(0,1fr)_auto] items-center gap-2">
+    <span className="grid w-full grid-cols-[3.35rem_minmax(0,1fr)_auto_auto] items-center gap-2">
       <RecommendationBadgeSlot rank={recommendationRank} />
-      <span className="min-w-0 truncate whitespace-nowrap leading-tight">{label}</span>
+      <span className="min-w-0 truncate whitespace-nowrap leading-tight">{normalizedLabel}</span>
+      <FreeModelBadge isFree={isFree} />
       {tier ? <CostTierIcons tier={tier} /> : <span />}
     </span>
   )
@@ -180,6 +199,17 @@ function ModeOptionContent({ mode }: { mode: ModeOption }) {
   )
 }
 
+function stopSelectTypeaheadEvent(event: React.KeyboardEvent<HTMLInputElement>) {
+  event.stopPropagation()
+}
+
+function isGroupExpandedByDefault(provider: 'openrouter' | 'anthropic', groupId: string): boolean {
+  if (provider === 'openrouter') {
+    return groupId === 'recommended'
+  }
+  return true
+}
+
 function ControlsBody({
   providers,
   selectedProvider,
@@ -187,6 +217,9 @@ function ControlsBody({
   models,
   selectedModel,
   onModelChange,
+  modelGroups,
+  onLoadAllOpenRouterModels,
+  isLoadingOpenRouterAllModels,
   modes,
   selectedMode,
   onModeChange,
@@ -200,9 +233,30 @@ function ControlsBody({
   const selectedModelOption = useMemo(() => models.find((model) => model.id === selectedModel), [models, selectedModel])
   const selectedModeOption = useMemo(() => modes.find((mode) => mode.value === selectedMode), [modes, selectedMode])
   const showOpenRouterRanking = selectedProvider === 'openrouter'
+  const [modelSearch, setModelSearch] = useState('')
+  const [expandedModelGroups, setExpandedModelGroups] = useState<Record<string, boolean>>({})
+  const filteredModelGroups = useMemo(() => {
+    const groups = modelGroups && modelGroups.length > 0
+      ? modelGroups
+      : [{ id: 'all', label: 'Models', models, hasMore: false }]
+    if (groups.length === 0) {
+      return [] as Array<ChatModelGroupOption & { hasMore?: boolean }>
+    }
+    const query = modelSearch.trim().toLowerCase()
+    if (!query) {
+      return groups
+    }
+    return groups
+      .map((group) => ({
+        ...group,
+        models: group.models.filter((model) => model.id.toLowerCase().includes(query) || model.label.toLowerCase().includes(query)),
+      }))
+      .filter((group) => group.models.length > 0)
+  }, [modelGroups, modelSearch, models])
   const selectedTier = selectedModelOption?.provider === 'anthropic'
     ? getAnthropicModelCostTier(selectedModelOption.id)
     : null
+  const hasModelSearch = modelSearch.trim().length > 0
 
   return (
     <div className="grid gap-3">
@@ -248,6 +302,7 @@ function ControlsBody({
                   label={selectedModelOption.label}
                   recommendationRank={showOpenRouterRanking ? selectedModelOption.recommendationRank : undefined}
                   tier={selectedTier}
+                  isFree={selectedProvider === 'openrouter' ? selectedModelOption.isFree : false}
                   showRanking={showOpenRouterRanking}
                 />
               ) : 'Model'}
@@ -258,20 +313,77 @@ function ControlsBody({
             align="end"
             className={showOpenRouterRanking ? MODEL_SELECT_CONTENT_MOBILE_CLASS : MODEL_SELECT_CONTENT_MOBILE_COMPACT_CLASS}
           >
-            <ModelProviderTips provider={selectedProvider} />
-            {models.map((model) => {
-              const modelTier = model.provider === 'anthropic' ? getAnthropicModelCostTier(model.id) : null
-              return (
-                <SelectItem key={model.id} value={model.id} disabled={model.availability !== 'available'}>
-                  <ModelOptionContent
-                    label={model.label}
-                    recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
-                    tier={modelTier}
-                    showRanking={showOpenRouterRanking}
+            <div className="sticky top-0 z-10 bg-popover">
+              <ModelProviderTips provider={selectedProvider} />
+              {selectedProvider === 'openrouter' && (
+                <div className="px-2 pb-2">
+                  <Input
+                    value={modelSearch}
+                    onChange={(event) => setModelSearch(event.target.value)}
+                    onKeyDown={stopSelectTypeaheadEvent}
+                    onKeyUp={stopSelectTypeaheadEvent}
+                    placeholder="Search OpenRouter models"
+                    aria-label="Search OpenRouter models"
+                    className="h-8 text-xs"
                   />
-                </SelectItem>
-              )
-            })}
+                </div>
+              )}
+            </div>
+            <div className="max-h-[min(72vh,42rem)] overflow-y-auto overscroll-contain px-1 pb-1">
+              {filteredModelGroups.map((group) => {
+                const isExpanded = hasModelSearch
+                  || (expandedModelGroups[group.id] ?? isGroupExpandedByDefault(selectedProvider, group.id))
+                return (
+                  <SelectGroup key={group.id}>
+                    <SelectLabel className="px-1">
+                      <button
+                        type="button"
+                        className="inline-flex w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-[11px] uppercase tracking-wide text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={(event) => {
+                          event.preventDefault()
+                          setExpandedModelGroups((prev) => ({ ...prev, [group.id]: !isExpanded }))
+                        }}
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                          {group.label}
+                        </span>
+                        <span className="text-[10px] normal-case text-muted-foreground/80">{group.models.length}</span>
+                      </button>
+                    </SelectLabel>
+                    {isExpanded && group.models.map((model) => {
+                      const modelTier = model.provider === 'anthropic' ? getAnthropicModelCostTier(model.id) : null
+                      return (
+                        <SelectItem key={`${group.id}-${model.id}`} value={model.id} disabled={model.availability !== 'available'}>
+                          <ModelOptionContent
+                            label={model.label}
+                            recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
+                            tier={modelTier}
+                            isFree={selectedProvider === 'openrouter' ? model.isFree : false}
+                            showRanking={showOpenRouterRanking}
+                          />
+                        </SelectItem>
+                      )
+                    })}
+                    {isExpanded && group.id === 'all' && group.hasMore && selectedProvider === 'openrouter' && onLoadAllOpenRouterModels && (
+                      <div className="px-2 py-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 w-full text-xs"
+                          onClick={onLoadAllOpenRouterModels}
+                          disabled={isLoadingOpenRouterAllModels}
+                        >
+                          {isLoadingOpenRouterAllModels ? 'Loading models...' : 'Load full OpenRouter catalog'}
+                        </Button>
+                      </div>
+                    )}
+                  </SelectGroup>
+                )
+              })}
+            </div>
           </SelectContent>
         </Select>
       </label>
@@ -321,13 +433,29 @@ function ControlsBody({
 }
 
 export function DesktopChatControls(props: SharedControlProps) {
+  const [desktopModelSearch, setDesktopModelSearch] = useState('')
+  const [desktopExpandedModelGroups, setDesktopExpandedModelGroups] = useState<Record<string, boolean>>({})
   const selectedDesktopProvider = props.providers.find((provider) => provider.id === props.selectedProvider)
   const selectedDesktopModel = props.models.find((model) => model.id === props.selectedModel)
   const selectedDesktopMode = props.modes.find((mode) => mode.value === props.selectedMode)
   const showOpenRouterRanking = props.selectedProvider === 'openrouter'
+  const desktopFilteredModelGroups = useMemo(() => {
+    const groups = props.modelGroups && props.modelGroups.length > 0
+      ? props.modelGroups
+      : [{ id: 'all', label: 'Models', models: props.models, hasMore: false }]
+    const query = desktopModelSearch.trim().toLowerCase()
+    if (!query) return groups
+    return groups
+      .map((group) => ({
+        ...group,
+        models: group.models.filter((model) => model.id.toLowerCase().includes(query) || model.label.toLowerCase().includes(query)),
+      }))
+      .filter((group) => group.models.length > 0)
+  }, [props.modelGroups, props.models, desktopModelSearch])
   const selectedDesktopTier = selectedDesktopModel?.provider === 'anthropic'
     ? getAnthropicModelCostTier(selectedDesktopModel.id)
     : null
+  const hasDesktopModelSearch = desktopModelSearch.trim().length > 0
 
   return (
     <div className="hidden xl:flex items-center gap-2">
@@ -354,6 +482,7 @@ export function DesktopChatControls(props: SharedControlProps) {
                 label={selectedDesktopModel.label}
                 recommendationRank={showOpenRouterRanking ? selectedDesktopModel.recommendationRank : undefined}
                 tier={selectedDesktopTier}
+                isFree={props.selectedProvider === 'openrouter' ? selectedDesktopModel.isFree : false}
                 showRanking={showOpenRouterRanking}
               />
             ) : null}
@@ -364,20 +493,77 @@ export function DesktopChatControls(props: SharedControlProps) {
           align="end"
           className={showOpenRouterRanking ? MODEL_SELECT_CONTENT_CLASS : MODEL_SELECT_CONTENT_COMPACT_CLASS}
           >
-            <ModelProviderTips provider={props.selectedProvider} />
-          {props.models.map((model) => {
-            const modelTier = model.provider === 'anthropic' ? getAnthropicModelCostTier(model.id) : null
-            return (
-              <SelectItem key={model.id} value={model.id} disabled={model.availability !== 'available'}>
-                <ModelOptionContent
-                  label={model.label}
-                  recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
-                  tier={modelTier}
-                  showRanking={showOpenRouterRanking}
-                />
-              </SelectItem>
-            )
-          })}
+            <div className="sticky top-0 z-10 bg-popover">
+              <ModelProviderTips provider={props.selectedProvider} />
+              {props.selectedProvider === 'openrouter' && (
+                <div className="px-2 pb-2">
+                  <Input
+                    value={desktopModelSearch}
+                    onChange={(event) => setDesktopModelSearch(event.target.value)}
+                    onKeyDown={stopSelectTypeaheadEvent}
+                    onKeyUp={stopSelectTypeaheadEvent}
+                    placeholder="Search OpenRouter models"
+                    aria-label="Search OpenRouter models"
+                    className="h-8 text-xs"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="max-h-[min(72vh,42rem)] overflow-y-auto overscroll-contain px-1 pb-1">
+              {desktopFilteredModelGroups.map((group) => {
+                const isExpanded = hasDesktopModelSearch
+                  || (desktopExpandedModelGroups[group.id] ?? isGroupExpandedByDefault(props.selectedProvider, group.id))
+                return (
+                  <SelectGroup key={group.id}>
+                    <SelectLabel className="px-1">
+                      <button
+                        type="button"
+                        className="inline-flex w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-[11px] uppercase tracking-wide text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={(event) => {
+                          event.preventDefault()
+                          setDesktopExpandedModelGroups((prev) => ({ ...prev, [group.id]: !isExpanded }))
+                        }}
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                          {group.label}
+                        </span>
+                        <span className="text-[10px] normal-case text-muted-foreground/80">{group.models.length}</span>
+                      </button>
+                    </SelectLabel>
+                    {isExpanded && group.models.map((model) => {
+                      const modelTier = model.provider === 'anthropic' ? getAnthropicModelCostTier(model.id) : null
+                      return (
+                        <SelectItem key={`${group.id}-${model.id}`} value={model.id} disabled={model.availability !== 'available'}>
+                          <ModelOptionContent
+                            label={model.label}
+                            recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
+                            tier={modelTier}
+                            isFree={props.selectedProvider === 'openrouter' ? model.isFree : false}
+                            showRanking={showOpenRouterRanking}
+                          />
+                        </SelectItem>
+                      )
+                    })}
+                    {isExpanded && group.id === 'all' && group.hasMore && props.selectedProvider === 'openrouter' && props.onLoadAllOpenRouterModels && (
+                      <div className="px-2 py-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 w-full text-xs"
+                          onClick={props.onLoadAllOpenRouterModels}
+                          disabled={props.isLoadingOpenRouterAllModels}
+                        >
+                          {props.isLoadingOpenRouterAllModels ? 'Loading models...' : 'Load full OpenRouter catalog'}
+                        </Button>
+                      </div>
+                    )}
+                  </SelectGroup>
+                )
+              })}
+            </div>
         </SelectContent>
       </Select>
 

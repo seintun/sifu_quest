@@ -1,20 +1,23 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { canSaveAnthropicApiKey, shouldShowRemoveApiKey } from './account-settings-ui.ts'
+import { canSaveProviderApiKey, shouldShowRemoveApiKey } from './account-settings-ui.ts'
 
-test('canSaveAnthropicApiKey returns false for empty and whitespace input', () => {
-  assert.equal(canSaveAnthropicApiKey(''), false)
-  assert.equal(canSaveAnthropicApiKey('   '), false)
+test('canSaveProviderApiKey returns false for empty and whitespace input', () => {
+  assert.equal(canSaveProviderApiKey('anthropic', ''), false)
+  assert.equal(canSaveProviderApiKey('openrouter', '   '), false)
 })
 
-test('canSaveAnthropicApiKey returns true for sk-ant- prefixed input', () => {
-  assert.equal(canSaveAnthropicApiKey('sk-ant-abc123'), true)
-  assert.equal(canSaveAnthropicApiKey('  sk-ant-abc123  '), true)
+test('canSaveProviderApiKey validates anthropic prefixes', () => {
+  assert.equal(canSaveProviderApiKey('anthropic', 'sk-ant-abc123'), true)
+  assert.equal(canSaveProviderApiKey('anthropic', '  sk-ant-abc123  '), true)
+  assert.equal(canSaveProviderApiKey('anthropic', 'sk-or-v1-abc123'), false)
 })
 
-test('canSaveAnthropicApiKey returns false for non-Anthropic prefix', () => {
-  assert.equal(canSaveAnthropicApiKey('sk-live-123'), false)
+test('canSaveProviderApiKey validates openrouter prefixes', () => {
+  assert.equal(canSaveProviderApiKey('openrouter', 'sk-or-v1-abc123'), true)
+  assert.equal(canSaveProviderApiKey('openrouter', '  sk-or-v1-abc123  '), true)
+  assert.equal(canSaveProviderApiKey('openrouter', 'sk-ant-abc123'), false)
 })
 
 test('shouldShowRemoveApiKey mirrors persisted hasApiKey state', () => {

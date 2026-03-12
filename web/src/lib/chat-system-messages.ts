@@ -14,13 +14,13 @@ export type ChatMessageMeta = {
 
 const SYSTEM_MESSAGES: Record<ChatSystemCode, string> = {
   free_tier_exhausted:
-    `${BRAND_EMOJIS.medal} Free limit reached. Visit **Settings** to add your Anthropic BYOK for unlimited Ask Sifu coaching.`,
+    `${BRAND_EMOJIS.medal} Free limit reached. Visit **Settings** to add your provider API key for expanded Ask Sifu coaching.`,
   guest_limit_reached:
-    `${BRAND_EMOJIS.trophy} Guest limit reached. Sign up, then add Anthropic BYOK in **Settings** to continue.`,
+    `${BRAND_EMOJIS.trophy} Guest limit reached. Sign up, then add your provider API key in **Settings** to continue.`,
   provider_key_required:
-    `${BRAND_EMOJIS.primary} Anthropic requires BYOK. Add your key in **Settings** to continue.`,
+    `${BRAND_EMOJIS.primary} This model requires BYOK. Add your key in **Settings** to continue.`,
   invalid_provider_key:
-    `${BRAND_EMOJIS.fist} Your saved Anthropic key is invalid. Re-add it in **Settings** and try again.`,
+    `${BRAND_EMOJIS.fist} Your saved provider key is invalid. Re-add it in **Settings** and try again.`,
   chat_temporary_error:
     `I hit a temporary issue loading your dojo workspace. Please try again in a moment.`,
 }

@@ -3,9 +3,12 @@ export type QuotaProfile = {
   api_key_enc: string | null
   free_quota_exhausted: boolean
   free_user_messages_used: number
+  has_provider_key?: boolean
 }
 
 export type QuotaProvider = 'openrouter' | 'anthropic'
+
+export type QuotaProviderKeyMap = Record<QuotaProvider, boolean>
 
 export type FreeQuotaView = {
   isFreeTier: boolean
@@ -15,19 +18,25 @@ export type FreeQuotaView = {
 }
 
 export function isUsingFreeTier(profile: QuotaProfile): boolean {
-  return profile.is_guest || !profile.api_key_enc
+  if (profile.is_guest) {
+    return true
+  }
+  if (typeof profile.has_provider_key === 'boolean') {
+    return !profile.has_provider_key
+  }
+  return !profile.api_key_enc
 }
 
 export function shouldEnforceProviderQuota(
   profile: QuotaProfile,
   provider: QuotaProvider,
-  hasAnthropicKey: boolean,
+  providerKeys: QuotaProviderKeyMap,
 ): boolean {
   if (!isUsingFreeTier(profile)) {
     return false
   }
 
-  if (provider === 'anthropic' && hasAnthropicKey) {
+  if (providerKeys[provider]) {
     return false
   }
 
@@ -71,7 +80,7 @@ export function getQuotaErrorForLimit(
 
   return {
     error: 'missing_api_key',
-    message: 'You have exhausted your free messages. Please add your Anthropic API key in Settings to continue.',
+    message: 'You have exhausted your free messages. Please add your API key in Settings to continue.',
   }
 }
 

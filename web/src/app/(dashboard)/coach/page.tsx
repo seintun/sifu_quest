@@ -129,15 +129,18 @@ export default function CoachPage() {
     selectedProvider,
     selectedModel,
     selectedProviderInfo,
+    modelGroupsByProvider,
     availableModelsForSelectedProvider,
     sessionMetrics,
-    hasAnthropicKey,
+    hasProviderKey,
     streamPhase,
     hasOlderMessages,
     isLoadingOlder,
     loadOlderMessages,
     updateProviderSelection,
     updateModelSelection,
+    isLoadingOpenRouterAllModels,
+    loadAllOpenRouterModels,
     formatMicrousd,
   } = useChat(mode);
 
@@ -165,7 +168,7 @@ export default function CoachPage() {
   const isQuotaBlocked = Boolean(
     freeQuota?.isFreeTier &&
     freeQuota.remaining <= 0 &&
-    !(selectedProvider === "anthropic" && hasAnthropicKey),
+    !hasProviderKey[selectedProvider],
   );
 
   const selectedModeLabel = useMemo(
@@ -362,8 +365,11 @@ export default function CoachPage() {
     selectedProvider,
     onProviderChange: updateProviderSelection,
     models: availableModelsForSelectedProvider,
+    modelGroups: modelGroupsByProvider[selectedProvider] ?? [],
     selectedModel,
     onModelChange: updateModelSelection,
+    onLoadAllOpenRouterModels: loadAllOpenRouterModels,
+    isLoadingOpenRouterAllModels,
     modes: MODES,
     selectedMode: mode,
     onModeChange: handleModeChange,
@@ -439,8 +445,11 @@ export default function CoachPage() {
             selectedProvider={selectedProvider}
             onProviderChange={updateProviderSelection}
             models={availableModelsForSelectedProvider}
+            modelGroups={modelGroupsByProvider[selectedProvider] ?? []}
             selectedModel={selectedModel}
             onModelChange={updateModelSelection}
+            onLoadAllOpenRouterModels={loadAllOpenRouterModels}
+            isLoadingOpenRouterAllModels={isLoadingOpenRouterAllModels}
             modes={MODES}
             selectedMode={mode}
             onModeChange={handleModeChange}

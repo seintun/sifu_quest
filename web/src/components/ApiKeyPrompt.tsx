@@ -27,7 +27,7 @@ export function ApiKeyPrompt({ onClose }: ApiKeyPromptProps = {}) {
           </div>
           <CardTitle className="text-lg md:text-xl">Free Limit Reached</CardTitle>
           <CardDescription className="text-sm text-foreground/80">
-            Add your Anthropic BYOK in Settings for unlimited AI chat usage.
+            Add your own provider API key in Settings for expanded AI chat usage.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 pt-2 pb-4">

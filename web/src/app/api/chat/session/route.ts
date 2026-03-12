@@ -1,13 +1,15 @@
 import { auth } from '@/auth'
 import { ensureUserProfile } from '@/lib/account-state'
+import { decryptKey } from '@/lib/apikey'
 import { DEFAULT_OPENROUTER_MODEL } from '@/lib/chat-provider-config'
+import { loadChatEntitlements } from '@/lib/chat-entitlements'
 import {
   isMissingMessageTelemetryColumnError,
   isMissingSessionTelemetryColumnError,
 } from '@/lib/chat-schema-compat'
 import { resolveProviderSelection } from '@/lib/chat-selection'
 import { computeFreeQuota } from '@/lib/free-quota'
-import { hasEncryptedProviderApiKey } from '@/lib/provider-api-keys'
+import { getEncryptedProviderApiKey } from '@/lib/provider-api-keys'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
@@ -78,8 +80,12 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient()
     const userProfile = await ensureUserProfile(userId, session.user.email)
-    const hasAnthropicKey = await hasEncryptedProviderApiKey(userId, 'anthropic')
-    const freeQuota = computeFreeQuota(userProfile)
+    const entitlements = await loadChatEntitlements(userId)
+    const encryptedOpenRouterKey = entitlements.providerKeys.openrouter
+      ? await getEncryptedProviderApiKey(userId, 'openrouter')
+      : null
+    const openRouterApiKey = encryptedOpenRouterKey ? decryptKey(encryptedOpenRouterKey) : null
+    const freeQuota = computeFreeQuota({ ...userProfile, has_provider_key: entitlements.hasAnyProviderKey })
 
     let chatSession: SessionRow | null = null
     let sessionTelemetryAvailable = true
@@ -129,7 +135,10 @@ export async function GET(request: NextRequest) {
       {
         preferredProvider: userProfile.default_provider,
         preferredModel: userProfile.default_model,
-        hasAnthropicKey,
+        providerKeys: entitlements.providerKeys,
+        openRouterModelScope: entitlements.openRouterModelScope,
+        userCacheKey: userId,
+        openRouterApiKey,
       },
     )
 
@@ -153,7 +162,10 @@ export async function GET(request: NextRequest) {
       {
         preferredProvider: chatSession.provider ?? null,
         preferredModel: chatSession.model ?? null,
-        hasAnthropicKey,
+        providerKeys: entitlements.providerKeys,
+        openRouterModelScope: entitlements.openRouterModelScope,
+        userCacheKey: userId,
+        openRouterApiKey,
       },
     )
 
@@ -317,13 +329,20 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient()
     const userProfile = await ensureUserProfile(userId, session.user.email)
-    const hasAnthropicKey = await hasEncryptedProviderApiKey(userId, 'anthropic')
+    const entitlements = await loadChatEntitlements(userId)
+    const encryptedOpenRouterKey = entitlements.providerKeys.openrouter
+      ? await getEncryptedProviderApiKey(userId, 'openrouter')
+      : null
+    const openRouterApiKey = encryptedOpenRouterKey ? decryptKey(encryptedOpenRouterKey) : null
 
     const selection = await resolveProviderSelection(
       {
         preferredProvider: provider ?? userProfile.default_provider,
         preferredModel: model ?? userProfile.default_model,
-        hasAnthropicKey,
+        providerKeys: entitlements.providerKeys,
+        openRouterModelScope: entitlements.openRouterModelScope,
+        userCacheKey: userId,
+        openRouterApiKey,
       },
     )
 
@@ -390,7 +409,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
     }
 
-    const freeQuota = computeFreeQuota(userProfile)
+    const freeQuota = computeFreeQuota({ ...userProfile, has_provider_key: entitlements.hasAnyProviderKey })
 
     const { data: currentDefaults, error: profileDefaultsError } = await supabase
       .from('user_profiles')

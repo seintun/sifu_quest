@@ -12,6 +12,7 @@ test('computeFreeQuota returns unlimited when user has BYOK and is not guest', (
   const quota = computeFreeQuotaForLimit({
     is_guest: false,
     api_key_enc: 'encrypted-key',
+    has_provider_key: true,
     free_quota_exhausted: false,
     free_user_messages_used: 0,
   }, 5)
@@ -23,6 +24,7 @@ test('computeFreeQuota returns remaining turns for free-tier guest', () => {
   const quota = computeFreeQuotaForLimit({
     is_guest: true,
     api_key_enc: null,
+    has_provider_key: false,
     free_quota_exhausted: false,
     free_user_messages_used: 2,
   }, 5)
@@ -37,6 +39,7 @@ test('getQuotaError blocks exhausted guest users', () => {
   const error = getQuotaErrorForLimit({
     is_guest: true,
     api_key_enc: null,
+    has_provider_key: false,
     free_quota_exhausted: true,
     free_user_messages_used: 5,
   }, 5)
@@ -51,29 +54,31 @@ test('getQuotaError blocks exhausted signed-in free users', () => {
   const error = getQuotaErrorForLimit({
     is_guest: false,
     api_key_enc: null,
+    has_provider_key: false,
     free_quota_exhausted: false,
     free_user_messages_used: 5,
   }, 5)
 
   assert.deepEqual(error, {
     error: 'missing_api_key',
-    message: 'You have exhausted your free messages. Please add your Anthropic API key in Settings to continue.',
+    message: 'You have exhausted your free messages. Please add your API key in Settings to continue.',
   })
 })
 
 test('isUsingFreeTier is true for guest and no-key users', () => {
-  assert.equal(isUsingFreeTier({ is_guest: true, api_key_enc: 'x', free_quota_exhausted: false, free_user_messages_used: 0 }), true)
-  assert.equal(isUsingFreeTier({ is_guest: false, api_key_enc: null, free_quota_exhausted: false, free_user_messages_used: 0 }), true)
-  assert.equal(isUsingFreeTier({ is_guest: false, api_key_enc: 'x', free_quota_exhausted: false, free_user_messages_used: 0 }), false)
+  assert.equal(isUsingFreeTier({ is_guest: true, api_key_enc: 'x', has_provider_key: true, free_quota_exhausted: false, free_user_messages_used: 0 }), true)
+  assert.equal(isUsingFreeTier({ is_guest: false, api_key_enc: null, has_provider_key: false, free_quota_exhausted: false, free_user_messages_used: 0 }), true)
+  assert.equal(isUsingFreeTier({ is_guest: false, api_key_enc: null, has_provider_key: true, free_quota_exhausted: false, free_user_messages_used: 0 }), false)
 })
 
 test('shouldEnforceProviderQuota enforces guest no-key on OpenRouter', () => {
   const enforced = shouldEnforceProviderQuota({
     is_guest: true,
     api_key_enc: null,
+    has_provider_key: false,
     free_quota_exhausted: false,
     free_user_messages_used: 0,
-  }, 'openrouter', false)
+  }, 'openrouter', { openrouter: false, anthropic: false })
 
   assert.equal(enforced, true)
 })
@@ -82,20 +87,22 @@ test('shouldEnforceProviderQuota enforces guest with key on OpenRouter', () => {
   const enforced = shouldEnforceProviderQuota({
     is_guest: true,
     api_key_enc: 'encrypted-key',
+    has_provider_key: true,
     free_quota_exhausted: false,
     free_user_messages_used: 0,
-  }, 'openrouter', true)
+  }, 'openrouter', { openrouter: true, anthropic: false })
 
-  assert.equal(enforced, true)
+  assert.equal(enforced, false)
 })
 
 test('shouldEnforceProviderQuota bypasses guest with key on Anthropic', () => {
   const enforced = shouldEnforceProviderQuota({
     is_guest: true,
     api_key_enc: 'encrypted-key',
+    has_provider_key: true,
     free_quota_exhausted: true,
     free_user_messages_used: 10,
-  }, 'anthropic', true)
+  }, 'anthropic', { openrouter: false, anthropic: true })
 
   assert.equal(enforced, false)
 })
@@ -104,9 +111,10 @@ test('shouldEnforceProviderQuota bypasses signed-in with key on Anthropic', () =
   const enforced = shouldEnforceProviderQuota({
     is_guest: false,
     api_key_enc: 'encrypted-key',
+    has_provider_key: true,
     free_quota_exhausted: false,
     free_user_messages_used: 0,
-  }, 'anthropic', true)
+  }, 'anthropic', { openrouter: false, anthropic: true })
 
   assert.equal(enforced, false)
 })

@@ -21,13 +21,22 @@ test('normalizeTokenUsage keeps explicit total when provided', () => {
   })
 })
 
-test('estimateCostMicrousd returns zero for OpenRouter usage', () => {
+test('estimateCostMicrousd returns zero for OpenRouter free usage', () => {
   const cost = estimateCostMicrousd('openrouter', 'openai/gpt-oss-20b:free', {
     inputTokens: 1000,
     outputTokens: 1000,
     totalTokens: 2000,
   })
   assert.equal(cost, 0)
+})
+
+test('estimateCostMicrousd returns null for OpenRouter paid usage', () => {
+  const cost = estimateCostMicrousd('openrouter', 'openai/gpt-4o', {
+    inputTokens: 1000,
+    outputTokens: 1000,
+    totalTokens: 2000,
+  })
+  assert.equal(cost, null)
 })
 
 test('estimateCostMicrousd returns non-zero for Anthropic Sonnet usage', () => {

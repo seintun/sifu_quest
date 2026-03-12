@@ -1,5 +1,5 @@
 import { encryptKey } from '@/lib/apikey'
-import { validateAnthropicApiKey } from '@/lib/apikey-validation'
+import { validateAnthropicApiKey, validateOpenRouterApiKey } from '@/lib/apikey-validation'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { deleteEncryptedProviderApiKey, upsertEncryptedProviderApiKey } from '@/lib/provider-api-keys'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
@@ -35,6 +35,13 @@ function extractDbErrorCode(error: unknown): string | null {
   return typeof maybeCode === 'string' ? maybeCode : null
 }
 
+function parseProvider(value: unknown): 'anthropic' | 'openrouter' | null {
+  if (value === 'anthropic' || value === 'openrouter') {
+    return value
+  }
+  return null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
@@ -44,7 +51,11 @@ export async function POST(request: NextRequest) {
     
     const { apiKey, provider } = await request.json().catch(() => ({})) as { apiKey?: unknown; provider?: unknown }
     const normalizedApiKey = typeof apiKey === 'string' ? apiKey.trim() : ''
-    const normalizedProvider = provider === 'openrouter' ? 'openrouter' : 'anthropic'
+    const normalizedProvider = parseProvider(provider)
+
+    if (!normalizedProvider) {
+      return NextResponse.json({ error: 'Provider is required.' }, { status: 400 })
+    }
 
     if (normalizedProvider === 'anthropic') {
       if (!normalizedApiKey || !normalizedApiKey.startsWith('sk-ant-')) {
@@ -58,8 +69,17 @@ export async function POST(request: NextRequest) {
         }
         return NextResponse.json({ error: keyValidation.error, code: keyValidation.code }, { status: 503 })
       }
-    } else if (!normalizedApiKey) {
-      return NextResponse.json({ error: 'Invalid OpenRouter API key' }, { status: 400 })
+    } else {
+      if (!normalizedApiKey || !normalizedApiKey.startsWith('sk-or-')) {
+        return NextResponse.json({ error: 'Invalid OpenRouter API key' }, { status: 400 })
+      }
+      const keyValidation = await validateOpenRouterApiKey(normalizedApiKey)
+      if (!keyValidation.ok) {
+        if (keyValidation.code === 'invalid_key') {
+          return NextResponse.json({ error: keyValidation.error, code: keyValidation.code }, { status: 400 })
+        }
+        return NextResponse.json({ error: keyValidation.error, code: keyValidation.code }, { status: 503 })
+      }
     }
     
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
@@ -99,7 +119,10 @@ export async function DELETE(request: NextRequest) {
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const supabase = createAdminClient()
     const { searchParams } = new URL(request.url)
-    const normalizedProvider = searchParams.get('provider') === 'openrouter' ? 'openrouter' : 'anthropic'
+    const normalizedProvider = parseProvider(searchParams.get('provider'))
+    if (!normalizedProvider) {
+      return NextResponse.json({ error: 'Provider is required.' }, { status: 400 })
+    }
     await deleteEncryptedProviderApiKey(userId, normalizedProvider)
     
     await supabase.from('audit_log').insert({
