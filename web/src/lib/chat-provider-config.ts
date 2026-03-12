@@ -91,7 +91,9 @@ export function parseChatProvider(
 }
 
 export function isOpenRouterFreeModel(modelId: string): boolean {
-  return modelId === OPENROUTER_FREE_ROUTER_MODEL || modelId.endsWith(":free");
+  const normalized = modelId.trim().toLowerCase();
+  if (normalized === OPENROUTER_FREE_ROUTER_MODEL) return true;
+  return /.+[^:]:free$/i.test(normalized);
 }
 
 export function isKnownAnthropicModel(modelId: string): boolean {
