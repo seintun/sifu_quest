@@ -30,7 +30,21 @@ for (const scenario of scenarios) {
     await expect(composer).toBeVisible()
     await expect(scrollContainer).toBeVisible()
 
+    if (scenario.width < 768) {
+      await expect(page.getByTestId('mobile-bottom-nav')).toHaveCount(0)
+      await expect(page.getByTestId('mobile-coach-toggle')).toBeVisible()
+      await expect(page.getByTestId('mobile-coach-toggle')).toContainText('To Dojo')
+      await expect(page.getByTestId('desktop-coach-floating-cta')).toBeHidden()
+    } else {
+      await expect(page.getByTestId('desktop-coach-floating-cta')).toBeHidden()
+    }
+
     const before = await composer.boundingBox()
+    expect(before).not.toBeNull()
+    if (before) {
+      expect(before.y + before.height).toBeLessThanOrEqual(scenario.height)
+    }
+
     await scrollContainer.evaluate((node) => {
       node.scrollTop = node.scrollHeight
     })

@@ -216,7 +216,7 @@ export default function CoachPage() {
   const isAnthropicLocked = Boolean(anthropicProvider && anthropicProvider.availability !== 'available')
 
   return (
-    <div data-testid="coach-shell" className="flex flex-col h-[calc(100dvh-5.75rem)] md:h-[calc(100dvh-3rem)] overflow-hidden">
+    <div data-testid="coach-shell" className="flex flex-col h-[calc(100dvh-4.5rem)] md:h-[calc(100dvh-3rem)] overflow-hidden">
       <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <MessageCircle className="h-[18px] w-[18px] text-coach shrink-0" />
