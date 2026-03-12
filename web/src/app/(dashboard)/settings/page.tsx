@@ -568,8 +568,8 @@ function SettingsPageContent() {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-            <Card className={cn(glassCardClass, "xl:col-span-7")}>
+          <div className="grid grid-cols-1 gap-4">
+            <Card className={glassCardClass}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <UserRound className="h-4 w-4 text-plan" />
@@ -651,7 +651,10 @@ function SettingsPageContent() {
               </CardContent>
             </Card>
 
-            <Card className={cn(glassCardClass, "xl:col-span-5")}>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <Card className={glassCardClass}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <KeyRound className="h-4 w-4 text-coach" />
@@ -746,7 +749,7 @@ function SettingsPageContent() {
               </CardContent>
             </Card>
 
-            <Card className={cn(glassCardClass, "xl:col-span-5")}>
+            <Card className={glassCardClass}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <KeyRound className="h-4 w-4 text-coach" />

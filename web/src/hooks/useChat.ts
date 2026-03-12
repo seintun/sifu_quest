@@ -173,6 +173,7 @@ export function useChat(mode: string) {
     openrouter: false,
     anthropic: false,
   })
+  const [openRouterSearchQuery, setOpenRouterSearchQuery] = useState('')
   const [isLoadingOpenRouterAllModels, setIsLoadingOpenRouterAllModels] = useState(false)
   const [streamPhase, setStreamPhase] = useState<StreamPhase>('idle')
   const [hasOlderMessages, setHasOlderMessages] = useState(false)
@@ -182,6 +183,11 @@ export function useChat(mode: string) {
   const abortRef = useRef<AbortController | null>(null)
   const bootstrapAbortRef = useRef<AbortController | null>(null)
   const olderAbortRef = useRef<AbortController | null>(null)
+  const openRouterCatalogAbortRef = useRef<AbortController | null>(null)
+  const openRouterCatalogCacheRef = useRef<Map<string, {
+    modelsByProvider: Record<ChatProvider, ChatModelOption[]>
+    modelGroupsByProvider: Record<ChatProvider, ChatModelGroupOption[]>
+  }>>(new Map())
   const storedSelectionRef = useRef<ChatSelection | null | undefined>(undefined)
 
   const applySelection = useCallback((provider: ChatProvider, model: string) => {
@@ -200,6 +206,18 @@ export function useChat(mode: string) {
     setHasOlderMessages(Boolean(paging?.hasOlder))
     setNextBefore(paging?.nextBefore ?? null)
     setNextBeforeId(paging?.nextBeforeId ?? null)
+  }, [])
+
+  const applyProviderCatalogPayload = useCallback((payload: {
+    modelsByProvider?: Record<ChatProvider, ChatModelOption[]>
+    modelGroupsByProvider?: Record<ChatProvider, ChatModelGroupOption[]>
+  }) => {
+    if (payload.modelsByProvider) {
+      setModelsByProvider(payload.modelsByProvider)
+    }
+    if (payload.modelGroupsByProvider) {
+      setModelGroupsByProvider(payload.modelGroupsByProvider)
+    }
   }, [])
 
   const loadBootstrap = useCallback(async () => {
@@ -279,6 +297,7 @@ export function useChat(mode: string) {
     abortRef.current?.abort()
     bootstrapAbortRef.current?.abort()
     olderAbortRef.current?.abort()
+    openRouterCatalogAbortRef.current?.abort()
     setIsStreaming(false)
     setSessionId(null)
     setUpgradeRequired(null)
@@ -287,6 +306,8 @@ export function useChat(mode: string) {
     setSessionMetrics(null)
     setHasProviderKey({ openrouter: false, anthropic: false })
     setModelGroupsByProvider({ openrouter: [], anthropic: [] })
+    setOpenRouterSearchQuery('')
+    openRouterCatalogCacheRef.current.clear()
     setIsLoadingOpenRouterAllModels(false)
     setStreamPhase('idle')
     setHasOlderMessages(false)
@@ -300,6 +321,7 @@ export function useChat(mode: string) {
       abortRef.current?.abort()
       bootstrapAbortRef.current?.abort()
       olderAbortRef.current?.abort()
+      openRouterCatalogAbortRef.current?.abort()
     }
   }, [mode, loadBootstrap])
 

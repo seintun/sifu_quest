@@ -90,6 +90,15 @@ function RecommendationBadgeSlot({ rank }: { rank?: number }) {
   )
 }
 
+function FreeModelBadge({ isFree }: { isFree?: boolean }) {
+  if (!isFree) return null
+  return (
+    <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium leading-none text-emerald-200">
+      Free
+    </span>
+  )
+}
+
 function ModelProviderTips({ provider }: { provider: 'openrouter' | 'anthropic' }) {
   const tips = getProviderModelTips(provider)
 
@@ -124,26 +133,32 @@ function ModelOptionContent({
   label,
   recommendationRank,
   tier,
+  isFree,
   showRanking = true,
 }: {
   label: string
   recommendationRank?: number
   tier?: 1 | 2 | 3 | null
+  isFree?: boolean
   showRanking?: boolean
 }) {
+  const normalizedLabel = isFree ? label.replace(/\s*\(free\)\s*$/i, '') : label
+
   if (!showRanking) {
     return (
       <span className="inline-flex max-w-full items-center gap-2">
-        <span className="min-w-0 max-w-[14rem] truncate whitespace-nowrap leading-tight">{label}</span>
+        <span className="min-w-0 max-w-[14rem] truncate whitespace-nowrap leading-tight">{normalizedLabel}</span>
+        <FreeModelBadge isFree={isFree} />
         {tier ? <CostTierIcons tier={tier} /> : null}
       </span>
     )
   }
 
   return (
-    <span className="grid w-full grid-cols-[3.35rem_minmax(0,1fr)_auto] items-center gap-2">
+    <span className="grid w-full grid-cols-[3.35rem_minmax(0,1fr)_auto_auto] items-center gap-2">
       <RecommendationBadgeSlot rank={recommendationRank} />
-      <span className="min-w-0 truncate whitespace-nowrap leading-tight">{label}</span>
+      <span className="min-w-0 truncate whitespace-nowrap leading-tight">{normalizedLabel}</span>
+      <FreeModelBadge isFree={isFree} />
       {tier ? <CostTierIcons tier={tier} /> : <span />}
     </span>
   )
@@ -182,6 +197,10 @@ function ModeOptionContent({ mode }: { mode: ModeOption }) {
       <span>{mode.label}</span>
     </span>
   )
+}
+
+function stopSelectTypeaheadEvent(event: React.KeyboardEvent<HTMLInputElement>) {
+  event.stopPropagation()
 }
 
 function ControlsBody({
@@ -271,6 +290,7 @@ function ControlsBody({
                   label={selectedModelOption.label}
                   recommendationRank={showOpenRouterRanking ? selectedModelOption.recommendationRank : undefined}
                   tier={selectedTier}
+                  isFree={selectedProvider === 'openrouter' ? selectedModelOption.isFree : false}
                   showRanking={showOpenRouterRanking}
                 />
               ) : 'Model'}
@@ -287,6 +307,8 @@ function ControlsBody({
                 <Input
                   value={modelSearch}
                   onChange={(event) => setModelSearch(event.target.value)}
+                  onKeyDown={stopSelectTypeaheadEvent}
+                  onKeyUp={stopSelectTypeaheadEvent}
                   placeholder="Search OpenRouter models"
                   className="h-8 text-xs"
                 />
@@ -303,6 +325,7 @@ function ControlsBody({
                         label={model.label}
                         recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
                         tier={modelTier}
+                        isFree={selectedProvider === 'openrouter' ? model.isFree : false}
                         showRanking={showOpenRouterRanking}
                       />
                     </SelectItem>
@@ -373,10 +396,24 @@ function ControlsBody({
 }
 
 export function DesktopChatControls(props: SharedControlProps) {
+  const [desktopModelSearch, setDesktopModelSearch] = useState('')
   const selectedDesktopProvider = props.providers.find((provider) => provider.id === props.selectedProvider)
   const selectedDesktopModel = props.models.find((model) => model.id === props.selectedModel)
   const selectedDesktopMode = props.modes.find((mode) => mode.value === props.selectedMode)
   const showOpenRouterRanking = props.selectedProvider === 'openrouter'
+  const desktopFilteredModelGroups = useMemo(() => {
+    const groups = props.modelGroups && props.modelGroups.length > 0
+      ? props.modelGroups
+      : [{ id: 'all', label: 'Models', models: props.models }]
+    const query = desktopModelSearch.trim().toLowerCase()
+    if (!query) return groups
+    return groups
+      .map((group) => ({
+        ...group,
+        models: group.models.filter((model) => model.id.toLowerCase().includes(query) || model.label.toLowerCase().includes(query)),
+      }))
+      .filter((group) => group.models.length > 0)
+  }, [props.modelGroups, props.models, desktopModelSearch])
   const selectedDesktopTier = selectedDesktopModel?.provider === 'anthropic'
     ? getAnthropicModelCostTier(selectedDesktopModel.id)
     : null
@@ -406,6 +443,7 @@ export function DesktopChatControls(props: SharedControlProps) {
                 label={selectedDesktopModel.label}
                 recommendationRank={showOpenRouterRanking ? selectedDesktopModel.recommendationRank : undefined}
                 tier={selectedDesktopTier}
+                isFree={props.selectedProvider === 'openrouter' ? selectedDesktopModel.isFree : false}
                 showRanking={showOpenRouterRanking}
               />
             ) : null}
@@ -417,9 +455,19 @@ export function DesktopChatControls(props: SharedControlProps) {
           className={showOpenRouterRanking ? MODEL_SELECT_CONTENT_CLASS : MODEL_SELECT_CONTENT_COMPACT_CLASS}
           >
             <ModelProviderTips provider={props.selectedProvider} />
-          {(props.modelGroups && props.modelGroups.length > 0
-            ? props.modelGroups
-            : [{ id: 'all', label: 'Models', models: props.models }]).map((group) => (
+            {props.selectedProvider === 'openrouter' && (
+              <div className="px-2 pb-2">
+                <Input
+                  value={desktopModelSearch}
+                  onChange={(event) => setDesktopModelSearch(event.target.value)}
+                  onKeyDown={stopSelectTypeaheadEvent}
+                  onKeyUp={stopSelectTypeaheadEvent}
+                  placeholder="Search OpenRouter models"
+                  className="h-8 text-xs"
+                />
+              </div>
+            )}
+          {desktopFilteredModelGroups.map((group) => (
             <SelectGroup key={group.id}>
               <SelectLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">{group.label}</SelectLabel>
               {group.models.map((model) => {
@@ -430,6 +478,7 @@ export function DesktopChatControls(props: SharedControlProps) {
                       label={model.label}
                       recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
                       tier={modelTier}
+                      isFree={props.selectedProvider === 'openrouter' ? model.isFree : false}
                       showRanking={showOpenRouterRanking}
                     />
                   </SelectItem>
