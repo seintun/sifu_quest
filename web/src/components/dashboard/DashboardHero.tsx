@@ -20,18 +20,19 @@ export function DashboardHero({ metrics, overallPlanPct }: DashboardHeroProps) {
       <div className="pointer-events-none absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-streak/10 blur-3xl" />
       <CardContent className="relative p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="font-display text-2xl font-bold">{BRAND_EMOJIS.primary} Sifu Dojo</h1>
-            <p className="text-muted-foreground text-sm mt-1">{BRAND_EMOJIS.star} Your next best interview action</p>
-            <div className="mt-3 flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2.5">
+              <h1 className="font-display text-2xl font-bold">{BRAND_EMOJIS.primary} Sifu Dojo</h1>
               {metrics ? (
-                <span className="rounded-md border border-border bg-elevated/70 px-2.5 py-1 text-xs text-muted-foreground">
-                  {overallPlanPct}% plan complete · {metrics.currentStreak} day streak
+                <span className="inline-flex shrink-0 self-start whitespace-nowrap rounded-md border border-border bg-elevated/70 px-2 py-1 text-[11px] text-muted-foreground sm:px-2.5 sm:text-xs">
+                  <span className="sm:hidden">{overallPlanPct}% · {metrics.currentStreak}d</span>
+                  <span className="hidden sm:inline">{overallPlanPct}% plan complete · {metrics.currentStreak} day streak</span>
                 </span>
               ) : (
-                <div className="h-6 w-44 animate-pulse rounded-md bg-muted/80" />
+                <div className="h-6 w-20 animate-pulse rounded-md bg-muted/80 sm:w-44" />
               )}
             </div>
+            <p className="mt-1 text-sm text-muted-foreground">{BRAND_EMOJIS.star} Your next best interview action</p>
           </div>
 
           {metrics?.todayFocus && (

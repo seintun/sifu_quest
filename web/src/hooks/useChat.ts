@@ -34,6 +34,7 @@ export interface ChatModelOption {
   provider: ChatProvider
   isFree: boolean
   availability: ModelAvailability
+  recommendationRank?: number
   reason?: string
 }
 
