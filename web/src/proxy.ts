@@ -8,7 +8,7 @@
  * (returning 401 JSON) and must remain accessible to unauthenticated
  * callers such as internal workers that use a shared secret header.
  */
-export { auth as middleware } from "@/auth"
+export { auth as proxy } from "@/auth"
 
 export const config = {
   matcher: [
