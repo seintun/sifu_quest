@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sifu Quest | Offline</title>
+  <meta name="theme-color" content="#09090B" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #09090b;
+      --panel: #18181b;
+      --text: #fafafa;
+      --muted: #a1a1aa;
+      --warn: #f59e0b;
+      --border: #3f3f46;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(1200px 600px at 10% -20%, #1f2937 0%, var(--bg) 45%);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+      padding: 24px;
+    }
+
+    .card {
+      width: min(560px, 100%);
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--border));
+      color: var(--warn);
+      background: color-mix(in srgb, var(--warn) 10%, transparent);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+
+    h1 { margin: 12px 0 8px; font-size: 24px; }
+    p { margin: 0 0 12px; color: var(--muted); line-height: 1.5; }
+
+    button {
+      border: 1px solid var(--border);
+      background: #27272a;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button:hover { background: #323238; }
+  </style>
+</head>
+<body>
+  <main class="card" role="main" aria-live="polite">
+    <span class="pill">Offline mode</span>
+    <h1>You are not connected right now.</h1>
+    <p>Previously visited pages may still work from cache. Actions that require live data will resume after you reconnect.</p>
+    <button type="button" onclick="window.location.reload()">Try again</button>
+  </main>
+</body>
+</html>

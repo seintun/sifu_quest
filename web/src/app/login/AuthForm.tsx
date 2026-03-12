@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { User } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
@@ -8,8 +9,10 @@ import { useState } from "react";
 export function AuthForm() {
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [isLoadingGuest, setIsLoadingGuest] = useState(false);
+  const { isOffline } = useNetworkStatus();
 
   const handleGoogleSignIn = async () => {
+    if (isOffline) return;
     setIsLoadingGoogle(true);
     try {
       await signIn("google", { callbackUrl: "/" });
@@ -20,6 +23,7 @@ export function AuthForm() {
   };
 
   const handleGuestSignIn = async () => {
+    if (isOffline) return;
     setIsLoadingGuest(true);
     try {
       await signIn("anonymous", { callbackUrl: "/" });
@@ -36,7 +40,7 @@ export function AuthForm() {
         variant="outline"
         className="w-full h-11 sm:h-12 text-sm relative group overflow-hidden border-border bg-transparent hover:bg-surface transition-all"
         onClick={handleGoogleSignIn}
-        disabled={isLoadingGoogle || isLoadingGuest}
+        disabled={isLoadingGoogle || isLoadingGuest || isOffline}
       >
         <div className="absolute inset-x-0 bottom-0 h-[1px] bg-gradient-to-r from-transparent via-coach to-transparent translate-y-full group-hover:translate-y-0 transition-transform" />
         {isLoadingGoogle ? (
@@ -80,7 +84,7 @@ export function AuthForm() {
         variant="secondary"
         className="w-full h-11 sm:h-12 text-sm group hover:bg-elevated text-foreground"
         onClick={handleGuestSignIn}
-        disabled={isLoadingGoogle || isLoadingGuest}
+        disabled={isLoadingGoogle || isLoadingGuest || isOffline}
       >
         {isLoadingGuest ? (
           <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-muted-foreground border-t-foreground rounded-full animate-spin" />
@@ -91,6 +95,11 @@ export function AuthForm() {
           </>
         )}
       </Button>
+      {isOffline && (
+        <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+          You are offline. Sign in becomes available when your internet reconnects.
+        </p>
+      )}
     </div>
   );
 }

@@ -1,8 +1,10 @@
 import { OnboardingGuard } from "@/components/layout/OnboardingGuard";
+import { OfflineBanner } from "@/components/pwa/OfflineBanner";
+import { ServiceWorkerRegistration } from "@/components/pwa/ServiceWorkerRegistration";
 import { Toaster } from "@/components/ui/sonner";
 import { APP_KEYWORDS, BRAND_DESCRIPTION, BRAND_NAME, BRAND_TAGLINE, getCanonicalSiteUrl } from "@/lib/brand";
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -44,7 +46,20 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: BRAND_NAME,
+  },
   manifest: "/manifest.webmanifest",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#09090B",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
@@ -57,6 +72,8 @@ export default function RootLayout({
       <body
         className={`${geist.variable} ${geistMono.variable} antialiased`}
       >
+        <ServiceWorkerRegistration />
+        <OfflineBanner />
         <OnboardingGuard>
           {children}
         </OnboardingGuard>
