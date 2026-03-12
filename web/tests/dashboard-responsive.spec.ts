@@ -38,6 +38,7 @@ for (const scenario of scenarios) {
     if (scenario.mobile) {
       const bottomNav = page.getByTestId('mobile-bottom-nav')
       await expect(bottomNav).toBeVisible()
+      await expect(page.getByTestId('desktop-coach-floating-cta')).toBeHidden()
       await expect(page.getByTestId('mobile-primary-dashboard')).toBeVisible()
       await expect(page.getByTestId('mobile-primary-coach')).toBeVisible()
       await expect(page.getByTestId('mobile-primary-plan')).toBeVisible()
@@ -45,6 +46,9 @@ for (const scenario of scenarios) {
       await page.getByTestId('mobile-sidebar-trigger').click()
       await expect(page.getByTestId('mobile-sidebar-content')).toBeVisible()
       await expect(page.getByTestId('nav-link-settings')).toBeVisible()
+    } else {
+      await expect(page.getByTestId('desktop-coach-floating-cta')).toBeVisible()
+      await expect(page.getByTestId('desktop-coach-floating-cta')).toContainText('Ask Sifu')
     }
   })
 }

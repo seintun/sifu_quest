@@ -14,7 +14,7 @@ import {
 } from '@/lib/dashboard-navigation'
 import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
 import { cn } from '@/lib/utils'
-import { LogOut, MoreHorizontal } from 'lucide-react'
+import { ArrowRight, Home, LogOut, MessageCircle, MoreHorizontal } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -140,6 +140,72 @@ function LogoutFooter({ deferred, onDeferredLogout }: LogoutFooterProps) {
   )
 }
 
+function MobileCoachToggle({ onCoachRoute }: { onCoachRoute: boolean }) {
+  const destination = onCoachRoute ? '/' : '/coach'
+  const label = onCoachRoute ? 'To Dojo' : 'Ask Sifu'
+  const helper = onCoachRoute ? 'Dashboard' : 'Live'
+  const Icon = onCoachRoute ? Home : MessageCircle
+
+  return (
+    <Link
+      href={destination}
+      data-testid="mobile-coach-toggle"
+      aria-label={label}
+      className={cn(
+        'group inline-flex items-center gap-1.5 rounded-full border border-coach/35 bg-coach/8 pl-2 pr-2.5 py-1',
+        'text-coach hover:text-coach/90 hover:border-coach/55 hover:bg-coach/12 active:scale-[0.98]',
+        'motion-safe:transition-all motion-safe:duration-200',
+      )}
+    >
+      <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-coach/18">
+        <Icon className="h-3.5 w-3.5 motion-safe:transition-transform motion-safe:duration-200 group-hover:scale-110 group-hover:rotate-6" />
+      </span>
+      <span className="text-xs font-medium leading-none">{label}</span>
+      <span className="inline-flex items-center gap-1 pl-0.5 text-[10px] text-coach/75">
+        <span className="h-1.5 w-1.5 rounded-full bg-coach/90 animate-pulse" aria-hidden="true" />
+        {helper}
+      </span>
+      <ArrowRight className="h-3 w-3 opacity-80 motion-safe:transition-transform motion-safe:duration-200 group-hover:translate-x-0.5" />
+    </Link>
+  )
+}
+
+export function DesktopCoachFloatingCta() {
+  const pathname = usePathname()
+  const onCoachRoute = pathname.startsWith('/coach')
+  const destination = '/coach'
+  const title = 'Ask Sifu'
+  const helper = 'Open Coach'
+  const Icon = MessageCircle
+
+  if (onCoachRoute) {
+    return null
+  }
+
+  return (
+    <Link
+      href={destination}
+      data-testid="desktop-coach-floating-cta"
+      aria-label={title}
+      className={cn(
+        'group hidden md:flex fixed right-6 bottom-6 z-50 items-center gap-3 rounded-2xl border border-coach/35 px-4 py-3',
+        'bg-gradient-to-r from-coach/20 via-coach/10 to-coach/5 backdrop-blur shadow-[0_10px_30px_rgb(14_165_233_/_0.22)]',
+        'text-coach hover:border-coach/55 hover:shadow-[0_12px_34px_rgb(14_165_233_/_0.3)] active:scale-[0.99]',
+        'motion-safe:transition-all motion-safe:duration-200',
+      )}
+    >
+      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-coach/20 ring-1 ring-coach/35">
+        <Icon className="h-4 w-4 motion-safe:transition-transform motion-safe:duration-200 group-hover:scale-110" />
+      </span>
+      <span className="flex flex-col leading-tight">
+        <span className="text-sm font-semibold">{title}</span>
+        <span className="text-[11px] text-coach/80">{helper}</span>
+      </span>
+      <ArrowRight className="h-3.5 w-3.5 opacity-80 motion-safe:transition-transform motion-safe:duration-200 group-hover:translate-x-0.5" />
+    </Link>
+  )
+}
+
 export function Sidebar() {
   return (
     <aside
@@ -171,13 +237,7 @@ export function MobileSidebar() {
     >
       <div className="flex h-full items-center justify-between px-3">
         <h1 className="font-display text-base font-bold text-foreground">Sifu Quest</h1>
-        <Link
-          href={onCoachRoute ? '/' : '/coach'}
-          data-testid="mobile-coach-toggle"
-          className="text-xs text-coach hover:text-coach/80 transition-colors"
-        >
-          {onCoachRoute ? 'Back Home' : 'Open Coach'}
-        </Link>
+        <MobileCoachToggle onCoachRoute={onCoachRoute} />
       </div>
     </div>
   )

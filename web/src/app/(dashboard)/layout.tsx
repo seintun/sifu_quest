@@ -1,4 +1,4 @@
-import { MobileBottomNav, MobileSidebar, Sidebar } from "@/components/layout/Sidebar";
+import { DesktopCoachFloatingCta, MobileBottomNav, MobileSidebar, Sidebar } from "@/components/layout/Sidebar";
 import { AuthStatusProvider } from "@/context/AuthStatusContext";
 
 export default function DashboardLayout({
@@ -10,6 +10,7 @@ export default function DashboardLayout({
     <AuthStatusProvider>
       <Sidebar />
       <MobileSidebar />
+      <DesktopCoachFloatingCta />
       <MobileBottomNav />
       <main className="md:ml-56 min-h-screen pt-12 pb-16 md:pt-0 md:pb-0">
         <div className="p-3 sm:p-4 md:p-6">
