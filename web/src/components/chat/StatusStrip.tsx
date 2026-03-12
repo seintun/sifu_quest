@@ -35,8 +35,7 @@ export function StatusStrip({
     }
 
     if (sessionMetrics) {
-      labels.push(`Turns ${sessionMetrics.userTurns}`)
-      labels.push(formatMicrousd(sessionMetrics.estimatedCostMicrousd))
+      labels.push(`Est. cost ${formatMicrousd(sessionMetrics.estimatedCostMicrousd)}`)
     }
 
     if (selectedProviderInfo?.availability !== 'available' && selectedProviderInfo?.reason) {
@@ -100,7 +99,6 @@ export function StatusStrip({
           {sessionMetrics && (
             <div className="px-1.5 py-1">
               <div className="flex flex-wrap gap-x-4 gap-y-1">
-                <span>Turns: {sessionMetrics.userTurns}</span>
                 <span>Input tokens: {sessionMetrics.inputTokens}</span>
                 <span>Output tokens: {sessionMetrics.outputTokens}</span>
                 <span>Total tokens: {sessionMetrics.totalTokens}</span>

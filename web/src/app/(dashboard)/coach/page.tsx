@@ -16,7 +16,15 @@ import { useChat } from "@/hooks/useChat";
 import { BRAND_NAME, MODE_LABELS, NAV_COPY } from "@/lib/brand";
 import { buildSystemMeta, getSystemMessage } from "@/lib/chat-system-messages";
 import { fetcher } from "@/lib/fetcher";
-import { ArrowDown, ChevronDown, KeyRound, MessageCircle, RotateCcw, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ChevronDown,
+  Home,
+  KeyRound,
+  MessageCircle,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import {
   useCallback,
@@ -70,6 +78,8 @@ const MODES: ModeOption[] = [
 ];
 
 const BYOK_NOTICE = "BYOK in Settings for unlimited chat.";
+const AI_DISCLAIMER =
+  "Sifu is AI, not an all-knowing being, and can make mistakes. Verify important information.";
 const SCROLL_FOLLOW_THRESHOLD_PX = 80;
 
 function ChatSkeleton() {
@@ -383,12 +393,13 @@ export default function CoachPage() {
       className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+3.25rem)] bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] flex flex-col overflow-hidden md:static md:h-[calc(100dvh-3rem)]"
     >
       <div className="xl:hidden fixed top-0 left-0 right-0 md:left-56 z-40 pt-[env(safe-area-inset-top)]">
-        <div className="grid h-12 grid-cols-[auto_1fr_auto] items-center gap-2 border-b border-border/40 bg-surface/30 px-3 backdrop-blur-xl">
+        <div className="grid h-12 grid-cols-[auto_1fr_auto] items-center gap-2 border-b border-border/10 bg-surface/10 px-3 backdrop-blur-2xl">
           <Link
             href="/"
             aria-label="Go to Home Dashboard"
-            className="inline-flex items-center rounded-full border border-border/70 bg-surface/35 px-3 py-1 text-sm font-display font-semibold text-foreground"
+            className="inline-flex h-8 items-center rounded-xl border border-violet-400/35 bg-gradient-to-r from-violet-500/20 via-violet-500/10 to-violet-500/5 px-3 text-sm font-display font-semibold text-violet-200 shadow-[0_8px_24px_rgb(139_92_246_/_0.22)] backdrop-blur-xl transition-all duration-150 hover:border-violet-300/55 hover:from-violet-500/25 hover:to-violet-500/10 hover:shadow-[0_10px_30px_rgb(139_92_246_/_0.3)]"
           >
+            <Home className="mr-1.5 h-3.5 w-3.5 shrink-0" />
             {BRAND_NAME}
           </Link>
           <div className="justify-self-center">
@@ -442,9 +453,7 @@ export default function CoachPage() {
         <div className="hidden xl:flex mb-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] text-warning items-center justify-between gap-2 shrink-0">
           <span className="inline-flex items-center gap-1.5 flex-1 min-w-0 whitespace-nowrap">
             <KeyRound className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">
-              {BYOK_NOTICE}
-            </span>
+            <span className="truncate">{BYOK_NOTICE}</span>
           </span>
           <Link
             href="/settings"
@@ -537,6 +546,9 @@ export default function CoachPage() {
                     placeholder={composerPlaceholder}
                     textareaRef={textareaRef}
                   />
+                  <p className="px-3 pb-2 pt-1 text-center text-[10px] leading-tight text-foreground/70">
+                    {AI_DISCLAIMER}
+                  </p>
                 </div>
               </div>
 
