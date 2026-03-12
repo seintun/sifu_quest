@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
+import { DOJO_TITLE_ROLL_EFFECT_MS, generateDojoTitlePhrase } from '@/lib/dojo-title'
 import { cn } from '@/lib/utils'
 import {
   type OnboardingCoreAnswers,
@@ -23,8 +24,9 @@ import {
 } from '@/lib/onboarding-v2'
 import { getOnboardingCoreSteps, isCoreStepComplete, type OnboardingCoreStepKey } from '@/lib/onboarding-flow'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { Dice5 } from 'lucide-react'
 
 type OnboardingStatusResponse = {
   onboarding?: {
@@ -160,6 +162,8 @@ export default function OnboardingPage() {
   const [core, setCore] = useState<OnboardingCoreAnswers>(createEmptyCoreAnswers())
   const [enrichment, setEnrichment] = useState<OnboardingEnrichmentAnswers>(createEmptyEnrichmentAnswers())
   const [stepIndex, setStepIndex] = useState(0)
+  const [isGeneratingName, setIsGeneratingName] = useState(false)
+  const generateNameResetTimerRef = useRef<number | null>(null)
 
   const steps = useMemo(() => getOnboardingCoreSteps(core), [core])
   const currentStep = steps[Math.min(stepIndex, Math.max(steps.length - 1, 0))]
@@ -196,6 +200,17 @@ export default function OnboardingPage() {
 
   function isCurrentStepComplete(step: OnboardingCoreStepKey): boolean {
     return isCoreStepComplete(step, core)
+  }
+
+  function runDojoNameRollEffect(): void {
+    setIsGeneratingName(true)
+    if (generateNameResetTimerRef.current !== null) {
+      window.clearTimeout(generateNameResetTimerRef.current)
+    }
+    generateNameResetTimerRef.current = window.setTimeout(() => {
+      setIsGeneratingName(false)
+      generateNameResetTimerRef.current = null
+    }, DOJO_TITLE_ROLL_EFFECT_MS)
   }
 
   async function handleSubmitCore(): Promise<void> {
@@ -260,18 +275,28 @@ export default function OnboardingPage() {
         const activeDraft = serverDraft ?? localDraft
 
         if (activeDraft) {
-          setCore((prev) => ({ ...prev, ...activeDraft.core }))
           setEnrichment((prev) => ({ ...prev, ...activeDraft.enrichment }))
           setStepIndex(Math.max(0, activeDraft.currentStep ?? 0))
         }
 
+        let namePrefill = ''
         if (accountRes.ok) {
           const accountData = (await accountRes.json()) as AccountStatusResponse
-          const namePrefill = accountData.account?.displayName || accountData.account?.prefillName || ''
-          if (namePrefill) {
-            setCore((prev) => (prev.name.trim() ? prev : { ...prev, name: toTitleCase(namePrefill) }))
-          }
+          namePrefill = accountData.account?.displayName || accountData.account?.prefillName || ''
         }
+
+        setCore((prev) => {
+          const merged = activeDraft ? { ...prev, ...activeDraft.core } : prev
+          if (merged.name.trim()) {
+            return merged
+          }
+
+          if (namePrefill) {
+            return { ...merged, name: toTitleCase(namePrefill) }
+          }
+
+          return { ...merged, name: generateDojoTitlePhrase() }
+        })
       } catch (error) {
         console.error('[onboarding/bootstrap] failed to load onboarding context', error)
         toast.error('Setup Error', {
@@ -323,6 +348,14 @@ export default function OnboardingPage() {
     return () => clearTimeout(timer)
   }, [core, enrichment, hydrated, stepIndex])
 
+  useEffect(() => {
+    return () => {
+      if (generateNameResetTimerRef.current !== null) {
+        window.clearTimeout(generateNameResetTimerRef.current)
+      }
+    }
+  }, [])
+
   if (booting) {
     return <OnboardingSkeleton />
   }
@@ -355,7 +388,24 @@ export default function OnboardingPage() {
         <div className="animate-fade-in space-y-5" data-testid={`onboarding-step-${currentStep}`}>
           {currentStep === 'name' && (
             <div className="space-y-3">
-              <label htmlFor="name-input" className="block text-lg font-medium">What should we call you?</label>
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="name-input" className="block text-lg font-medium">What should we call you?</label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={cn('transition-transform duration-200', isGeneratingName && 'scale-[1.03]')}
+                  aria-label="Generate a random dojo name"
+                  title="Generate a random dojo name"
+                  onClick={() => {
+                    setCore((prev) => ({ ...prev, name: generateDojoTitlePhrase() }))
+                    runDojoNameRollEffect()
+                  }}
+                >
+                  <Dice5 className={cn('h-3.5 w-3.5', isGeneratingName && 'animate-spin')} aria-hidden="true" />
+                  Generate My Dojo Name
+                </Button>
+              </div>
               <Input
                 id="name-input"
                 data-testid="onboarding-name-input"
@@ -364,7 +414,10 @@ export default function OnboardingPage() {
                 onBlur={() => setCore((prev) => ({ ...prev, name: toTitleCase(prev.name) }))}
                 placeholder="Your name"
                 maxLength={ONBOARDING_MAX_NAME_LENGTH}
-                className="bg-surface border-border"
+                className={cn(
+                  'bg-surface border-border transition-all duration-300',
+                  isGeneratingName && 'border-primary/60 shadow-[0_0_0_3px_hsl(var(--ring)/0.18)]',
+                )}
                 autoFocus
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && complete) {
@@ -373,6 +426,12 @@ export default function OnboardingPage() {
                   }
                 }}
               />
+              <p className="text-xs text-muted-foreground">
+                Need inspiration? Roll for a dojo name.
+              </p>
+              <p className="sr-only" aria-live="polite">
+                {isGeneratingName ? 'New dojo name generated.' : ''}
+              </p>
             </div>
           )}
 

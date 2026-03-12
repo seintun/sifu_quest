@@ -97,7 +97,7 @@ function ModelRankingTips() {
           <a
             href="https://openrouter.ai/rankings?category=programming#categories"
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="underline underline-offset-2 hover:text-foreground"
           >
             openrouter.ai/rankings
@@ -277,7 +277,7 @@ function ControlsBody({
       <TooltipProvider delay={140}>
         <Tooltip>
           <TooltipTrigger
-            render={
+            render={(
               <Button
                 data-testid="mobile-clear-chat-button"
                 type="button"
@@ -285,12 +285,12 @@ function ControlsBody({
                 className="justify-start"
                 onClick={onClear}
                 aria-label="Clear chat history"
-              />
-            }
-          >
-            <Trash2 className="h-4 w-4" />
-            Clear chat history
-          </TooltipTrigger>
+              >
+                <Trash2 className="h-4 w-4" />
+                Clear chat history
+              </Button>
+            )}
+          />
           <TooltipContent side="top" className="max-w-[18rem] leading-snug">
             {CLEAR_CHAT_TOOLTIP_TEXT}
           </TooltipContent>
@@ -376,19 +376,20 @@ export function DesktopChatControls(props: SharedControlProps) {
       <TooltipProvider delay={140}>
         <Tooltip>
           <TooltipTrigger
-            render={
+            render={(
               <Button
                 data-testid="desktop-clear-chat-button"
+                type="button"
                 variant="ghost"
                 size="sm"
                 onClick={props.onClear}
                 className="text-muted-foreground hover:text-danger"
                 aria-label="Clear chat history"
-              />
-            }
-          >
-            <Trash2 className="h-4 w-4" />
-          </TooltipTrigger>
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          />
           <TooltipContent side="top" className="max-w-[18rem] leading-snug">
             {CLEAR_CHAT_TOOLTIP_TEXT}
           </TooltipContent>
