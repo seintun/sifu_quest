@@ -1,6 +1,7 @@
 'use client'
 
 import { Card, CardContent } from '@/components/ui/card'
+import { BRAND_EMOJIS } from '@/lib/brand'
 import type { DashboardMetrics } from '@/lib/metrics'
 import { Target } from 'lucide-react'
 
@@ -20,8 +21,8 @@ export function DashboardHero({ metrics, overallPlanPct }: DashboardHeroProps) {
       <CardContent className="relative p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="font-display text-2xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground text-sm mt-1">Your next best interview action</p>
+            <h1 className="font-display text-2xl font-bold">{BRAND_EMOJIS.primary} Sifu Dojo</h1>
+            <p className="text-muted-foreground text-sm mt-1">{BRAND_EMOJIS.star} Your next best interview action</p>
             <div className="mt-3 flex items-center gap-2">
               {metrics ? (
                 <span className="rounded-md border border-border bg-elevated/70 px-2.5 py-1 text-xs text-muted-foreground">

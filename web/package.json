@@ -1,6 +1,14 @@
 {
   "name": "sifu-quest",
   "version": "0.1.0",
+  "description": "Sifu Quest web app for AI coding interview coaching, DSA practice, and system design mastery.",
+  "keywords": [
+    "sifu quest",
+    "coding interview coach",
+    "dsa practice",
+    "system design prep",
+    "ai career coaching"
+  ],
   "private": true,
   "scripts": {
     "dev": "next dev",
