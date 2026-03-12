@@ -2,13 +2,15 @@
 
 import { Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { fetcher } from '@/lib/fetcher'
 import { canSaveAnthropicApiKey, shouldShowRemoveApiKey } from '@/lib/account-settings-ui'
+import { DOJO_TITLE_ROLL_EFFECT_MS, generateDojoTitlePhrase } from '@/lib/dojo-title'
 import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
 import { getOnboardingPrefillName } from '@/lib/onboarding-name'
 import { validateFullName } from '@/lib/profile-name'
+import { cn } from '@/lib/utils'
 import { performSignOut } from '@/lib/auth-signout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,7 +25,7 @@ import {
 } from '@/components/ui/dialog'
 import { GuestLogoutDialog } from '@/components/auth/GuestLogoutDialog'
 import { LogoutConfirmDialog } from '@/components/auth/LogoutConfirmDialog'
-import { KeyRound, Loader2, ShieldAlert, UserRound, LogOut } from 'lucide-react'
+import { Dice5, KeyRound, Loader2, ShieldAlert, UserRound, LogOut } from 'lucide-react'
 
 type AccountStatus = {
   userId: string
@@ -118,6 +120,8 @@ function SettingsPageContent() {
   const [apiKey, setApiKey] = useState('')
   const [apiKeyFieldError, setApiKeyFieldError] = useState('')
   const [fullName, setFullName] = useState('')
+  const [isGeneratingName, setIsGeneratingName] = useState(false)
+  const generateNameResetTimerRef = useRef<number | null>(null)
 
   const [isSavingName, setIsSavingName] = useState(false)
   const [isSavingKey, setIsSavingKey] = useState(false)
@@ -149,6 +153,17 @@ function SettingsPageContent() {
 
   const onboardingState = onboardingData as OnboardingStateResponse | undefined
 
+  function runDojoNameRollEffect(): void {
+    setIsGeneratingName(true)
+    if (generateNameResetTimerRef.current !== null) {
+      window.clearTimeout(generateNameResetTimerRef.current)
+    }
+    generateNameResetTimerRef.current = window.setTimeout(() => {
+      setIsGeneratingName(false)
+      generateNameResetTimerRef.current = null
+    }, DOJO_TITLE_ROLL_EFFECT_MS)
+  }
+
   useEffect(() => {
     if (accountData?.error && String(accountData.error).toLowerCase().includes('unauthorized')) {
       router.push('/api/auth/signin')
@@ -166,6 +181,14 @@ function SettingsPageContent() {
       setMessage({ text: 'Failed to link your Google account. Please try again.', type: 'error' })
     }
   }, [searchParams, mutateAccountStatus, mutateOnboarding])
+
+  useEffect(() => {
+    return () => {
+      if (generateNameResetTimerRef.current !== null) {
+        window.clearTimeout(generateNameResetTimerRef.current)
+      }
+    }
+  }, [])
 
   const handleSaveName = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -391,9 +414,27 @@ function SettingsPageContent() {
         <CardContent>
           <form onSubmit={handleSaveName} className="space-y-3">
             <div className="space-y-1.5">
-              <label htmlFor="fullName" className="text-sm font-medium text-foreground">
-                Full Name
-              </label>
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="fullName" className="text-sm font-medium text-foreground">
+                  Full Name
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={cn('transition-transform duration-200', isGeneratingName && 'scale-[1.03]')}
+                  disabled={isSavingName}
+                  aria-label="Generate a random dojo name"
+                  title="Generate a random dojo name"
+                  onClick={() => {
+                    setFullName(generateDojoTitlePhrase())
+                    runDojoNameRollEffect()
+                  }}
+                >
+                  <Dice5 className={cn('h-3.5 w-3.5', isGeneratingName && 'animate-spin')} aria-hidden="true" />
+                  Generate Dojo Name
+                </Button>
+              </div>
               <Input
                 id="fullName"
                 value={fullName}
@@ -401,8 +442,14 @@ function SettingsPageContent() {
                 placeholder="e.g., Ada Lovelace"
                 maxLength={80}
                 disabled={isSavingName}
-                className="bg-elevated/50"
+                className={cn(
+                  'bg-elevated/50 transition-all duration-300',
+                  isGeneratingName && 'border-primary/60 shadow-[0_0_0_3px_hsl(var(--ring)/0.18)]',
+                )}
               />
+              <p className="text-xs text-muted-foreground" aria-live="polite">
+                {isGeneratingName ? 'New dojo name generated.' : 'Click generate to roll a new dojo name.'}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <Button type="submit" disabled={isSavingName || !isNameDirty}>
