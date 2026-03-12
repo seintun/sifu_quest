@@ -85,15 +85,15 @@ function sortAndAnnotateOpenRouterModels(
 }
 
 async function fetchOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch): Promise<string[]> {
-  const fetchOptions: RequestInit = {
+  const fetchOptions: Omit<RequestInit, 'signal'> = {
     method: 'GET',
     cache: 'no-store',
-    signal: AbortSignal.timeout(3500),
   }
 
   try {
     const rscResponse = await fetchImpl(OPENROUTER_PROGRAMMING_RANKINGS_URL, {
       ...fetchOptions,
+      signal: AbortSignal.timeout(3500),
       headers: { RSC: '1' },
     })
 
@@ -103,7 +103,10 @@ async function fetchOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch
       if (extracted.length > 0) return extracted
     }
 
-    const htmlResponse = await fetchImpl(OPENROUTER_PROGRAMMING_RANKINGS_URL, fetchOptions)
+    const htmlResponse = await fetchImpl(OPENROUTER_PROGRAMMING_RANKINGS_URL, {
+      ...fetchOptions,
+      signal: AbortSignal.timeout(3500),
+    })
     if (!htmlResponse.ok) {
       return []
     }
