@@ -37,30 +37,40 @@ function NavLinks({
   onNavigate?: () => void
 }) {
   const pathname = usePathname()
+  const trackerIds = new Set<DashboardNavItem['id']>(['dsa', 'jobs', 'system-design', 'calendar'])
+  const firstTrackerIndex = items.findIndex((item) => trackerIds.has(item.id))
 
   return (
     <nav className="flex flex-col gap-1" aria-label="Main navigation">
-      {items.map((item) => {
+      {items.map((item, index) => {
         const isActive = pathname === item.href
         const colors = COLOR_CLASSES[item.domain]
         const Icon = item.icon
 
         return (
-          <Link
-            key={item.id}
-            href={item.href}
-            onClick={onNavigate}
-            data-testid={`nav-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-            className={cn(
-              'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-              isActive
-                ? `border-l-2 ${colors.border} ${colors.active} font-medium`
-                : 'text-muted-foreground hover:text-foreground hover:bg-elevated',
+          <div key={item.id}>
+            {index === firstTrackerIndex && (
+              <div className="px-3 pt-3 pb-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80">
+                  Trackers
+                </p>
+              </div>
             )}
-          >
-            <Icon className="h-4 w-4" />
-            {item.label}
-          </Link>
+            <Link
+              href={item.href}
+              onClick={onNavigate}
+              data-testid={`nav-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+              className={cn(
+                'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+                isActive
+                  ? `border-l-2 ${colors.border} ${colors.active} font-medium`
+                  : 'text-muted-foreground hover:text-foreground hover:bg-elevated',
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {item.label}
+            </Link>
+          </div>
         )
       })}
     </nav>

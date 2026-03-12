@@ -77,7 +77,7 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
   {
     id: 'dsa',
     href: '/dsa',
-    label: 'DSA Sifu',
+    label: 'DSA Tracker',
     hint: `${BRAND_EMOJIS.fist} Solve by pattern and level up`,
     icon: Hand,
     domain: 'dsa',
@@ -89,7 +89,7 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
   {
     id: 'jobs',
     href: '/jobs',
-    label: 'Job Search Sifu',
+    label: 'Job Search Tracker',
     hint: `${BRAND_EMOJIS.trophy} Keep your pipeline sharp`,
     icon: Award,
     domain: 'jobs',
@@ -101,7 +101,7 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
   {
     id: 'system-design',
     href: '/system-design',
-    label: 'System Design Sifu',
+    label: 'System Design Tracker',
     hint: `${BRAND_EMOJIS.star} Capture architecture tradeoffs`,
     icon: Sparkles,
     domain: 'design',
