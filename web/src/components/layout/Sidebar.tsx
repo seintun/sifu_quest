@@ -253,7 +253,7 @@ export function MobileSidebar() {
   return (
     <div
       data-testid="mobile-sidebar-header"
-      className="md:hidden fixed top-0 left-0 right-0 z-40 bg-surface border-b border-border h-12"
+      className="md:hidden fixed top-0 left-0 right-0 z-40 bg-surface border-b border-border h-[calc(env(safe-area-inset-top)+3rem)] pt-[env(safe-area-inset-top)]"
     >
       <div className="flex h-full items-center justify-between px-3">
         <h1 className="font-display text-base font-bold text-foreground">{BRAND_NAME}</h1>
@@ -307,7 +307,7 @@ export function MobileBottomNav() {
     <>
       <div
         data-testid="mobile-bottom-nav"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-surface/95 backdrop-blur"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-surface/95 backdrop-blur pb-[env(safe-area-inset-bottom)]"
       >
         <nav className="grid grid-cols-4 gap-1 px-2 py-1.5" aria-label="Mobile primary navigation">
           {selectMobilePrimaryNavItems().map((item) => {
