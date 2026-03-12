@@ -11,7 +11,8 @@ export function normalizeMarkdownContent(
   let normalized = content
     .replace(/\r\n?/g, '\n')
     // Fix malformed list prefixes from streamed chunks: "-item" => "- item".
-    .replace(/^(\s*[-*])(\S)/gm, '$1 $2')
+    // Limit to "-" so emphasis markers like "*italic*" are not modified.
+    .replace(/^(\s*-)(\S)/gm, '$1 $2')
     // Normalize em/en-dash bullets to markdown bullets.
     .replace(/^\s*[–—]\s+/gm, '- ')
     // Normalize divider-like lines into markdown hr.
@@ -26,4 +27,3 @@ export function normalizeMarkdownContent(
 
   return normalized
 }
-

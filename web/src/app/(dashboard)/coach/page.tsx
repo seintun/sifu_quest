@@ -397,7 +397,7 @@ export default function CoachPage() {
           <Link
             href="/"
             aria-label="Go to Home Dashboard"
-            className="inline-flex h-8 items-center rounded-xl border border-violet-400/35 bg-gradient-to-r from-violet-500/20 via-violet-500/10 to-violet-500/5 px-3 text-sm font-display font-semibold text-violet-200 shadow-[0_8px_24px_rgb(139_92_246_/_0.22)] backdrop-blur-xl transition-all duration-150 hover:border-violet-300/55 hover:from-violet-500/25 hover:to-violet-500/10 hover:shadow-[0_10px_30px_rgb(139_92_246_/_0.3)]"
+            className="inline-flex h-8 items-center rounded-xl border border-border/40 bg-surface/20 px-3 text-sm font-display font-semibold text-foreground shadow-sm backdrop-blur-xl transition-all duration-150 hover:border-border/60 hover:bg-surface/30 hover:shadow-md"
           >
             <Home className="mr-1.5 h-3.5 w-3.5 shrink-0" />
             {BRAND_NAME}

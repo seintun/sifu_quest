@@ -11,7 +11,7 @@ import { parsePlan } from '@/lib/parsers/plan-parser'
 import { DOMAIN_COLORS } from '@/lib/theme'
 import { normalizeMarkdownContent } from '@/lib/markdown-formatting'
 import { AlertTriangle, Calendar, CheckCircle2, RefreshCw } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { fetcher } from '@/lib/fetcher'
 import type { Components } from 'react-markdown'
@@ -239,7 +239,7 @@ function PlanCheckItem({
   onToggle: (id: string, checked: boolean) => void
 }) {
   const [loading, setLoading] = useState(false)
-  const normalizedItemText = normalizeMarkdownContent(item.text)
+  const normalizedItemText = useMemo(() => normalizeMarkdownContent(item.text), [item.text])
 
   const handleToggle = async () => {
     setLoading(true)
