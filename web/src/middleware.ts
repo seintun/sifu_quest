@@ -17,9 +17,9 @@ export const config = {
      * - /api/**         (all API routes handle auth themselves)
      * - /login          (sign-in page)
      * - /_next/**       (Next.js static/build assets)
-     * - /favicon.ico, /sitemap.xml, /robots.txt (static metadata)
+     * - /favicon.ico, /manifest.webmanifest, /site.webmanifest, /sitemap.xml, /robots.txt (static metadata)
      * - image files
      */
-    '/((?!api|login|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico)).*)',
+    '/((?!api|login|_next/static|_next/image|favicon.ico|manifest.webmanifest|site.webmanifest|sitemap.xml|robots.txt|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico)).*)',
   ],
 }
