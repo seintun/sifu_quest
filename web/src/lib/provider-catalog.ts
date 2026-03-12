@@ -15,6 +15,11 @@ import {
   type OpenRouterModelScope,
   type ProviderKeyMap,
 } from './chat-provider-config.ts'
+import {
+  buildRecommendedOpenRouterModels,
+  normalizeOpenRouterModelRecords,
+  type OpenRouterModelRecord,
+} from './openrouter-model-catalog-utils.ts'
 import { extractRankingModelIdsFromPayload } from './openrouter-ranking-utils.ts'
 
 const OPENROUTER_MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models'
@@ -22,10 +27,7 @@ const OPENROUTER_PROGRAMMING_RANKINGS_FETCH_URL = 'https://openrouter.ai/ranking
 const OPENROUTER_CATALOG_TTL_MS = 5 * 60 * 1000
 const OPENROUTER_RANKINGS_TTL_MS = 30 * 60 * 1000
 const OPENROUTER_USER_CATALOG_TTL_MS = 2 * 60 * 1000
-
-type OpenRouterModelRecord = {
-  id?: string
-}
+const OPENROUTER_USER_CACHE_MAX_ENTRIES = 120
 
 type OpenRouterCatalogResponse = {
   data?: OpenRouterModelRecord[]
@@ -68,6 +70,9 @@ export type BuildProviderCatalogInput = {
 let openRouterCache: OpenRouterCache | null = null
 let openRouterRankingsCache: OpenRouterRankingsCache | null = null
 const openRouterUserCache = new Map<string, OpenRouterUserCache>()
+let openRouterFreeModelsInFlight: Promise<ChatModelDescriptor[]> | null = null
+let openRouterRankingsInFlight: Promise<string[]> | null = null
+const openRouterUserInFlight = new Map<string, Promise<ChatModelDescriptor[]>>()
 
 const getCachedOpenRouterFreeModels = unstable_cache(
   async () => fetchOpenRouterFreeModels(fetch),
@@ -91,77 +96,16 @@ function buildFallbackOpenRouterModels(): ChatModelDescriptor[] {
   }))
 }
 
-function normalizeOpenRouterModelRecords(records: OpenRouterModelRecord[]): ChatModelDescriptor[] {
-  const seen = new Set<string>()
-  return records
-    .map((record) => (typeof record.id === 'string' ? record.id.trim() : ''))
-    .filter((id) => id.length > 0)
-    .filter((id) => {
-      const key = id.toLowerCase()
-      if (seen.has(key)) {
-        return false
-      }
-      seen.add(key)
-      return true
-    })
-    .map<ChatModelDescriptor>((id) => ({
-      id,
-      label: sanitizeModelLabel(id),
-      provider: 'openrouter',
-      isFree: id.endsWith(':free'),
-      availability: 'available',
-    }))
-}
-
-function sortAndAnnotateOpenRouterModels(
-  models: ChatModelDescriptor[],
-  dynamicOrder: readonly string[] = [],
-): ChatModelDescriptor[] {
-  if (dynamicOrder.length === 0) {
-    return [...models].sort((a, b) => a.label.localeCompare(b.label))
-  }
-
-  const rankById = new Map<string, number>(dynamicOrder.map((id, index) => [id.toLowerCase(), index + 1]))
-
-  return models
-    .map((model) => {
-      const rank = rankById.get(model.id.toLowerCase())
-      return rank ? { ...model, recommendationRank: rank } : model
-    })
-    .sort((a, b) => {
-      const rankA = a.recommendationRank ?? Number.MAX_SAFE_INTEGER
-      const rankB = b.recommendationRank ?? Number.MAX_SAFE_INTEGER
-      if (rankA !== rankB) return rankA - rankB
-      return a.label.localeCompare(b.label)
-    })
-}
-
 function hashUserCacheKey(userCacheKey: string): string {
   return createHash('sha256').update(userCacheKey).digest('hex').slice(0, 24)
 }
 
 async function fetchOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch): Promise<string[]> {
-  const fetchOptions: Omit<RequestInit, 'signal'> = {
-    method: 'GET',
-    cache: 'no-store',
-  }
-
   try {
-    const rscResponse = await fetchImpl(OPENROUTER_PROGRAMMING_RANKINGS_FETCH_URL, {
-      ...fetchOptions,
-      signal: AbortSignal.timeout(3500),
-      headers: { RSC: '1' },
-    })
-
-    if (rscResponse.ok) {
-      const payload = await rscResponse.text()
-      const extracted = extractRankingModelIdsFromPayload(payload)
-      if (extracted.length > 0) return extracted
-    }
-
     const htmlResponse = await fetchImpl(OPENROUTER_PROGRAMMING_RANKINGS_FETCH_URL, {
-      ...fetchOptions,
-      signal: AbortSignal.timeout(3500),
+      method: 'GET',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(2500),
     })
     if (!htmlResponse.ok) {
       return []
@@ -185,12 +129,42 @@ async function getOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch):
     return openRouterRankingsCache.modelOrder
   }
 
-  const modelOrder = await fetchOpenRouterProgrammingRanking(fetchImpl)
+  if (openRouterRankingsInFlight) {
+    return openRouterRankingsInFlight
+  }
+
+  openRouterRankingsInFlight = fetchOpenRouterProgrammingRanking(fetchImpl)
+  let modelOrder: string[]
+  try {
+    modelOrder = await openRouterRankingsInFlight
+  } finally {
+    openRouterRankingsInFlight = null
+  }
+
   openRouterRankingsCache = {
     modelOrder,
     expiresAt: now + OPENROUTER_RANKINGS_TTL_MS,
   }
   return modelOrder
+}
+
+function pruneExpiredOpenRouterUserCache(now: number): void {
+  for (const [key, entry] of openRouterUserCache.entries()) {
+    if (entry.expiresAt <= now) {
+      openRouterUserCache.delete(key)
+    }
+  }
+
+  if (openRouterUserCache.size <= OPENROUTER_USER_CACHE_MAX_ENTRIES) return
+
+  const entries = [...openRouterUserCache.entries()]
+    .sort((a, b) => a[1].expiresAt - b[1].expiresAt)
+
+  const toDelete = openRouterUserCache.size - OPENROUTER_USER_CACHE_MAX_ENTRIES
+  for (let index = 0; index < toDelete; index += 1) {
+    const [key] = entries[index]
+    openRouterUserCache.delete(key)
+  }
 }
 
 async function fetchOpenRouterModels(
@@ -238,7 +212,18 @@ export async function getOpenRouterFreeModels(fetchImpl: typeof fetch = fetch): 
     return openRouterCache.models
   }
 
-  const models = await fetchOpenRouterFreeModels(fetchImpl)
+  if (openRouterFreeModelsInFlight) {
+    return openRouterFreeModelsInFlight
+  }
+
+  openRouterFreeModelsInFlight = fetchOpenRouterFreeModels(fetchImpl)
+  let models: ChatModelDescriptor[]
+  try {
+    models = await openRouterFreeModelsInFlight
+  } finally {
+    openRouterFreeModelsInFlight = null
+  }
+
   openRouterCache = {
     models,
     expiresAt: now + OPENROUTER_CATALOG_TTL_MS,
@@ -252,13 +237,28 @@ async function getOpenRouterFullModelsForUser(
   fetchImpl: typeof fetch = fetch,
 ): Promise<ChatModelDescriptor[]> {
   const now = Date.now()
+  pruneExpiredOpenRouterUserCache(now)
+
   const hashedKey = hashUserCacheKey(userCacheKey)
   const cached = openRouterUserCache.get(hashedKey)
   if (cached && cached.expiresAt > now) {
     return cached.models
   }
 
-  const models = await fetchOpenRouterModels(fetchImpl, openRouterApiKey)
+  const inFlight = openRouterUserInFlight.get(hashedKey)
+  if (inFlight) {
+    return inFlight
+  }
+
+  const nextFetch = fetchOpenRouterModels(fetchImpl, openRouterApiKey)
+  openRouterUserInFlight.set(hashedKey, nextFetch)
+  let models: ChatModelDescriptor[]
+  try {
+    models = await nextFetch
+  } finally {
+    openRouterUserInFlight.delete(hashedKey)
+  }
+
   openRouterUserCache.set(hashedKey, {
     models,
     expiresAt: now + OPENROUTER_USER_CATALOG_TTL_MS,
@@ -287,19 +287,16 @@ export async function buildProviderCatalog(
     }
   }
 
-  const rankedOpenRouterModels = sortAndAnnotateOpenRouterModels(openRouterModels, dynamicProgrammingOrder)
   const query = input.openRouterQuery?.trim().toLowerCase()
   const filteredOpenRouterModels = query
-    ? rankedOpenRouterModels.filter((model) => model.id.toLowerCase().includes(query) || model.label.toLowerCase().includes(query))
-    : rankedOpenRouterModels
+    ? openRouterModels.filter((model) => model.id.toLowerCase().includes(query) || model.label.toLowerCase().includes(query))
+    : openRouterModels
 
-  const recommendedOpenRouterModels = filteredOpenRouterModels
-    .filter((model) => typeof model.recommendationRank === 'number')
-    .slice(0, OPENROUTER_RECOMMENDED_MODELS_LIMIT)
-
-  if (recommendedOpenRouterModels.length === 0 && filteredOpenRouterModels.length > 0) {
-    recommendedOpenRouterModels.push(...filteredOpenRouterModels.slice(0, Math.min(10, filteredOpenRouterModels.length)))
-  }
+  const recommendedOpenRouterModels = buildRecommendedOpenRouterModels(
+    filteredOpenRouterModels,
+    dynamicProgrammingOrder,
+    OPENROUTER_RECOMMENDED_MODELS_LIMIT,
+  )
 
   const includeAll = Boolean(input.includeAllOpenRouterModels)
   const openRouterModelsForDropdown = includeAll
