@@ -2,7 +2,6 @@ import { auth } from '@/auth'
 import { decryptKey } from '@/lib/apikey'
 import { ensureUserProfile, touchUserLastActiveAt } from '@/lib/account-state'
 import { sanitizeIncomingChatMessages } from '@/lib/chat-message-sanitizer'
-import { loadChatEntitlements } from '@/lib/chat-entitlements'
 import { estimateCostMicrousd, normalizeTokenUsage, parseUsdToMicrousd, type TokenUsage } from '@/lib/chat-usage'
 import {
   isMissingMessageTelemetryColumnError,
@@ -17,7 +16,7 @@ import {
 } from '@/lib/chat-provider-config'
 import { getQuotaError, incrementFreeUserMessagesUsed, shouldEnforceProviderQuota } from '@/lib/free-quota'
 import { readMemoryFiles, readModeFile } from '@/lib/memory'
-import { getEncryptedProviderApiKey } from '@/lib/provider-api-keys'
+import { getEncryptedProviderApiKey, hasEncryptedProviderApiKey } from '@/lib/provider-api-keys'
 import { buildSifuMasterToneGuidelines } from '@/lib/brand'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
@@ -696,19 +695,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const entitlements = await loadChatEntitlements(userId)
-    const encryptedOpenRouterKey = entitlements.providerKeys.openrouter
-      ? await getEncryptedProviderApiKey(userId, 'openrouter')
-      : null
-    const decryptedOpenRouterKey = encryptedOpenRouterKey ? decryptKey(encryptedOpenRouterKey) : null
+    const hasAnthropicKey = await hasEncryptedProviderApiKey(userId, 'anthropic')
     const selection = await resolveProviderSelection(
       {
         preferredProvider: payload.provider ?? sessionPreferenceProvider ?? userProfile.default_provider,
         preferredModel: payload.model ?? sessionPreferenceModel ?? userProfile.default_model,
-        providerKeys: entitlements.providerKeys,
-        openRouterModelScope: entitlements.openRouterModelScope,
-        userCacheKey: userId,
-        openRouterApiKey: decryptedOpenRouterKey,
+        hasAnthropicKey,
       },
     )
 
@@ -720,24 +712,20 @@ export async function POST(request: NextRequest) {
 
     const resolvedProvider = selection.selection.provider
     const resolvedModel = selection.selection.model
-    const enforceQuota = shouldEnforceProviderQuota(
-      { ...userProfile, has_provider_key: entitlements.hasAnyProviderKey },
-      resolvedProvider,
-      entitlements.providerKeys,
-    )
+    const enforceQuota = shouldEnforceProviderQuota(userProfile, resolvedProvider, hasAnthropicKey)
 
     if (enforceQuota) {
-      const quotaError = getQuotaError({ ...userProfile, has_provider_key: entitlements.hasAnyProviderKey })
+      const quotaError = getQuotaError(userProfile)
       if (quotaError) {
         return new Response(JSON.stringify(quotaError), { status: 403 })
       }
     }
 
-    if (resolvedProvider === 'openrouter' && entitlements.openRouterModelScope === 'free_only' && !isOpenRouterFreeModel(resolvedModel)) {
+    if (resolvedProvider === 'openrouter' && !isOpenRouterFreeModel(resolvedModel)) {
       return new Response(
         JSON.stringify({
           error: 'model_unavailable',
-          message: 'Selected OpenRouter model requires your OpenRouter API key in Settings.',
+          message: 'Selected OpenRouter model is not available for free-tier usage.',
         }),
         { status: 403 },
       )
@@ -762,16 +750,7 @@ export async function POST(request: NextRequest) {
       }
       providerApiKey = decrypted
     } else {
-      const sharedOpenRouterKey = process.env.OPENROUTER_API_KEY?.trim() ?? ''
-      const canFallbackToSharedFreeModel = sharedOpenRouterKey.length > 0 && isOpenRouterFreeModel(resolvedModel)
-
-      if (encryptedOpenRouterKey && !decryptedOpenRouterKey && !canFallbackToSharedFreeModel) {
-        return new Response(JSON.stringify({
-          error: 'invalid_api_key',
-          message: 'Your saved OpenRouter API key could not be decrypted. Please re-add it in Settings to continue.',
-        }), { status: 403 })
-      }
-      providerApiKey = decryptedOpenRouterKey?.trim() ?? sharedOpenRouterKey
+      providerApiKey = process.env.OPENROUTER_API_KEY?.trim() ?? ''
       if (!providerApiKey) {
         return new Response(JSON.stringify({
           error: 'provider_unavailable',
