@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
-  canSaveAnthropicApiKey,
+  canSaveProviderApiKey,
   shouldShowRemoveApiKey,
 } from "@/lib/account-settings-ui";
 import { performSignOut } from "@/lib/auth-signout";
@@ -58,8 +58,7 @@ type AccountStatus = {
   isGuest: boolean;
   isLinked: boolean;
   displayName: string | null;
-  hasApiKey: boolean;
-  hasAnthropicApiKey?: boolean;
+  hasProviderKey?: { openrouter: boolean; anthropic: boolean };
   defaultProvider?: "openrouter" | "anthropic";
   defaultModel?: string | null;
   prefillName: string | null;
@@ -141,8 +140,14 @@ function SettingsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [apiKey, setApiKey] = useState("");
-  const [apiKeyFieldError, setApiKeyFieldError] = useState("");
+  const [anthropicApiKey, setAnthropicApiKey] = useState("");
+  const [openRouterApiKey, setOpenRouterApiKey] = useState("");
+  const [apiKeyFieldErrors, setApiKeyFieldErrors] = useState<
+    Record<"anthropic" | "openrouter", string>
+  >({
+    anthropic: "",
+    openrouter: "",
+  });
   const [fullName, setFullName] = useState("");
   const [isGeneratingName, setIsGeneratingName] = useState(false);
   const generateNameResetTimerRef = useRef<number | null>(null);
@@ -281,46 +286,67 @@ function SettingsPageContent() {
     }
   };
 
-  const handleSaveKey = async (e: React.FormEvent) => {
+  const handleSaveKey = async (
+    e: React.FormEvent,
+    provider: "anthropic" | "openrouter",
+  ) => {
     e.preventDefault();
     setIsSavingKey(true);
     setMessage(null);
-    setApiKeyFieldError("");
+    setApiKeyFieldErrors((prev) => ({ ...prev, [provider]: "" }));
+    const apiKey =
+      provider === "anthropic"
+        ? anthropicApiKey.trim()
+        : openRouterApiKey.trim();
 
     try {
       const res = await fetch("/api/auth/apikey", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey }),
+        body: JSON.stringify({ apiKey, provider }),
       });
 
       const data = await res.json();
       if (res.ok) {
         setMessage({ text: "API key saved successfully.", type: "success" });
-        setApiKey("");
+        if (provider === "anthropic") {
+          setAnthropicApiKey("");
+        } else {
+          setOpenRouterApiKey("");
+        }
         mutateAccountStatus();
       } else {
         if (data.code === "apikey_config_error") {
-          setApiKeyFieldError(
-            "Secure key storage is temporarily unavailable. Your key was not saved. Please try again later.",
-          );
+          setApiKeyFieldErrors((prev) => ({
+            ...prev,
+            [provider]:
+              "Secure key storage is temporarily unavailable. Your key was not saved. Please try again later.",
+          }));
         } else {
-          setApiKeyFieldError(data.error || "Failed to save API key.");
+          setApiKeyFieldErrors((prev) => ({
+            ...prev,
+            [provider]: data.error || "Failed to save API key.",
+          }));
         }
       }
     } catch {
-      setApiKeyFieldError("An unexpected error occurred while saving API key.");
+      setApiKeyFieldErrors((prev) => ({
+        ...prev,
+        [provider]: "An unexpected error occurred while saving API key.",
+      }));
     } finally {
       setIsSavingKey(false);
     }
   };
 
-  const handleRemoveKey = async () => {
+  const handleRemoveKey = async (provider: "anthropic" | "openrouter") => {
     setIsRemovingKey(true);
     setMessage(null);
 
     try {
-      const res = await fetch("/api/auth/apikey", { method: "DELETE" });
+      const res = await fetch(`/api/auth/apikey?provider=${provider}`, {
+        method: "DELETE",
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setMessage({
@@ -330,6 +356,7 @@ function SettingsPageContent() {
         return;
       }
       setMessage({ text: "API key removed.", type: "success" });
+      setApiKeyFieldErrors((prev) => ({ ...prev, [provider]: "" }));
       mutateAccountStatus();
     } catch {
       setMessage({
@@ -416,12 +443,23 @@ function SettingsPageContent() {
     () => fullName.trim().replace(/\s+/g, " "),
     [fullName],
   );
-  const canSaveApiKey = useMemo(() => canSaveAnthropicApiKey(apiKey), [apiKey]);
+  const canSaveAnthropicApiKey = useMemo(
+    () => canSaveProviderApiKey("anthropic", anthropicApiKey),
+    [anthropicApiKey],
+  );
+  const canSaveOpenRouterApiKey = useMemo(
+    () => canSaveProviderApiKey("openrouter", openRouterApiKey),
+    [openRouterApiKey],
+  );
   const isNameDirty = normalizedInputName !== normalizedCurrentName;
   const hasAnthropicApiKey = Boolean(
-    accountStatus?.hasAnthropicApiKey ?? accountStatus?.hasApiKey,
+    accountStatus?.hasProviderKey?.anthropic,
+  );
+  const hasOpenRouterApiKey = Boolean(
+    accountStatus?.hasProviderKey?.openrouter,
   );
   const hasSavedAnthropicKey = shouldShowRemoveApiKey(hasAnthropicApiKey);
+  const hasSavedOpenRouterKey = shouldShowRemoveApiKey(hasOpenRouterApiKey);
 
   const formatMicrousd = useCallback(
     (microusd: number) => `$${(microusd / 1_000_000).toFixed(4)}`,
@@ -635,23 +673,29 @@ function SettingsPageContent() {
                     in logs, and you can remove it at any time.
                   </p>
                 </div>
-                <form onSubmit={handleSaveKey} className="space-y-3">
+                <form
+                  onSubmit={(event) => handleSaveKey(event, "anthropic")}
+                  className="space-y-3"
+                >
                   <div className="space-y-1.5">
                     <label
-                      htmlFor="apiKey"
+                      htmlFor="anthropicApiKey"
                       className="text-sm font-medium text-foreground"
                     >
                       API Key (sk-ant-...)
                     </label>
                     <div className="relative">
                       <Input
-                        id="apiKey"
+                        id="anthropicApiKey"
                         type="password"
-                        value={apiKey}
+                        value={anthropicApiKey}
                         onChange={(e) => {
-                          setApiKey(e.target.value);
-                          if (apiKeyFieldError) {
-                            setApiKeyFieldError("");
+                          setAnthropicApiKey(e.target.value);
+                          if (apiKeyFieldErrors.anthropic) {
+                            setApiKeyFieldErrors((prev) => ({
+                              ...prev,
+                              anthropic: "",
+                            }));
                           }
                         }}
                         placeholder={
@@ -671,7 +715,7 @@ function SettingsPageContent() {
                           type="button"
                           variant="secondary"
                           size="sm"
-                          onClick={handleRemoveKey}
+                          onClick={() => handleRemoveKey("anthropic")}
                           disabled={isSavingKey || isRemovingKey}
                           className="absolute bottom-1 right-1 top-1 h-auto border border-border/70 bg-surface px-2.5 text-xs shadow-none transition-colors hover:bg-surface/95"
                         >
@@ -679,16 +723,104 @@ function SettingsPageContent() {
                         </Button>
                       )}
                     </div>
-                    {apiKeyFieldError && (
+                    {apiKeyFieldErrors.anthropic && (
                       <p className="text-xs text-danger" role="alert">
-                        {apiKeyFieldError}
+                        {apiKeyFieldErrors.anthropic}
                       </p>
                     )}
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                     <Button
                       type="submit"
-                      disabled={!canSaveApiKey || isSavingKey || isRemovingKey}
+                      disabled={
+                        !canSaveAnthropicApiKey || isSavingKey || isRemovingKey
+                      }
+                      className="w-full sm:w-auto"
+                    >
+                      {isSavingKey
+                        ? "Storing Securely..."
+                        : "Store Securely (AES-256-CBC)"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className={cn(glassCardClass, "xl:col-span-5")}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <KeyRound className="h-4 w-4 text-coach" />
+                  OpenRouter API Key
+                </CardTitle>
+                <CardDescription>
+                  Add your own OpenRouter key to unlock paid OpenRouter models.
+                  Your key is encrypted before storage and used only for your
+                  requests.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <form
+                  onSubmit={(event) => handleSaveKey(event, "openrouter")}
+                  className="space-y-3"
+                >
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="openRouterApiKey"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      API Key (sk-or-...)
+                    </label>
+                    <div className="relative">
+                      <Input
+                        id="openRouterApiKey"
+                        type="password"
+                        value={openRouterApiKey}
+                        onChange={(e) => {
+                          setOpenRouterApiKey(e.target.value);
+                          if (apiKeyFieldErrors.openrouter) {
+                            setApiKeyFieldErrors((prev) => ({
+                              ...prev,
+                              openrouter: "",
+                            }));
+                          }
+                        }}
+                        placeholder={
+                          hasSavedOpenRouterKey
+                            ? "sk-or-•••••••••••••••• (stored securely)"
+                            : "Paste your OpenRouter key"
+                        }
+                        className={cn(
+                          "bg-elevated/50",
+                          hasSavedOpenRouterKey && "pr-[7.25rem]",
+                        )}
+                        required
+                        disabled={isSavingKey}
+                      />
+                      {hasSavedOpenRouterKey && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleRemoveKey("openrouter")}
+                          disabled={isSavingKey || isRemovingKey}
+                          className="absolute bottom-1 right-1 top-1 h-auto border border-border/70 bg-surface px-2.5 text-xs shadow-none transition-colors hover:bg-surface/95"
+                        >
+                          {isRemovingKey ? "Removing..." : "Remove Key"}
+                        </Button>
+                      )}
+                    </div>
+                    {apiKeyFieldErrors.openrouter && (
+                      <p className="text-xs text-danger" role="alert">
+                        {apiKeyFieldErrors.openrouter}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                    <Button
+                      type="submit"
+                      disabled={
+                        !canSaveOpenRouterApiKey || isSavingKey || isRemovingKey
+                      }
                       className="w-full sm:w-auto"
                     >
                       {isSavingKey

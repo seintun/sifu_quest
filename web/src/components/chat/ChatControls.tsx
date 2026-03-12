@@ -1,6 +1,7 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -20,7 +21,7 @@ import {
 } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getAnthropicModelCostTier, getProviderModelTips } from '@/lib/chat-provider-config'
-import type { ChatModelOption, ChatProviderOption } from '@/hooks/useChat'
+import type { ChatModelGroupOption, ChatModelOption, ChatProviderOption } from '@/hooks/useChat'
 import { Briefcase, Coins, Lightbulb, LockKeyhole, Medal, MessageSquare, Network, Settings2, Sparkles, Trash2, Trophy } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -35,8 +36,11 @@ type SharedControlProps = {
   selectedProvider: 'openrouter' | 'anthropic'
   onProviderChange: (value: 'openrouter' | 'anthropic') => void
   models: ChatModelOption[]
+  modelGroups?: ChatModelGroupOption[]
   selectedModel: string
   onModelChange: (value: string) => void
+  onLoadAllOpenRouterModels?: () => void
+  isLoadingOpenRouterAllModels?: boolean
   modes: ModeOption[]
   selectedMode: string
   onModeChange: (value: string) => void
@@ -187,6 +191,9 @@ function ControlsBody({
   models,
   selectedModel,
   onModelChange,
+  modelGroups,
+  onLoadAllOpenRouterModels,
+  isLoadingOpenRouterAllModels,
   modes,
   selectedMode,
   onModeChange,
@@ -200,6 +207,22 @@ function ControlsBody({
   const selectedModelOption = useMemo(() => models.find((model) => model.id === selectedModel), [models, selectedModel])
   const selectedModeOption = useMemo(() => modes.find((mode) => mode.value === selectedMode), [modes, selectedMode])
   const showOpenRouterRanking = selectedProvider === 'openrouter'
+  const [modelSearch, setModelSearch] = useState('')
+  const filteredModelGroups = useMemo(() => {
+    if (!modelGroups || modelGroups.length === 0) {
+      return [] as ChatModelGroupOption[]
+    }
+    const query = modelSearch.trim().toLowerCase()
+    if (!query) {
+      return modelGroups
+    }
+    return modelGroups
+      .map((group) => ({
+        ...group,
+        models: group.models.filter((model) => model.id.toLowerCase().includes(query) || model.label.toLowerCase().includes(query)),
+      }))
+      .filter((group) => group.models.length > 0)
+  }, [modelGroups, modelSearch])
   const selectedTier = selectedModelOption?.provider === 'anthropic'
     ? getAnthropicModelCostTier(selectedModelOption.id)
     : null
@@ -259,19 +282,48 @@ function ControlsBody({
             className={showOpenRouterRanking ? MODEL_SELECT_CONTENT_MOBILE_CLASS : MODEL_SELECT_CONTENT_MOBILE_COMPACT_CLASS}
           >
             <ModelProviderTips provider={selectedProvider} />
-            {models.map((model) => {
-              const modelTier = model.provider === 'anthropic' ? getAnthropicModelCostTier(model.id) : null
-              return (
-                <SelectItem key={model.id} value={model.id} disabled={model.availability !== 'available'}>
-                  <ModelOptionContent
-                    label={model.label}
-                    recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
-                    tier={modelTier}
-                    showRanking={showOpenRouterRanking}
-                  />
-                </SelectItem>
-              )
-            })}
+            {selectedProvider === 'openrouter' && (
+              <div className="px-2 pb-2">
+                <Input
+                  value={modelSearch}
+                  onChange={(event) => setModelSearch(event.target.value)}
+                  placeholder="Search OpenRouter models"
+                  className="h-8 text-xs"
+                />
+              </div>
+            )}
+            {(filteredModelGroups.length > 0 ? filteredModelGroups : [{ id: 'all', label: 'Models', models }]).map((group) => (
+              <SelectGroup key={group.id}>
+                <SelectLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">{group.label}</SelectLabel>
+                {group.models.map((model) => {
+                  const modelTier = model.provider === 'anthropic' ? getAnthropicModelCostTier(model.id) : null
+                  return (
+                    <SelectItem key={`${group.id}-${model.id}`} value={model.id} disabled={model.availability !== 'available'}>
+                      <ModelOptionContent
+                        label={model.label}
+                        recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
+                        tier={modelTier}
+                        showRanking={showOpenRouterRanking}
+                      />
+                    </SelectItem>
+                  )
+                })}
+                {group.id === 'all' && group.hasMore && selectedProvider === 'openrouter' && onLoadAllOpenRouterModels && (
+                  <div className="px-2 py-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-full text-xs"
+                      onClick={onLoadAllOpenRouterModels}
+                      disabled={isLoadingOpenRouterAllModels}
+                    >
+                      {isLoadingOpenRouterAllModels ? 'Loading models...' : 'Load full OpenRouter catalog'}
+                    </Button>
+                  </div>
+                )}
+              </SelectGroup>
+            ))}
           </SelectContent>
         </Select>
       </label>
@@ -365,19 +417,40 @@ export function DesktopChatControls(props: SharedControlProps) {
           className={showOpenRouterRanking ? MODEL_SELECT_CONTENT_CLASS : MODEL_SELECT_CONTENT_COMPACT_CLASS}
           >
             <ModelProviderTips provider={props.selectedProvider} />
-          {props.models.map((model) => {
-            const modelTier = model.provider === 'anthropic' ? getAnthropicModelCostTier(model.id) : null
-            return (
-              <SelectItem key={model.id} value={model.id} disabled={model.availability !== 'available'}>
-                <ModelOptionContent
-                  label={model.label}
-                  recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
-                  tier={modelTier}
-                  showRanking={showOpenRouterRanking}
-                />
-              </SelectItem>
-            )
-          })}
+          {(props.modelGroups && props.modelGroups.length > 0
+            ? props.modelGroups
+            : [{ id: 'all', label: 'Models', models: props.models }]).map((group) => (
+            <SelectGroup key={group.id}>
+              <SelectLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">{group.label}</SelectLabel>
+              {group.models.map((model) => {
+                const modelTier = model.provider === 'anthropic' ? getAnthropicModelCostTier(model.id) : null
+                return (
+                  <SelectItem key={`${group.id}-${model.id}`} value={model.id} disabled={model.availability !== 'available'}>
+                    <ModelOptionContent
+                      label={model.label}
+                      recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
+                      tier={modelTier}
+                      showRanking={showOpenRouterRanking}
+                    />
+                  </SelectItem>
+                )
+              })}
+              {group.id === 'all' && group.hasMore && props.selectedProvider === 'openrouter' && props.onLoadAllOpenRouterModels && (
+                <div className="px-2 py-1.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-full text-xs"
+                    onClick={props.onLoadAllOpenRouterModels}
+                    disabled={props.isLoadingOpenRouterAllModels}
+                  >
+                    {props.isLoadingOpenRouterAllModels ? 'Loading models...' : 'Load full OpenRouter catalog'}
+                  </Button>
+                </div>
+              )}
+            </SelectGroup>
+          ))}
         </SelectContent>
       </Select>
 

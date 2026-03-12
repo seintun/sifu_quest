@@ -1,10 +1,10 @@
-export function extractFreeModelIdsFromRankingPayload(payload: string): string[] {
+export function extractRankingModelIdsFromPayload(payload: string): string[] {
   if (!payload) return []
 
   const patterns = [
-    /"variant_permaslug":"([^"]+:free)"/g,
-    /href="\/([^"]+:free)"/g,
-    /\b([a-z0-9-]+\/[a-z0-9._-]+:free)\b/gi,
+    /"variant_permaslug":"([^"]+)"/g,
+    /href="\/([^"]+)"/g,
+    /\b([a-z0-9-]+\/[a-z0-9._-]+(?::[a-z0-9._-]+)?)\b/gi,
   ]
 
   const seen = new Set<string>()
@@ -21,4 +21,8 @@ export function extractFreeModelIdsFromRankingPayload(payload: string): string[]
   }
 
   return models
+}
+
+export function extractFreeModelIdsFromRankingPayload(payload: string): string[] {
+  return extractRankingModelIdsFromPayload(payload).filter((id) => id.endsWith(':free'))
 }

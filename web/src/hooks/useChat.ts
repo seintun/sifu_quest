@@ -38,6 +38,13 @@ export interface ChatModelOption {
   reason?: string
 }
 
+export interface ChatModelGroupOption {
+  id: string
+  label: string
+  models: ChatModelOption[]
+  hasMore?: boolean
+}
+
 export interface SessionUsageMetrics {
   userTurns: number
   inputTokens: number
@@ -155,10 +162,18 @@ export function useChat(mode: string) {
     openrouter: [],
     anthropic: [],
   })
+  const [modelGroupsByProvider, setModelGroupsByProvider] = useState<Record<ChatProvider, ChatModelGroupOption[]>>({
+    openrouter: [],
+    anthropic: [],
+  })
   const [selectedProvider, setSelectedProvider] = useState<ChatProvider>('openrouter')
   const [selectedModel, setSelectedModel] = useState('')
   const [sessionMetrics, setSessionMetrics] = useState<SessionUsageMetrics | null>(null)
-  const [hasAnthropicKey, setHasAnthropicKey] = useState(false)
+  const [hasProviderKey, setHasProviderKey] = useState<Record<ChatProvider, boolean>>({
+    openrouter: false,
+    anthropic: false,
+  })
+  const [isLoadingOpenRouterAllModels, setIsLoadingOpenRouterAllModels] = useState(false)
   const [streamPhase, setStreamPhase] = useState<StreamPhase>('idle')
   const [hasOlderMessages, setHasOlderMessages] = useState(false)
   const [nextBefore, setNextBefore] = useState<string | null>(null)
@@ -204,8 +219,9 @@ export function useChat(mode: string) {
       const providerData = await providersRes.json().catch(() => ({})) as {
         providers?: ChatProviderOption[]
         modelsByProvider?: Record<ChatProvider, ChatModelOption[]>
+        modelGroupsByProvider?: Record<ChatProvider, ChatModelGroupOption[]>
         defaults?: { provider: ChatProvider; model: string }
-        account?: { hasAnthropicKey?: boolean }
+        account?: { hasProviderKey?: Record<ChatProvider, boolean> }
       }
       const sessionData = await sessionRes.json().catch(() => ({})) as ChatSessionResponse & { error?: string; message?: string }
 
@@ -222,7 +238,11 @@ export function useChat(mode: string) {
       setProviders(providerData.providers ?? [])
       const nextModelsByProvider = providerData.modelsByProvider ?? { openrouter: [], anthropic: [] }
       setModelsByProvider(nextModelsByProvider)
-      setHasAnthropicKey(Boolean(providerData.account?.hasAnthropicKey))
+      setModelGroupsByProvider(providerData.modelGroupsByProvider ?? { openrouter: [], anthropic: [] })
+      setHasProviderKey({
+        openrouter: Boolean(providerData.account?.hasProviderKey?.openrouter),
+        anthropic: Boolean(providerData.account?.hasProviderKey?.anthropic),
+      })
 
       const sessionSelection = resolveSelection(sessionData.selection ?? null, nextModelsByProvider)
       const storedSelection = resolveSelection(getStoredSelection(), nextModelsByProvider)
@@ -265,7 +285,9 @@ export function useChat(mode: string) {
     setMessages([])
     setFreeQuota(null)
     setSessionMetrics(null)
-    setHasAnthropicKey(false)
+    setHasProviderKey({ openrouter: false, anthropic: false })
+    setModelGroupsByProvider({ openrouter: [], anthropic: [] })
+    setIsLoadingOpenRouterAllModels(false)
     setStreamPhase('idle')
     setHasOlderMessages(false)
     setNextBefore(null)
@@ -289,14 +311,45 @@ export function useChat(mode: string) {
     setUpgradeRequired(null)
     setSelectedProvider(provider)
     setSelectedModel((prev) => {
-      const models = modelsByProvider[provider] ?? []
+      const groupedModels = modelGroupsByProvider[provider] ?? []
+      const allGroup = groupedModels.find((group) => group.id === 'all')
+      const models = allGroup?.models ?? modelsByProvider[provider] ?? []
       if (models.some((model) => model.id === prev && model.availability === 'available')) {
         return prev
       }
       const firstAvailable = models.find((model) => model.availability === 'available')
       return firstAvailable?.id ?? models[0]?.id ?? ''
     })
-  }, [modelsByProvider])
+  }, [modelGroupsByProvider, modelsByProvider])
+
+  const loadAllOpenRouterModels = useCallback(async () => {
+    if (isLoadingOpenRouterAllModels) return
+    setIsLoadingOpenRouterAllModels(true)
+    try {
+      const res = await fetch('/api/chat/providers?openrouterAll=1')
+      const data = await res.json().catch(() => ({})) as {
+        modelsByProvider?: Record<ChatProvider, ChatModelOption[]>
+        modelGroupsByProvider?: Record<ChatProvider, ChatModelGroupOption[]>
+      }
+      if (!res.ok) {
+        console.error('Failed to load full OpenRouter model catalog', data)
+        setBootstrapError('Unable to load full OpenRouter catalog right now. Please retry.')
+        return
+      }
+      if (data.modelsByProvider) {
+        setModelsByProvider(data.modelsByProvider)
+      }
+      if (data.modelGroupsByProvider) {
+        setModelGroupsByProvider(data.modelGroupsByProvider)
+      }
+      setBootstrapError(null)
+    } catch (error) {
+      console.error('Failed to load full OpenRouter model catalog', error)
+      setBootstrapError('Unable to load full OpenRouter catalog right now. Please retry.')
+    } finally {
+      setIsLoadingOpenRouterAllModels(false)
+    }
+  }, [isLoadingOpenRouterAllModels])
 
   const updateModelSelection = useCallback((modelId: string) => {
     setUpgradeRequired(null)
@@ -530,7 +583,7 @@ export function useChat(mode: string) {
     const previousQuota = freeQuota
     const shouldEnforceQuota = Boolean(
       freeQuota?.isFreeTier &&
-      !(selectedProvider === 'anthropic' && hasAnthropicKey),
+      !hasProviderKey[selectedProvider],
     )
 
     if (shouldEnforceQuota) {
@@ -609,7 +662,7 @@ export function useChat(mode: string) {
         abortRef.current = null
       }
     }
-  }, [messages, mode, ensureSession, freeQuota, selectedProvider, selectedModel, hasAnthropicKey, processStreamResponse])
+  }, [messages, mode, ensureSession, freeQuota, selectedProvider, selectedModel, hasProviderKey, processStreamResponse])
 
   const greet = useCallback(async () => {
     if (isStreaming) return
@@ -703,7 +756,10 @@ export function useChat(mode: string) {
   }, [])
 
   const selectedProviderInfo = providers.find((provider) => provider.id === selectedProvider) ?? null
-  const availableModelsForSelectedProvider = modelsByProvider[selectedProvider] ?? []
+  const selectedProviderGroups = modelGroupsByProvider[selectedProvider] ?? []
+  const availableModelsForSelectedProvider = selectedProviderGroups.find((group) => group.id === 'all')?.models
+    ?? modelsByProvider[selectedProvider]
+    ?? []
 
   return {
     messages,
@@ -720,15 +776,20 @@ export function useChat(mode: string) {
     stopStreaming,
     providers,
     modelsByProvider,
+    modelGroupsByProvider,
     selectedProvider,
     selectedModel,
     selectedProviderInfo,
     availableModelsForSelectedProvider,
     sessionMetrics,
-    hasAnthropicKey,
+    hasProviderKey,
+    hasAnthropicKey: hasProviderKey.anthropic,
+    hasOpenRouterKey: hasProviderKey.openrouter,
     streamPhase,
     hasOlderMessages,
     isLoadingOlder,
+    isLoadingOpenRouterAllModels,
+    loadAllOpenRouterModels,
     loadOlderMessages,
     updateProviderSelection,
     updateModelSelection,

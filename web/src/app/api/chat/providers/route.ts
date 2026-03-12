@@ -1,53 +1,28 @@
 import { auth } from '@/auth'
+import { decryptKey } from '@/lib/apikey'
 import { ensureUserProfile } from '@/lib/account-state'
-import {
-  DEFAULT_CHAT_PROVIDER,
-  DEFAULT_OPENROUTER_MODEL,
-  getAnthropicDefaultModel,
-  isKnownAnthropicModel,
-  isOpenRouterFreeModel,
-  type ChatProvider,
-} from '@/lib/chat-provider-config'
+import { DEFAULT_CHAT_PROVIDER, type ChatProvider } from '@/lib/chat-provider-config'
+import { loadChatEntitlements } from '@/lib/chat-entitlements'
+import { resolveProviderSelection } from '@/lib/chat-selection'
 import { buildProviderCatalog } from '@/lib/provider-catalog'
-import { hasEncryptedProviderApiKey } from '@/lib/provider-api-keys'
+import { getEncryptedProviderApiKey } from '@/lib/provider-api-keys'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 
-function resolveDefaultProvider(
-  preferredProvider: ChatProvider,
-  hasAnthropicKey: boolean,
-): ChatProvider {
+function parseBooleanFlag(value: string | null): boolean {
+  return value === '1' || value === 'true'
+}
+
+function resolveDefaultProvider(preferredProvider: ChatProvider, hasAnthropicKey: boolean): ChatProvider {
   if (preferredProvider === 'anthropic' && !hasAnthropicKey) {
     return DEFAULT_CHAT_PROVIDER
   }
   return preferredProvider
 }
 
-function resolveDefaultModel(
-  provider: ChatProvider,
-  preferredModel: string | null,
-  hasAnthropicKey: boolean,
-  openRouterModels: string[],
-): string {
-  if (provider === 'anthropic') {
-    if (!hasAnthropicKey) {
-      return openRouterModels[0] ?? DEFAULT_OPENROUTER_MODEL
-    }
-    if (preferredModel && isKnownAnthropicModel(preferredModel)) {
-      return preferredModel
-    }
-    return getAnthropicDefaultModel()
-  }
-
-  if (preferredModel && isOpenRouterFreeModel(preferredModel) && openRouterModels.includes(preferredModel)) {
-    return preferredModel
-  }
-  return openRouterModels[0] ?? DEFAULT_OPENROUTER_MODEL
-}
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
@@ -56,23 +31,49 @@ export async function GET() {
 
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const profile = await ensureUserProfile(userId, session.user.email)
-    const hasAnthropicKey = await hasEncryptedProviderApiKey(userId, 'anthropic')
-    const catalog = await buildProviderCatalog(hasAnthropicKey)
-    const openRouterModelIds = catalog.modelsByProvider.openrouter.map((model) => model.id)
+    const entitlements = await loadChatEntitlements(userId)
+    const encryptedOpenRouterKey = entitlements.providerKeys.openrouter
+      ? await getEncryptedProviderApiKey(userId, 'openrouter')
+      : null
+    const openRouterApiKey = encryptedOpenRouterKey ? decryptKey(encryptedOpenRouterKey) : null
+
+    const { searchParams } = new URL(request.url)
+    const includeAllOpenRouterModels = parseBooleanFlag(searchParams.get('openrouterAll'))
+    const openRouterQuery = searchParams.get('openrouterQuery')
+    const catalog = await buildProviderCatalog({
+      providerKeys: entitlements.providerKeys,
+      openRouterModelScope: entitlements.openRouterModelScope,
+      includeAllOpenRouterModels,
+      openRouterQuery,
+      userCacheKey: userId,
+      openRouterApiKey,
+    })
+
     const preferredProvider = profile.default_provider ?? DEFAULT_CHAT_PROVIDER
-    const defaultProvider = resolveDefaultProvider(preferredProvider, hasAnthropicKey)
-    const defaultModel = resolveDefaultModel(defaultProvider, profile.default_model, hasAnthropicKey, openRouterModelIds)
+    const defaultProvider = resolveDefaultProvider(preferredProvider, entitlements.providerKeys.anthropic)
+    const defaultSelection = await resolveProviderSelection({
+      preferredProvider: defaultProvider,
+      preferredModel: profile.default_model,
+      providerKeys: entitlements.providerKeys,
+      openRouterModelScope: entitlements.openRouterModelScope,
+      userCacheKey: userId,
+      openRouterApiKey,
+    })
+    const defaultModel = defaultSelection.ok
+      ? defaultSelection.selection.model
+      : (catalog.modelsByProvider.openrouter[0]?.id ?? catalog.defaults.model)
 
     return NextResponse.json({
       providers: catalog.providers,
       modelsByProvider: catalog.modelsByProvider,
+      modelGroupsByProvider: catalog.modelGroupsByProvider,
       defaults: {
         provider: defaultProvider,
         model: defaultModel,
       },
       account: {
         isGuest: profile.is_guest,
-        hasAnthropicKey,
+        hasProviderKey: entitlements.providerKeys,
       },
     })
   } catch (error) {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { extractFreeModelIdsFromRankingPayload } from './openrouter-ranking-utils.ts'
+import { extractFreeModelIdsFromRankingPayload, extractRankingModelIdsFromPayload } from './openrouter-ranking-utils.ts'
 
 test('extractFreeModelIdsFromRankingPayload supports multiple payload shapes', () => {
   const payload = [
@@ -15,5 +15,17 @@ test('extractFreeModelIdsFromRankingPayload supports multiple payload shapes', (
     'openai/gpt-oss-20b:free',
     'stepfun/step-3.5-flash:free',
     'nvidia/nemotron-3-super-120b-a12b:free',
+  ])
+})
+
+test('extractRankingModelIdsFromPayload captures free and paid model identifiers', () => {
+  const payload = [
+    '... "variant_permaslug":"anthropic/claude-sonnet-4-5" ...',
+    '... href="/openai/gpt-oss-20b:free" ...',
+  ].join('\n')
+
+  assert.deepEqual(extractRankingModelIdsFromPayload(payload), [
+    'anthropic/claude-sonnet-4-5',
+    'openai/gpt-oss-20b:free',
   ])
 })

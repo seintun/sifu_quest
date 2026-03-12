@@ -1,0 +1,31 @@
+# OpenRouter Paid BYOK Model Selector Design
+
+## UX Goals
+- Keep one `OpenRouter` provider in provider dropdown.
+- Preserve fast default experience for free users.
+- When OpenRouter BYOK exists, surface stronger coding models first and allow access to full model list.
+
+## Selector Behavior
+- Model menu shows grouped OpenRouter sections:
+  - `Recommended for Coding`
+  - `All OpenRouter Models`
+- `All OpenRouter Models` can be truncated on initial load for performance.
+- When truncated, show `Load full OpenRouter catalog` action in selector.
+- Add in-menu search for OpenRouter model IDs/labels.
+
+## Entitlement Behavior
+- No OpenRouter key:
+  - OpenRouter provider available
+  - only free models selectable
+- OpenRouter key present:
+  - OpenRouter provider remains same
+  - free + paid models selectable
+
+## Error/State UX
+- If full catalog fetch fails, preserve existing model list and show retry-safe message.
+- Invalid/decryption-failed saved provider key returns clear Settings re-entry action message.
+
+## Accessibility/Clarity Notes
+- Keep recommendation rank badges visible in OpenRouter lists.
+- Keep provider labels explicit (`OpenRouter`, `Anthropic`).
+- Keep key-required reasons human-readable in provider/model availability states.
