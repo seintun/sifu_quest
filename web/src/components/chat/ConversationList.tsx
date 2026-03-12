@@ -9,15 +9,15 @@ import remarkGfm from 'remark-gfm'
 
 const proseClasses = `chat-prose prose prose-invert prose-sm max-w-none whitespace-pre-wrap
   prose-headings:font-display prose-headings:text-foreground
-  prose-h2:text-base prose-h2:font-semibold prose-h2:mt-5 prose-h2:mb-2 prose-h2:pb-1 prose-h2:border-b prose-h2:border-border/40
-  prose-h3:text-sm prose-h3:font-semibold prose-h3:mt-4 prose-h3:mb-1.5
-  prose-h4:text-sm prose-h4:font-medium prose-h4:mt-3 prose-h4:mb-1
-  prose-p:text-foreground/85 prose-p:my-1.5 prose-p:leading-relaxed
+  prose-h2:text-base prose-h2:font-semibold prose-h2:mt-3.5 prose-h2:mb-1.5 prose-h2:pb-1 prose-h2:border-b prose-h2:border-border/40
+  prose-h3:text-sm prose-h3:font-semibold prose-h3:mt-3 prose-h3:mb-1
+  prose-h4:text-sm prose-h4:font-medium prose-h4:mt-2.5 prose-h4:mb-1
+  prose-p:text-foreground/85 prose-p:my-1 prose-p:leading-[1.5]
   prose-a:text-coach prose-a:no-underline hover:prose-a:underline
-  prose-li:text-foreground/85 prose-li:my-0.5 prose-li:leading-relaxed
+  prose-li:text-foreground/85 prose-li:my-0 prose-li:leading-[1.5]
   prose-strong:text-foreground prose-strong:font-semibold
-  prose-ol:my-2 prose-ul:my-2
-  prose-hr:border-border/40 prose-hr:my-4
+  prose-ol:my-1.5 prose-ul:my-1.5
+  prose-hr:border-border/40 prose-hr:my-3
   prose-blockquote:border-coach/40 prose-blockquote:bg-coach/5 prose-blockquote:rounded-r-lg prose-blockquote:py-0.5 prose-blockquote:px-3 prose-blockquote:not-italic
   [&_table]:w-full [&_table]:my-3 [&_table]:text-sm [&_table]:border-collapse
   [&_thead]:border-b [&_thead]:border-border/50
@@ -84,7 +84,7 @@ const ChatBubble = memo(function ChatBubble({
 
   return (
     <div className="flex justify-start">
-      <div className="bg-surface border border-coach/15 rounded-xl p-3.5 text-sm max-w-[92%] shadow-sm overflow-x-auto">
+      <div className="bg-surface border border-coach/15 rounded-xl p-3 text-sm max-w-[92%] shadow-sm overflow-x-auto">
         {isStreaming ? (
           <div className="whitespace-pre-wrap text-foreground/85 leading-relaxed">{message.content}</div>
         ) : (
