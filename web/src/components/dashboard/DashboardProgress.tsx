@@ -23,15 +23,15 @@ function MetricCard({
   const colors = DOMAIN_COLORS[domain]
   return (
     <Card data-testid={`metric-card-${domain}`} className={`h-full ${colors.bg} border ${colors.border} ${colors.glow} transition-all duration-200 hover:-translate-y-0.5`}>
-      <CardContent className="p-3 sm:p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">{title}</p>
-            <p className={`text-xl sm:text-2xl font-display font-bold mt-1 ${colors.text}`}>{value}</p>
-            {subtitle && <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{subtitle}</p>}
+      <CardContent className="p-2.5 sm:p-3">
+        <div className="flex items-start justify-between gap-2.5">
+          <div className="min-w-0">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider">{title}</p>
+            <p className={`mt-0.5 text-lg sm:text-xl font-display font-bold leading-tight ${colors.text}`}>{value}</p>
+            {subtitle && <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">{subtitle}</p>}
           </div>
-          <span className={`inline-flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg border ${colors.border} ${colors.bg}`}>
-            <Icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${colors.text} opacity-80`} />
+          <span className={`inline-flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-md border ${colors.border} ${colors.bg}`}>
+            <Icon className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${colors.text} opacity-80`} />
           </span>
         </div>
       </CardContent>
@@ -87,8 +87,8 @@ export function DashboardProgress({ metrics, planLabel }: DashboardProgressProps
     .join(', ') || 'No pipeline yet'
 
   return (
-    <section className="space-y-3" data-testid="dashboard-progress">
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3">
+    <section className="space-y-2.5 sm:space-y-3" data-testid="dashboard-progress">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
         <MetricCard
           title="DSA Problems"
           value={metrics?.dsaProblemsCompleted ?? 0}
@@ -118,9 +118,9 @@ export function DashboardProgress({ metrics, planLabel }: DashboardProgressProps
         />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-2.5 sm:gap-3">
         <Card className="xl:col-span-2 border border-border bg-surface">
-          <CardHeader className="pb-3 border-b border-border/40">
+          <CardHeader className="border-b border-border/40 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-plan" />
@@ -132,7 +132,7 @@ export function DashboardProgress({ metrics, planLabel }: DashboardProgressProps
               </Link>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4 pt-4">
+          <CardContent className="space-y-3 px-4 py-3.5">
             <ProgressBar
               label="Overall Plan"
               current={metrics?.planItemsCompleted ?? 0}
@@ -151,13 +151,13 @@ export function DashboardProgress({ metrics, planLabel }: DashboardProgressProps
         </Card>
 
         <Card className="border border-border bg-surface">
-          <CardHeader className="pb-3 border-b border-border/40">
+          <CardHeader className="border-b border-border/40 px-4 py-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Calendar className="h-4 w-4 text-streak" />
               Weekly Rhythm
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-4">
+          <CardContent className="px-4 py-3.5">
             {(metrics?.weeklyRhythm?.length ?? 0) > 0 ? (
               <div className="grid grid-cols-2 gap-2">
                 {metrics?.weeklyRhythm?.map((entry) => {
@@ -166,7 +166,7 @@ export function DashboardProgress({ metrics, planLabel }: DashboardProgressProps
                     <div
                       key={entry.day}
                       className={cn(
-                        'rounded-lg p-2 text-xs border',
+                        'rounded-lg border p-1.5 text-xs',
                         isToday
                           ? 'border-streak/40 bg-streak/10 text-streak'
                           : 'border-border/50 bg-elevated/40 text-muted-foreground',
