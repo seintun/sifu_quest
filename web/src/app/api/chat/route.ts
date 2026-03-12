@@ -320,7 +320,7 @@ async function buildSystemPrompt(
   mode: string | undefined,
   isGreeting: boolean | undefined,
 ): Promise<string> {
-  let systemPrompt = `You are Sifu, the master coach for coding and programming.\n\n${buildSifuMasterToneGuidelines()}`
+  let systemPrompt = 'You are Sifu, the master coach for coding and programming.'
   const modeConfig = MODE_TO_FILES[mode || 'dsa']
 
   if (!modeConfig) {

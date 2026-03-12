@@ -97,7 +97,7 @@ Results:
 ### Manual Verification
 
 - [x] Verified key Ask Sifu copy and mode labels in updated source surfaces.
-- [x] Verified site webmanifest values and icon paths.
+- [x] Verified manifest route values and icon paths.
 
 ## Risks and Mitigations
 

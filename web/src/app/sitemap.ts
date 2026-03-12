@@ -1,4 +1,4 @@
-import { getCanonicalSiteUrl } from '../lib/brand'
+import { getCanonicalSiteUrl } from '../lib/brand.ts'
 import type { MetadataRoute } from 'next'
 
 const ROUTES = ['/', '/coach', '/plan', '/dsa', '/system-design', '/jobs', '/calendar', '/memory', '/settings']

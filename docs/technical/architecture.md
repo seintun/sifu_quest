@@ -192,10 +192,10 @@ These files are read at runtime via `fs.readFile()` in `readModeFile()`. On Verc
 
 Sifu Quest centralizes branding and tone logic so UI copy, metadata, and AI behavior stay consistent:
 
-- `brandCopy` / `brandTheme`: naming, emoji + Lucide semantics, allowed contexts
-- `seoConfig`: title/description/keywords/canonical host
-- `aiToneConfig`: Sifu Master style and response guardrails
-- Metadata routes: `manifest`, `robots`, `sitemap`
+- Branding constants in `web/src/lib/brand.ts` (for example `BRAND_NAME`, `BRAND_TAGLINE`, `BRAND_EMOJIS`, `NAV_COPY`)
+- SEO metadata exports in `web/src/lib/brand.ts` (for example `BRAND_DESCRIPTION`, `APP_KEYWORDS`, `getCanonicalSiteUrl`)
+- AI tone helper `buildSifuMasterToneGuidelines` used by chat system prompt assembly
+- Metadata routes (`manifest`, `robots`, `sitemap`) that consume the shared branding/SEO exports
 
 ```mermaid
 flowchart LR

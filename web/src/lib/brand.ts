@@ -1,13 +1,3 @@
-import {
-  Award,
-  Hand,
-  Medal,
-  Shield,
-  Sparkles,
-  Trophy,
-  type LucideIcon,
-} from "lucide-react";
-
 export const BRAND_NAME = "Sifu Quest";
 export const BRAND_TAGLINE =
   "Master coding interviews with disciplined Sifu coaching";
@@ -22,16 +12,6 @@ export const BRAND_EMOJIS = {
   star: "⭐",
   fist: "👊",
 } as const;
-
-export const BRAND_ICONOGRAPHY: Record<keyof typeof BRAND_EMOJIS, LucideIcon> =
-  {
-    primary: Shield,
-    trophy: Trophy,
-    award: Award,
-    medal: Medal,
-    star: Sparkles,
-    fist: Hand,
-  };
 
 export const APP_KEYWORDS = [
   "Sifu Quest",

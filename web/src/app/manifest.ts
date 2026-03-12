@@ -1,4 +1,4 @@
-import { BRAND_DESCRIPTION, BRAND_NAME } from '../lib/brand'
+import { BRAND_DESCRIPTION, BRAND_NAME } from '../lib/brand.ts'
 import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
