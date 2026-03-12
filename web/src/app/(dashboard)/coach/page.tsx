@@ -9,6 +9,7 @@ import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useChat } from '@/hooks/useChat'
+import { BRAND_EMOJIS, MODE_LABELS, NAV_COPY } from '@/lib/brand'
 import { buildSystemMeta, getSystemMessage } from '@/lib/chat-system-messages'
 import { KeyRound, MessageCircle, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
@@ -25,11 +26,11 @@ const MODE_STARTERS: Record<string, string[]> = {
 }
 
 const MODES: ModeOption[] = [
-  { value: 'dsa', label: 'DSA Coach' },
-  { value: 'system-design', label: 'System Design' },
-  { value: 'interview-prep', label: 'Interview Prep' },
-  { value: 'job-search', label: 'Job Search' },
-  { value: 'business-ideas', label: 'Business Ideas' },
+  { value: 'dsa', label: MODE_LABELS.dsa },
+  { value: 'system-design', label: MODE_LABELS['system-design'] },
+  { value: 'interview-prep', label: MODE_LABELS['interview-prep'] },
+  { value: 'job-search', label: MODE_LABELS['job-search'] },
+  { value: 'business-ideas', label: MODE_LABELS['business-ideas'] },
 ]
 
 function ChatSkeleton() {
@@ -221,7 +222,7 @@ export default function CoachPage() {
         <div className="flex items-center gap-2 min-w-0">
           <MessageCircle className="h-[18px] w-[18px] text-coach shrink-0" />
           <div className="min-w-0">
-            <h1 className="font-display text-xl md:text-2xl leading-tight font-bold truncate">Coach Chat</h1>
+            <h1 className="font-display text-xl md:text-2xl leading-tight font-bold truncate">{NAV_COPY.askSifu}</h1>
             <p className="hidden sm:block text-xs text-muted-foreground truncate mt-0.5">{selectedModeLabel}</p>
           </div>
         </div>
@@ -250,7 +251,7 @@ export default function CoachPage() {
             selectedMode={mode}
             onModeChange={handleModeChange}
             onClear={handleClearHistory}
-            byokNotice={isAnthropicLocked ? 'BYOK in Settings for unlimited chat.' : null}
+            byokNotice={isAnthropicLocked ? `${BRAND_EMOJIS.medal} BYOK in Settings for unlimited chat.` : null}
           />
         </div>
       </div>
@@ -259,7 +260,7 @@ export default function CoachPage() {
         <div className="hidden md:flex mb-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] text-warning items-center justify-between gap-2 shrink-0">
           <span className="inline-flex items-center gap-1.5 flex-1 min-w-0 whitespace-nowrap">
             <KeyRound className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">BYOK in Settings for unlimited chat.</span>
+            <span className="truncate">{BRAND_EMOJIS.medal} BYOK in Settings for unlimited chat.</span>
           </span>
           <Link href="/settings" className="underline underline-offset-2 whitespace-nowrap hover:text-warning/90 shrink-0">
             Settings

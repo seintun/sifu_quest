@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useAuthStatus } from '@/context/AuthStatusContext'
 import { performSignOut } from '@/lib/auth-signout'
+import { BRAND_EMOJIS, BRAND_NAME, NAV_COPY } from '@/lib/brand'
 import {
   selectMobilePrimaryNavItems,
   selectMobileSecondaryNavItems,
@@ -142,7 +143,7 @@ function LogoutFooter({ deferred, onDeferredLogout }: LogoutFooterProps) {
 
 function MobileCoachToggle({ onCoachRoute }: { onCoachRoute: boolean }) {
   const destination = onCoachRoute ? '/' : '/coach'
-  const label = onCoachRoute ? 'To Dojo' : 'Ask Sifu'
+  const label = onCoachRoute ? NAV_COPY.toDojo : NAV_COPY.askSifu
   const helper = onCoachRoute ? 'Dashboard' : 'Live'
   const Icon = onCoachRoute ? Home : MessageCircle
 
@@ -174,7 +175,7 @@ export function DesktopCoachFloatingCta() {
   const pathname = usePathname()
   const onCoachRoute = pathname.startsWith('/coach')
   const destination = '/coach'
-  const title = 'Ask Sifu'
+  const title = NAV_COPY.askSifu
   const helper = 'Open Coach'
   const Icon = MessageCircle
 
@@ -213,8 +214,8 @@ export function Sidebar() {
       className="hidden md:flex w-56 flex-col fixed inset-y-0 left-0 bg-surface border-r border-border z-30"
     >
       <div className="p-4 border-b border-border">
-        <h1 className="font-display text-lg font-bold text-foreground">Sifu Quest</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">Personal Dashboard</p>
+        <h1 className="font-display text-lg font-bold text-foreground">{BRAND_NAME}</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">{NAV_COPY.dashboardHint}</p>
       </div>
       <div className="flex-1 overflow-y-auto p-3">
         <NavLinks items={selectSidebarNavItems()} />
@@ -236,7 +237,7 @@ export function MobileSidebar() {
       className="md:hidden fixed top-0 left-0 right-0 z-40 bg-surface border-b border-border h-12"
     >
       <div className="flex h-full items-center justify-between px-3">
-        <h1 className="font-display text-base font-bold text-foreground">Sifu Quest</h1>
+        <h1 className="font-display text-base font-bold text-foreground">{BRAND_NAME}</h1>
         <MobileCoachToggle onCoachRoute={onCoachRoute} />
       </div>
     </div>
@@ -304,7 +305,7 @@ export function MobileBottomNav() {
                 )}
               >
                 <Icon className="h-4 w-4" />
-                {item.label === 'Dashboard' ? 'Home' : item.label.replace(' Chat', '')}
+                {item.label === 'Dashboard' ? 'Home' : item.label}
               </Link>
             )
           })}
@@ -329,7 +330,7 @@ export function MobileBottomNav() {
             >
               <SheetTitle className="sr-only">More navigation</SheetTitle>
               <div className="p-4 border-b border-border">
-                <h2 className="font-display text-lg font-bold">Sifu Quest</h2>
+                <h2 className="font-display text-lg font-bold">{BRAND_EMOJIS.primary} {BRAND_NAME}</h2>
               </div>
               <div className="flex-1 p-3 overflow-y-auto">
                 <NavLinks items={selectMobileSecondaryNavItems()} onNavigate={() => setOpen(false)} />

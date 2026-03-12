@@ -1,3 +1,5 @@
+import { BRAND_EMOJIS } from './brand.ts'
+
 export type ChatSystemCode =
   | 'free_tier_exhausted'
   | 'guest_limit_reached'
@@ -12,15 +14,15 @@ export type ChatMessageMeta = {
 
 const SYSTEM_MESSAGES: Record<ChatSystemCode, string> = {
   free_tier_exhausted:
-    'Free limit reached. Visit **Settings** to add your Anthropic BYOK for unlimited AI chat usage.',
+    `${BRAND_EMOJIS.medal} Free limit reached. Visit **Settings** to add your Anthropic BYOK for unlimited Ask Sifu coaching.`,
   guest_limit_reached:
-    'Guest limit reached. Sign up, then add Anthropic BYOK in **Settings** to continue.',
+    `${BRAND_EMOJIS.trophy} Guest limit reached. Sign up, then add Anthropic BYOK in **Settings** to continue.`,
   provider_key_required:
-    'Anthropic requires BYOK. Add your key in **Settings** to continue.',
+    `${BRAND_EMOJIS.primary} Anthropic requires BYOK. Add your key in **Settings** to continue.`,
   invalid_provider_key:
-    'Your saved Anthropic key is invalid. Re-add it in **Settings** and try again.',
+    `${BRAND_EMOJIS.fist} Your saved Anthropic key is invalid. Re-add it in **Settings** and try again.`,
   chat_temporary_error:
-    'I hit a temporary issue loading your workspace. Please try again in a moment.',
+    `I hit a temporary issue loading your dojo workspace. Please try again in a moment.`,
 }
 
 export function getSystemMessage(code: ChatSystemCode): string {

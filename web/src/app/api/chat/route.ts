@@ -17,6 +17,7 @@ import {
 import { getQuotaError, incrementFreeUserMessagesUsed, shouldEnforceProviderQuota } from '@/lib/free-quota'
 import { readMemoryFiles, readModeFile } from '@/lib/memory'
 import { getEncryptedProviderApiKey, hasEncryptedProviderApiKey } from '@/lib/provider-api-keys'
+import { buildSifuMasterToneGuidelines } from '@/lib/brand'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import Anthropic from '@anthropic-ai/sdk'
@@ -319,12 +320,12 @@ async function buildSystemPrompt(
   mode: string | undefined,
   isGreeting: boolean | undefined,
 ): Promise<string> {
-  let systemPrompt = 'You are Sifu, a helpful mastery coach.'
+  let systemPrompt = `You are Sifu, the master coach for coding and programming.\n\n${buildSifuMasterToneGuidelines()}`
   const modeConfig = MODE_TO_FILES[mode || 'dsa']
 
   if (!modeConfig) {
     if (isGreeting) {
-      systemPrompt += '\n\n---\n## Greeting Instruction\n\nThe user just opened this mastery mode. Write a warm, concise welcome (2-4 sentences). Use a neutral greeting. End with one open question to kick off the session.'
+      systemPrompt += '\n\n---\n## Greeting Instruction\n\nThe user just opened this mastery mode. Write a warm, concise welcome (2-4 sentences) in Sifu tone. End with one open question to kick off the session.'
     }
     return systemPrompt
   }
@@ -337,6 +338,7 @@ async function buildSystemPrompt(
   if (modeContent) {
     systemPrompt = modeContent
   }
+  systemPrompt += `\n\n---\n${buildSifuMasterToneGuidelines()}`
 
   const memoryParts: string[] = []
   const profileContent = memoryByFile['profile.md'] ?? ''
@@ -375,7 +377,7 @@ async function buildSystemPrompt(
     const enrichmentInstruction = enrichmentQuestion
       ? `After the welcome, ask exactly one onboarding enrichment question: "${enrichmentQuestion}" Do not ask additional questions in the same message.`
       : 'End with one open question to kick off the session.'
-    systemPrompt += `\n\n---\n## Greeting Instruction\n\nThe user just opened this mastery mode. Write a warm, concise welcome (2-4 sentences). ${nameInstruction} Reference their past progress from memory if relevant. ${enrichmentInstruction}`
+    systemPrompt += `\n\n---\n## Greeting Instruction\n\nThe user just opened this mastery mode. Write a warm, concise welcome (2-4 sentences) in Sifu tone. ${nameInstruction} Reference their past progress from memory if relevant. ${enrichmentInstruction}`
   }
 
   return systemPrompt
