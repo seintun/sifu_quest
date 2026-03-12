@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/s
 import { useAuthStatus } from '@/context/AuthStatusContext'
 import { performSignOut } from '@/lib/auth-signout'
 import { BRAND_EMOJIS, BRAND_NAME, NAV_COPY } from '@/lib/brand'
+import { BetaBadge } from '@/components/ui/beta-badge'
 import {
   selectMobilePrimaryNavItems,
   selectMobileSecondaryNavItems,
@@ -230,7 +231,10 @@ export function Sidebar() {
       className="hidden md:flex w-64 flex-col fixed inset-y-0 left-0 bg-surface border-r border-border z-30"
     >
       <div className="p-4 border-b border-border">
-        <h1 className="font-display text-lg font-bold text-violet-200">{BRAND_NAME}</h1>
+        <h1 className="font-display text-lg font-bold text-violet-200">
+          {BRAND_NAME}
+          <BetaBadge className="ml-2 align-middle text-[8px] h-4" />
+        </h1>
         <p className="text-xs text-muted-foreground mt-0.5">{NAV_COPY.dashboardHint}</p>
       </div>
       <div className="flex-1 overflow-y-auto p-3">

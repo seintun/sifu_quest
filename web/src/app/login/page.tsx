@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { BRAND_EMOJIS, BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
+import { BetaBadge } from "@/components/ui/beta-badge";
 import { DOMAIN_COLORS } from "@/lib/theme";
 import { BookOpen, Compass, Shield } from "lucide-react";
 import { redirect } from "next/navigation";
@@ -41,6 +42,7 @@ export default async function LoginPage() {
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-7xl font-display font-bold tracking-tight text-foreground">
               {BRAND_NAME}
+              <BetaBadge className="ml-3 align-middle text-[8px] h-4" />
             </h1>
             <p className="mt-2 md:mt-4 text-sm sm:text-base md:text-lg text-muted-foreground max-w-md leading-relaxed">
               {BRAND_TAGLINE}. Train with Sifu guidance across DSA, system
