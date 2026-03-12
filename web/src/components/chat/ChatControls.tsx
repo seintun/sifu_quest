@@ -22,7 +22,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getAnthropicModelCostTier, getProviderModelTips } from '@/lib/chat-provider-config'
 import type { ChatModelGroupOption, ChatModelOption, ChatProviderOption } from '@/hooks/useChat'
-import { Briefcase, Coins, Lightbulb, LockKeyhole, Medal, MessageSquare, Network, Settings2, Sparkles, Trash2, Trophy } from 'lucide-react'
+import { Briefcase, ChevronDown, ChevronRight, Coins, Lightbulb, LockKeyhole, Medal, MessageSquare, Network, Settings2, Sparkles, Trash2, Trophy } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
@@ -203,6 +203,13 @@ function stopSelectTypeaheadEvent(event: React.KeyboardEvent<HTMLInputElement>) 
   event.stopPropagation()
 }
 
+function isGroupExpandedByDefault(provider: 'openrouter' | 'anthropic', groupId: string): boolean {
+  if (provider === 'openrouter') {
+    return groupId === 'recommended'
+  }
+  return true
+}
+
 function ControlsBody({
   providers,
   selectedProvider,
@@ -227,24 +234,29 @@ function ControlsBody({
   const selectedModeOption = useMemo(() => modes.find((mode) => mode.value === selectedMode), [modes, selectedMode])
   const showOpenRouterRanking = selectedProvider === 'openrouter'
   const [modelSearch, setModelSearch] = useState('')
+  const [expandedModelGroups, setExpandedModelGroups] = useState<Record<string, boolean>>({})
   const filteredModelGroups = useMemo(() => {
-    if (!modelGroups || modelGroups.length === 0) {
-      return [] as ChatModelGroupOption[]
+    const groups = modelGroups && modelGroups.length > 0
+      ? modelGroups
+      : [{ id: 'all', label: 'Models', models, hasMore: false }]
+    if (groups.length === 0) {
+      return [] as Array<ChatModelGroupOption & { hasMore?: boolean }>
     }
     const query = modelSearch.trim().toLowerCase()
     if (!query) {
-      return modelGroups
+      return groups
     }
-    return modelGroups
+    return groups
       .map((group) => ({
         ...group,
         models: group.models.filter((model) => model.id.toLowerCase().includes(query) || model.label.toLowerCase().includes(query)),
       }))
       .filter((group) => group.models.length > 0)
-  }, [modelGroups, modelSearch])
+  }, [modelGroups, modelSearch, models])
   const selectedTier = selectedModelOption?.provider === 'anthropic'
     ? getAnthropicModelCostTier(selectedModelOption.id)
     : null
+  const hasModelSearch = modelSearch.trim().length > 0
 
   return (
     <div className="grid gap-3">
@@ -317,39 +329,59 @@ function ControlsBody({
               )}
             </div>
             <div className="max-h-[min(72vh,42rem)] overflow-y-auto overscroll-contain px-1 pb-1">
-              {(filteredModelGroups.length > 0 ? filteredModelGroups : [{ id: 'all', label: 'Models', models }]).map((group) => (
-                <SelectGroup key={group.id}>
-                  <SelectLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">{group.label}</SelectLabel>
-                  {group.models.map((model) => {
-                    const modelTier = model.provider === 'anthropic' ? getAnthropicModelCostTier(model.id) : null
-                    return (
-                      <SelectItem key={`${group.id}-${model.id}`} value={model.id} disabled={model.availability !== 'available'}>
-                        <ModelOptionContent
-                          label={model.label}
-                          recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
-                          tier={modelTier}
-                          isFree={selectedProvider === 'openrouter' ? model.isFree : false}
-                          showRanking={showOpenRouterRanking}
-                        />
-                      </SelectItem>
-                    )
-                  })}
-                  {group.id === 'all' && group.hasMore && selectedProvider === 'openrouter' && onLoadAllOpenRouterModels && (
-                    <div className="px-2 py-1.5">
-                      <Button
+              {filteredModelGroups.map((group) => {
+                const isExpanded = hasModelSearch
+                  || (expandedModelGroups[group.id] ?? isGroupExpandedByDefault(selectedProvider, group.id))
+                return (
+                  <SelectGroup key={group.id}>
+                    <SelectLabel className="px-1">
+                      <button
                         type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 w-full text-xs"
-                        onClick={onLoadAllOpenRouterModels}
-                        disabled={isLoadingOpenRouterAllModels}
+                        className="inline-flex w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-[11px] uppercase tracking-wide text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={(event) => {
+                          event.preventDefault()
+                          setExpandedModelGroups((prev) => ({ ...prev, [group.id]: !isExpanded }))
+                        }}
                       >
-                        {isLoadingOpenRouterAllModels ? 'Loading models...' : 'Load full OpenRouter catalog'}
-                      </Button>
-                    </div>
-                  )}
-                </SelectGroup>
-              ))}
+                        <span className="inline-flex items-center gap-1.5">
+                          {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                          {group.label}
+                        </span>
+                        <span className="text-[10px] normal-case text-muted-foreground/80">{group.models.length}</span>
+                      </button>
+                    </SelectLabel>
+                    {isExpanded && group.models.map((model) => {
+                      const modelTier = model.provider === 'anthropic' ? getAnthropicModelCostTier(model.id) : null
+                      return (
+                        <SelectItem key={`${group.id}-${model.id}`} value={model.id} disabled={model.availability !== 'available'}>
+                          <ModelOptionContent
+                            label={model.label}
+                            recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
+                            tier={modelTier}
+                            isFree={selectedProvider === 'openrouter' ? model.isFree : false}
+                            showRanking={showOpenRouterRanking}
+                          />
+                        </SelectItem>
+                      )
+                    })}
+                    {isExpanded && group.id === 'all' && group.hasMore && selectedProvider === 'openrouter' && onLoadAllOpenRouterModels && (
+                      <div className="px-2 py-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 w-full text-xs"
+                          onClick={onLoadAllOpenRouterModels}
+                          disabled={isLoadingOpenRouterAllModels}
+                        >
+                          {isLoadingOpenRouterAllModels ? 'Loading models...' : 'Load full OpenRouter catalog'}
+                        </Button>
+                      </div>
+                    )}
+                  </SelectGroup>
+                )
+              })}
             </div>
           </SelectContent>
         </Select>
@@ -401,6 +433,7 @@ function ControlsBody({
 
 export function DesktopChatControls(props: SharedControlProps) {
   const [desktopModelSearch, setDesktopModelSearch] = useState('')
+  const [desktopExpandedModelGroups, setDesktopExpandedModelGroups] = useState<Record<string, boolean>>({})
   const selectedDesktopProvider = props.providers.find((provider) => provider.id === props.selectedProvider)
   const selectedDesktopModel = props.models.find((model) => model.id === props.selectedModel)
   const selectedDesktopMode = props.modes.find((mode) => mode.value === props.selectedMode)
@@ -408,7 +441,7 @@ export function DesktopChatControls(props: SharedControlProps) {
   const desktopFilteredModelGroups = useMemo(() => {
     const groups = props.modelGroups && props.modelGroups.length > 0
       ? props.modelGroups
-      : [{ id: 'all', label: 'Models', models: props.models }]
+      : [{ id: 'all', label: 'Models', models: props.models, hasMore: false }]
     const query = desktopModelSearch.trim().toLowerCase()
     if (!query) return groups
     return groups
@@ -421,6 +454,7 @@ export function DesktopChatControls(props: SharedControlProps) {
   const selectedDesktopTier = selectedDesktopModel?.provider === 'anthropic'
     ? getAnthropicModelCostTier(selectedDesktopModel.id)
     : null
+  const hasDesktopModelSearch = desktopModelSearch.trim().length > 0
 
   return (
     <div className="hidden xl:flex items-center gap-2">
@@ -474,39 +508,59 @@ export function DesktopChatControls(props: SharedControlProps) {
               )}
             </div>
             <div className="max-h-[min(72vh,42rem)] overflow-y-auto overscroll-contain px-1 pb-1">
-              {desktopFilteredModelGroups.map((group) => (
-                <SelectGroup key={group.id}>
-                  <SelectLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">{group.label}</SelectLabel>
-                  {group.models.map((model) => {
-                    const modelTier = model.provider === 'anthropic' ? getAnthropicModelCostTier(model.id) : null
-                    return (
-                      <SelectItem key={`${group.id}-${model.id}`} value={model.id} disabled={model.availability !== 'available'}>
-                        <ModelOptionContent
-                          label={model.label}
-                          recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
-                          tier={modelTier}
-                          isFree={props.selectedProvider === 'openrouter' ? model.isFree : false}
-                          showRanking={showOpenRouterRanking}
-                        />
-                      </SelectItem>
-                    )
-                  })}
-                  {group.id === 'all' && group.hasMore && props.selectedProvider === 'openrouter' && props.onLoadAllOpenRouterModels && (
-                    <div className="px-2 py-1.5">
-                      <Button
+              {desktopFilteredModelGroups.map((group) => {
+                const isExpanded = hasDesktopModelSearch
+                  || (desktopExpandedModelGroups[group.id] ?? isGroupExpandedByDefault(props.selectedProvider, group.id))
+                return (
+                  <SelectGroup key={group.id}>
+                    <SelectLabel className="px-1">
+                      <button
                         type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 w-full text-xs"
-                        onClick={props.onLoadAllOpenRouterModels}
-                        disabled={props.isLoadingOpenRouterAllModels}
+                        className="inline-flex w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-[11px] uppercase tracking-wide text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={(event) => {
+                          event.preventDefault()
+                          setDesktopExpandedModelGroups((prev) => ({ ...prev, [group.id]: !isExpanded }))
+                        }}
                       >
-                        {props.isLoadingOpenRouterAllModels ? 'Loading models...' : 'Load full OpenRouter catalog'}
-                      </Button>
-                    </div>
-                  )}
-                </SelectGroup>
-              ))}
+                        <span className="inline-flex items-center gap-1.5">
+                          {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                          {group.label}
+                        </span>
+                        <span className="text-[10px] normal-case text-muted-foreground/80">{group.models.length}</span>
+                      </button>
+                    </SelectLabel>
+                    {isExpanded && group.models.map((model) => {
+                      const modelTier = model.provider === 'anthropic' ? getAnthropicModelCostTier(model.id) : null
+                      return (
+                        <SelectItem key={`${group.id}-${model.id}`} value={model.id} disabled={model.availability !== 'available'}>
+                          <ModelOptionContent
+                            label={model.label}
+                            recommendationRank={showOpenRouterRanking ? model.recommendationRank : undefined}
+                            tier={modelTier}
+                            isFree={props.selectedProvider === 'openrouter' ? model.isFree : false}
+                            showRanking={showOpenRouterRanking}
+                          />
+                        </SelectItem>
+                      )
+                    })}
+                    {isExpanded && group.id === 'all' && group.hasMore && props.selectedProvider === 'openrouter' && props.onLoadAllOpenRouterModels && (
+                      <div className="px-2 py-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 w-full text-xs"
+                          onClick={props.onLoadAllOpenRouterModels}
+                          disabled={props.isLoadingOpenRouterAllModels}
+                        >
+                          {props.isLoadingOpenRouterAllModels ? 'Loading models...' : 'Load full OpenRouter catalog'}
+                        </Button>
+                      </div>
+                    )}
+                  </SelectGroup>
+                )
+              })}
             </div>
         </SelectContent>
       </Select>

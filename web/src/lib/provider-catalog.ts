@@ -302,6 +302,7 @@ export async function buildProviderCatalog(
   const openRouterModelsForDropdown = includeAll
     ? filteredOpenRouterModels
     : filteredOpenRouterModels.slice(0, OPENROUTER_ALL_MODELS_INITIAL_LIMIT)
+  const openRouterFreeModelsForDropdown = openRouterModelsForDropdown.filter((model) => model.isFree)
 
   const anthropicModels = ANTHROPIC_MODEL_CATALOG.map<ChatModelDescriptor>((model) => ({
     id: model.id,
@@ -336,6 +337,11 @@ export async function buildProviderCatalog(
           id: 'recommended',
           label: 'Recommended for Coding',
           models: recommendedOpenRouterModels,
+        },
+        {
+          id: 'free',
+          label: 'Free Models',
+          models: openRouterFreeModelsForDropdown,
         },
         {
           id: 'all',
