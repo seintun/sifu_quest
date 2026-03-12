@@ -3,7 +3,7 @@
 import type { FreeQuota, SessionUsageMetrics, ChatProviderOption } from '@/hooks/useChat'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 
 type StatusStripProps = {
   freeQuota: FreeQuota | null
@@ -24,6 +24,7 @@ export function StatusStrip({
   isExpanded,
   onToggle,
 }: StatusStripProps) {
+  const detailsId = useId()
   const DetailsIcon = isExpanded ? ChevronUp : ChevronDown
 
   const summaryLabel = useMemo(() => {
@@ -59,6 +60,8 @@ export function StatusStrip({
         type="button"
         variant="ghost"
         onClick={onToggle}
+        aria-expanded={isExpanded}
+        aria-controls={detailsId}
         className="h-auto w-full justify-between rounded-md px-1.5 py-1 text-xs text-foreground/95 hover:bg-background/20"
       >
         <span className="inline-flex items-center gap-1.5 min-w-0 text-left">
@@ -72,7 +75,7 @@ export function StatusStrip({
       </Button>
 
       {isExpanded && (
-        <div className="mt-1 space-y-1 text-xs text-foreground/90 px-1">
+        <div id={detailsId} className="mt-1 space-y-1 text-xs text-foreground/90 px-1">
           {freeQuota?.isFreeTier && selectedProvider === 'openrouter' && (
             <div className="px-1.5 py-1">
               <div className="flex items-center justify-between gap-2 font-medium">

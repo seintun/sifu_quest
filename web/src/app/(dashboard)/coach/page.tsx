@@ -471,7 +471,7 @@ export default function CoachPage() {
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
                 data-testid="conversation-scroll"
-                className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-3 pb-28 md:p-4 md:pb-32"
+                className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-3 pb-28 md:px-4 md:pt-4 md:pb-32"
               >
                 <ConversationList
                   messages={messages}
