@@ -12,7 +12,7 @@ import {
 import { extractFreeModelIdsFromRankingPayload } from './openrouter-ranking-utils'
 
 const OPENROUTER_MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models'
-const OPENROUTER_PROGRAMMING_RANKINGS_URL = 'https://openrouter.ai/rankings?category=programming#categories'
+const OPENROUTER_PROGRAMMING_RANKINGS_FETCH_URL = 'https://openrouter.ai/rankings?category=programming'
 const OPENROUTER_CATALOG_TTL_MS = 5 * 60 * 1000
 const OPENROUTER_RANKINGS_TTL_MS = 30 * 60 * 1000
 
@@ -91,7 +91,7 @@ async function fetchOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch
   }
 
   try {
-    const rscResponse = await fetchImpl(OPENROUTER_PROGRAMMING_RANKINGS_URL, {
+    const rscResponse = await fetchImpl(OPENROUTER_PROGRAMMING_RANKINGS_FETCH_URL, {
       ...fetchOptions,
       signal: AbortSignal.timeout(3500),
       headers: { RSC: '1' },
@@ -103,7 +103,7 @@ async function fetchOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch
       if (extracted.length > 0) return extracted
     }
 
-    const htmlResponse = await fetchImpl(OPENROUTER_PROGRAMMING_RANKINGS_URL, {
+    const htmlResponse = await fetchImpl(OPENROUTER_PROGRAMMING_RANKINGS_FETCH_URL, {
       ...fetchOptions,
       signal: AbortSignal.timeout(3500),
     })
@@ -114,7 +114,7 @@ async function fetchOpenRouterProgrammingRanking(fetchImpl: typeof fetch = fetch
     const payload = await htmlResponse.text()
     return extractFreeModelIdsFromRankingPayload(payload)
   } catch (error) {
-    console.warn('OpenRouter programming ranking fetch failed; using static ranking fallback', error)
+    console.warn('OpenRouter programming ranking fetch failed; returning empty ranking list and keeping default catalog order', error)
     return []
   }
 }

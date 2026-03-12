@@ -426,8 +426,11 @@ export default function OnboardingPage() {
                   }
                 }}
               />
-              <p className="text-xs text-muted-foreground" aria-live="polite">
-                {isGeneratingName ? 'New dojo name generated.' : 'Need inspiration? Roll for a dojo name.'}
+              <p className="text-xs text-muted-foreground">
+                Need inspiration? Roll for a dojo name.
+              </p>
+              <p className="sr-only" aria-live="polite">
+                {isGeneratingName ? 'New dojo name generated.' : ''}
               </p>
             </div>
           )}

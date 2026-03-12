@@ -58,12 +58,6 @@ type AccountUsage = {
 
 type FlashMessage = { text: string; type: 'success' | 'error' } | null
 
-type OnboardingStateResponse = {
-  onboarding: {
-    status: 'not_started' | 'in_progress' | 'core_complete' | 'enriched_complete'
-  }
-}
-
 export default function SettingsPage() {
   return (
     <Suspense fallback={<div className="p-8 text-muted-foreground">Loading settings...</div>}>
@@ -142,7 +136,7 @@ function SettingsPageContent() {
 
   const { data: accountData, mutate: mutateAccountStatus, isLoading: isAccountStatusLoading, error: accountSwrError } = useSWR('/api/account/status', fetcher)
   const { data: usageData, mutate: mutateUsage, isLoading: isUsageLoading } = useSWR('/api/account/usage', fetcher)
-  const { data: onboardingData, mutate: mutateOnboarding } = useSWR('/api/onboarding/status?kick=true', fetcher)
+  const { mutate: mutateOnboarding } = useSWR('/api/onboarding/status?kick=true', fetcher)
 
   const accountStatus = accountData?.account as AccountStatus | undefined
   const accountStatusError = accountData?.error || accountSwrError?.message || ''
@@ -150,8 +144,6 @@ function SettingsPageContent() {
 
   const usage = usageData as AccountUsage | undefined
   const usageError = usageData?.message || usageData?.error || ''
-
-  const onboardingState = onboardingData as OnboardingStateResponse | undefined
 
   function runDojoNameRollEffect(): void {
     setIsGeneratingName(true)
@@ -447,8 +439,11 @@ function SettingsPageContent() {
                   isGeneratingName && 'border-primary/60 shadow-[0_0_0_3px_hsl(var(--ring)/0.18)]',
                 )}
               />
-              <p className="text-xs text-muted-foreground" aria-live="polite">
-                {isGeneratingName ? 'New dojo name generated.' : 'Click generate to roll a new dojo name.'}
+              <p className="text-xs text-muted-foreground">
+                Click generate to roll a new dojo name.
+              </p>
+              <p className="sr-only" aria-live="polite">
+                {isGeneratingName ? 'New dojo name generated.' : ''}
               </p>
             </div>
             <div className="flex items-center gap-2">

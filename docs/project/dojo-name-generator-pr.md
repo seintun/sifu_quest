@@ -1,6 +1,8 @@
 ## Summary
 
-Adds a lightweight dojo-style random name generator for profile naming flows. Users can generate names like "Curious Monkey" in onboarding and settings, with accessible micro-interactions (dice icon spin, input highlight pulse, and polite live-region feedback).
+Adds two shipped scopes in one PR:
+- Dojo profile name generation in onboarding/settings with accessible micro-interactions.
+- OpenRouter programming ranking integration for model ordering and ranking badges in chat controls, plus related UI refinements.
 
 ## Proposal / Design Links
 
@@ -17,12 +19,15 @@ Users lacked fast, on-theme name inspiration during onboarding/profile setup, le
 - Add explicit "Generate Dojo Name" controls in onboarding and settings.
 - Add accessibility attributes and subtle UI feedback animations.
 - Add unit tests for generator behavior and timing constants.
+- Add dynamic OpenRouter programming ranking fetch/caching and annotate/sort model options by rank.
+- Show recommendation rank badges in model selectors and tighten control layout behavior.
 
 ## Non-Goals
 
 - Persisting generator history.
 - User-customizable word banks.
 - Server-side name generation.
+- Replacing static OpenRouter fallback catalog behavior when remote endpoints fail.
 
 ## User Stories
 
