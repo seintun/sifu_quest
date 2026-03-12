@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/sheet'
 import { getAnthropicModelCostTier } from '@/lib/chat-provider-config'
 import type { ChatModelOption, ChatProviderOption } from '@/hooks/useChat'
-import { Coins, Settings2, Trash2 } from 'lucide-react'
+import { Coins, Medal, Settings2, Sparkles, Trash2, Trophy } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -45,6 +45,17 @@ function CostTierIcons({ tier }: { tier: 1 | 2 | 3 }) {
     <span className="inline-flex items-center gap-1 text-warning">
       <Coins className="h-3 w-3" />
       <span className="text-[11px] leading-none font-medium">x{tier}</span>
+    </span>
+  )
+}
+
+function RecommendationBadge({ rank }: { rank?: number }) {
+  if (!rank) return null
+  const Icon = rank === 1 ? Trophy : rank <= 3 ? Medal : Sparkles
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-primary">
+      <Icon className="h-2.5 w-2.5" />
+      <span>#{rank}</span>
     </span>
   )
 }
@@ -108,6 +119,7 @@ function ControlsBody({
                 <span className="inline-flex items-center gap-1.5">
                   <span>{selectedModelOption.label}</span>
                   {selectedTier && <CostTierIcons tier={selectedTier} />}
+                  <RecommendationBadge rank={selectedModelOption.recommendationRank} />
                 </span>
               ) : 'Model'}
             </SelectValue>
@@ -120,6 +132,7 @@ function ControlsBody({
                   <span className="inline-flex items-center gap-1.5">
                     <span>{model.label}</span>
                     {modelTier && <CostTierIcons tier={modelTier} />}
+                    <RecommendationBadge rank={model.recommendationRank} />
                   </span>
                 </SelectItem>
               )
@@ -178,6 +191,7 @@ export function DesktopChatControls(props: SharedControlProps) {
                 <span className="inline-flex items-center gap-1.5">
                   <span>{model.label}</span>
                   {modelTier && <CostTierIcons tier={modelTier} />}
+                  <RecommendationBadge rank={model.recommendationRank} />
                 </span>
               </SelectItem>
             )

@@ -12,6 +12,7 @@ export type ChatModelDescriptor = {
   provider: ChatProvider;
   isFree: boolean;
   availability: ModelAvailability;
+  recommendationRank?: number;
   reason?: string;
 };
 
