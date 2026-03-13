@@ -103,20 +103,21 @@ function toErrorCode(error: unknown): string {
     return 'identity_mismatch'
   }
   
-  // Anthropic API specific errors
-  if (error instanceof Anthropic.APIError) {
-    if (error.status === 401) return 'anthropic_auth_error'
-    if (error.status === 429) return 'anthropic_rate_limit'
-    if (error.status === 400) return 'anthropic_invalid_request'
-    if (error.status && error.status >= 500) return 'anthropic_server_error'
-    return `anthropic_error_${error.status || 'unknown'}`
+  // Generic provider error detection based on status codes (Anthropic, OpenAI, etc.)
+  const status = (error as any)?.status || (error as any)?.statusCode
+  if (typeof status === 'number') {
+    if (status === 401) return 'provider_auth_error'
+    if (status === 429) return 'provider_rate_limit'
+    if (status === 400 || status === 422) return 'provider_invalid_request'
+    if (status >= 500) return 'provider_server_error'
   }
 
   if (error instanceof Error) {
-    if (error.message.includes('ANTHROPIC_API_KEY')) {
-      return 'planner_env_missing'
+    const msg = error.message.toUpperCase()
+    if (msg.includes('API_KEY')) {
+      return 'provider_env_missing'
     }
-    return 'plan_generation_failed'
+    return 'provider_generation_failed'
   }
   return 'unknown_error'
 }
@@ -305,25 +306,26 @@ Format as clean markdown suitable for rendering.`
 }
 
 async function createPlanContent(data: LegacyOnboardingPayload): Promise<string> {
+  const provider = 'Anthropic' // Hardcoded for now, but ready for parameterization
   assertRequiredEnv(['ANTHROPIC_API_KEY'])
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   
-  console.log(`[createPlanContent] Initiating plan generation for ${data.name}...`)
+  console.log(`[createPlanContent] [${provider}] Initiating plan generation for ${data.name}...`)
   
   try {
     const response = await client.messages.create({
-      model: 'claude-3-5-sonnet-20241022', // Standardized to correct 3.5 Sonnet model ID
+      model: 'claude-3-5-sonnet-20241022', // Fixed model ID (reverted by user previously)
       max_tokens: 2048,
       messages: [{ role: 'user', content: buildPlanPrompt(data) }],
     })
-    console.log(`[createPlanContent] Successfully generated plan content for ${data.name}`)
+    console.log(`[createPlanContent] [${provider}] Successfully generated plan content for ${data.name}`)
     return (response.content[0] as { type: 'text'; text: string }).text
   } catch (error) {
-    console.error(`[createPlanContent] Error calling Anthropic API for ${data.name}:`, error)
-    if (error instanceof Anthropic.APIError) {
-      console.error(`Status code: ${error.status}, Type: ${error.type}`)
+    console.error(`[createPlanContent] [${provider}] Error calling API for ${data.name}:`, error)
+    if ((error as any)?.status) {
+      console.error(`Status code: ${(error as any).status}`)
     }
-    throw error // Re-throw to be caught by runPlanJobForUser
+    throw error 
   }
 }
 
