@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { ONBOARDING_SCHEMA_VERSION } from './onboarding-v2'
+import { GUEST_SESSION_EXPIRY_MS } from './quota'
 import { createAdminClient } from './supabase-admin'
 
 export type UserProfileState = {
@@ -53,7 +54,7 @@ export function isAnonymousSessionEmail(email?: string | null): boolean {
 }
 
 function getGuestExpiryISOString(): string {
-  return new Date(Date.now() + 30 * 60 * 1000).toISOString()
+  return new Date(Date.now() + GUEST_SESSION_EXPIRY_MS).toISOString()
 }
 
 export async function ensureUserProfile(userId: string, sessionEmail?: string | null): Promise<UserProfileState> {
