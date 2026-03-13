@@ -30,6 +30,7 @@ import {
 } from "@/lib/dojo-title";
 import { fetcher } from "@/lib/fetcher";
 import { startGuestGoogleUpgrade } from "@/lib/guest-upgrade";
+import { GuestExpiryBanner } from "@/components/dashboard/GuestExpiryBanner";
 import { getOnboardingPrefillName } from "@/lib/onboarding-name";
 import { validateFullName } from "@/lib/profile-name";
 import { cn } from "@/lib/utils";
@@ -529,11 +530,13 @@ function SettingsPageContent() {
                   : glassCardClass
               }
             >
-              <CardHeader className="space-y-2">
-                <CardTitle className="flex items-center gap-2">
-                  <UserRound className="h-4 w-4 text-streak" />
-                  {isGuest ? "Guest Session" : "Your Account"}
-                </CardTitle>
+              <CardHeader className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <UserRound className="h-4 w-4 text-streak" />
+                    {isGuest ? "Guest Session" : "Your Account"}
+                  </CardTitle>
+                </div>
                 <CardDescription>
                   {isGuest
                     ? "You're browsing as a guest. Your progress is saved temporarily — it will be lost if you sign out without linking Google."
@@ -541,26 +544,8 @@ function SettingsPageContent() {
                       ? `Signed in as ${accountStatus.displayName}.`
                       : "Signed in with Google."}
                 </CardDescription>
+                {isGuest && <GuestExpiryBanner variant="banner" onSignOut={handleSignOutClick} />}
               </CardHeader>
-              <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                {isGuest && (
-                  <Button
-                    onClick={handleLinkGoogle}
-                    disabled={isAccountStatusLoading}
-                    className="w-full sm:w-auto"
-                  >
-                    Link Google Account
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  className="flex w-full items-center gap-2 border-danger/30 text-danger hover:bg-danger/5 hover:text-danger sm:w-auto"
-                  onClick={handleSignOutClick}
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sign Out
-                </Button>
-              </CardContent>
             </Card>
           )}
 

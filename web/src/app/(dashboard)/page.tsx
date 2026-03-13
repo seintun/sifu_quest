@@ -1,12 +1,10 @@
 'use client'
 
 import { DashboardHero } from '@/components/dashboard/DashboardHero'
-import {
-  DashboardOnboardingPrompt,
-  type EnrichmentPromptKey,
-} from '@/components/dashboard/DashboardOnboardingPrompt'
+import { DashboardOnboardingPrompt, type EnrichmentPromptKey } from '@/components/dashboard/DashboardOnboardingPrompt'
 import { DashboardLaunchpad } from '@/components/dashboard/DashboardLaunchpad'
 import { DashboardProgress } from '@/components/dashboard/DashboardProgress'
+import { GuestExpiryBanner } from '@/components/dashboard/GuestExpiryBanner'
 import { Card, CardContent } from '@/components/ui/card'
 import { fetcher } from '@/lib/fetcher'
 import type { DashboardMetrics } from '@/lib/metrics'
@@ -270,10 +268,15 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
-
+      
       <DashboardHero metrics={metrics} overallPlanPct={overallPlanPct} />
 
-      <DashboardOnboardingPrompt
+      <div className="-mt-1.5 focus-within:relative">
+        <GuestExpiryBanner />
+      </div>
+
+      <div className="-mt-1.5">
+        <DashboardOnboardingPrompt
         planStatus={planStatus}
         activePrompt={activePrompt}
         activePromptOptions={activePromptOptions}
@@ -286,6 +289,7 @@ export default function DashboardPage() {
         onCustomFieldChange={(field, value) => setEnrichmentDraft((prev) => ({ ...prev, [field]: value }))}
         onSave={() => void saveEnrichmentPrompt()}
       />
+    </div>
 
       <DashboardLaunchpad />
       <DashboardProgress metrics={metrics} planLabel={planLabel} />
