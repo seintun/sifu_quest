@@ -34,6 +34,7 @@ export async function GET() {
         isAnonymousSession,
         isLinked: !profile.is_guest,
         displayName: profile.display_name,
+        guestExpiresAt: profile.guest_expires_at,
         hasProviderKey: entitlements.providerKeys,
         defaultProvider: profile.default_provider,
         defaultModel: profile.default_model,

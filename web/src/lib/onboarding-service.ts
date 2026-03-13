@@ -102,11 +102,22 @@ function toErrorCode(error: unknown): string {
   if (error instanceof MemoryWriteError && error.dbCode === '23503') {
     return 'identity_mismatch'
   }
+  
+  // Generic provider error detection based on status codes (Anthropic, OpenAI, etc.)
+  const status = (error as any)?.status || (error as any)?.statusCode
+  if (typeof status === 'number') {
+    if (status === 401) return 'provider_auth_error'
+    if (status === 429) return 'provider_rate_limit'
+    if (status === 400 || status === 422) return 'provider_invalid_request'
+    if (status >= 500) return 'provider_server_error'
+  }
+
   if (error instanceof Error) {
-    if (error.message.includes('ANTHROPIC_API_KEY')) {
-      return 'planner_env_missing'
+    const msg = error.message.toUpperCase()
+    if (msg.includes('API_KEY')) {
+      return 'provider_env_missing'
     }
-    return 'plan_generation_failed'
+    return 'provider_generation_failed'
   }
   return 'unknown_error'
 }
@@ -295,14 +306,27 @@ Format as clean markdown suitable for rendering.`
 }
 
 async function createPlanContent(data: LegacyOnboardingPayload): Promise<string> {
-  assertRequiredEnv(['ANTHROPIC_API_KEY'])
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 2048,
-    messages: [{ role: 'user', content: buildPlanPrompt(data) }],
-  })
-  return (response.content[0] as { type: 'text'; text: string }).text
+  const provider = 'Anthropic' // Hardcoded for now, but ready for parameterization
+  assertRequiredEnv(['SIFU_ANTHROPIC_API_KEY'])
+  const client = new Anthropic({ apiKey: process.env.SIFU_ANTHROPIC_API_KEY })
+  
+  console.log(`[createPlanContent] [${provider}] Initiating plan generation...`)
+  
+  try {
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: buildPlanPrompt(data) }],
+    })
+    console.log(`[createPlanContent] [${provider}] Successfully generated plan content`)
+    return (response.content[0] as { type: 'text'; text: string }).text
+  } catch (error) {
+    console.error(`[createPlanContent] [${provider}] Error calling API:`, error)
+    if ((error as any)?.status) {
+      console.error(`Status code: ${(error as any).status}`)
+    }
+    throw error 
+  }
 }
 
 export async function persistCoreOnboardingFiles(
@@ -353,6 +377,7 @@ export async function queueOnboardingPlanJob(
       attempt_count: 0,
       available_at: now,
       last_error_code: null,
+      last_error_details: null,
       updated_at: now,
       completed_at: null,
     })
@@ -378,6 +403,7 @@ export async function queueOnboardingPlanJob(
       attempt_count: 0,
       available_at: now,
       last_error_code: null,
+      last_error_details: null,
       updated_at: now,
       completed_at: null,
     })
@@ -418,6 +444,7 @@ export async function queueOnboardingPlanJob(
         attempt_count: 0,
         available_at: now,
         last_error_code: null,
+        last_error_details: null,
         updated_at: now,
         completed_at: null,
       },
@@ -440,6 +467,7 @@ export async function markOnboardingPlanQueued(userId: string): Promise<void> {
     .update({
       onboarding_plan_status: 'queued',
       onboarding_plan_error_code: null,
+      onboarding_plan_error_details: null,
       onboarding_plan_retries: 0,
       onboarding_plan_last_attempt_at: null,
       last_active_at: now,
@@ -559,7 +587,7 @@ export async function loadOnboardingState(userId: string): Promise<{
   const supabaseAdmin = createAdminClient()
   const { data, error } = await supabaseAdmin
     .from('user_profiles')
-    .select('onboarding_version, onboarding_status, onboarding_completion_percent, onboarding_next_prompt_key, onboarding_draft, onboarding_plan_status, onboarding_plan_error_code')
+    .select('onboarding_version, onboarding_status, onboarding_completion_percent, onboarding_next_prompt_key, onboarding_draft, onboarding_plan_status, onboarding_plan_error_code, onboarding_plan_error_details')
     .eq('id', userId)
     .maybeSingle()
 
@@ -583,6 +611,7 @@ export async function loadOnboardingState(userId: string): Promise<{
     plan: {
       status: (data?.onboarding_plan_status as OnboardingPlanPayload['status']) ?? 'not_queued',
       lastErrorCode: data?.onboarding_plan_error_code ?? null,
+      errorDetails: data?.onboarding_plan_error_details ?? null,
     },
     draft,
   }
@@ -658,6 +687,7 @@ async function markPlanJobFailure(
   userId: string,
   attemptCount: number,
   errorCode: string,
+  errorDetails: Record<string, unknown> | null = null,
 ): Promise<void> {
   const supabaseAdmin = createAdminClient()
   const now = new Date().toISOString()
@@ -670,6 +700,7 @@ async function markPlanJobFailure(
       status: retryState.nextStatus,
       attempt_count: attemptCount,
       last_error_code: errorCode,
+      last_error_details: errorDetails,
       available_at: retryState.availableAtIso,
       updated_at: now,
     })
@@ -693,6 +724,7 @@ async function markPlanJobFailure(
     .update({
       onboarding_plan_status: exhausted ? 'failed' : 'queued',
       onboarding_plan_error_code: errorCode,
+      onboarding_plan_error_details: errorDetails,
       onboarding_plan_retries: attemptCount,
       onboarding_plan_last_attempt_at: now,
       last_active_at: now,
@@ -818,7 +850,22 @@ async function runPlanJobForUser(userId: string): Promise<boolean> {
     await markPlanJobSuccess(userId, nextAttempt)
     return true
   } catch (error) {
-    await markPlanJobFailure(userId, nextAttempt, toErrorCode(error))
+    const errorCode = toErrorCode(error)
+    const errorDetails = {
+      message: error instanceof Error ? error.message : String(error),
+      provider: 'Anthropic', // Parametrize later if needed
+      timestamp: new Date().toISOString(),
+      status: (error as any)?.status || (error as any)?.statusCode || null,
+    }
+
+    console.error(`[onboarding-service] Plan generation JOB FAILED for user ${userId}:`)
+    console.error(`Error Code: ${errorCode}`)
+    console.error(`Full Error:`, error)
+    if (error instanceof Error && error.stack) {
+      console.error(`Stack trace:`, error.stack)
+    }
+    
+    await markPlanJobFailure(userId, nextAttempt, errorCode, errorDetails)
     return true
   }
 }

@@ -10,6 +10,7 @@ type AccountStatus = {
   isLinked: boolean
   displayName: string | null
   avatarUrl: string | null
+  guestExpiresAt: string | null
 }
 
 type AuthStatusContextValue = {

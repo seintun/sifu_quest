@@ -4,7 +4,8 @@ const INFRA_ENV_KEYS = [
   'SUPABASE_SERVICE_ROLE_KEY',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
-  'ANTHROPIC_API_KEY',
+  'SIFU_ANTHROPIC_API_KEY',
+  'SIFU_OPENROUTER_API_KEY',
   'API_KEY_ENCRYPTION_SECRET',
   'NEXTAUTH_SECRET',
   'NEXTAUTH_URL',
@@ -16,7 +17,7 @@ export class MissingEnvironmentVariableError extends Error {
   missingKeys: string[]
 
   constructor(missingKeys: string[]) {
-    super('Server configuration is incomplete.')
+    super(`Server configuration is incomplete. Missing keys: ${missingKeys.join(', ')}`)
     this.name = 'MissingEnvironmentVariableError'
     this.missingKeys = missingKeys
   }

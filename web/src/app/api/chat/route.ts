@@ -762,7 +762,7 @@ export async function POST(request: NextRequest) {
       }
       providerApiKey = decrypted
     } else {
-      const sharedOpenRouterKey = process.env.OPENROUTER_API_KEY?.trim() ?? ''
+      const sharedOpenRouterKey = process.env.SIFU_OPENROUTER_API_KEY?.trim() ?? ''
       const canFallbackToSharedFreeModel = sharedOpenRouterKey.length > 0 && isOpenRouterFreeModel(resolvedModel)
 
       if (encryptedOpenRouterKey && !decryptedOpenRouterKey && !canFallbackToSharedFreeModel) {

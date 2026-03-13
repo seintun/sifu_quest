@@ -41,7 +41,7 @@ A visual dashboard shows your current streak, DSA patterns mastered, system desi
 ### 🔒 Your Data, Your Keys
 - **Free mode** uses a shared server OpenRouter key for users without a personal key (guest or signed-in): **10 user messages**
 - **Provider BYOK** — add your own OpenRouter and/or Anthropic API keys in **Settings**
-- **Infrastructure secrets** (`Supabase`, `Google OAuth`, shared `OPENROUTER_API_KEY`) are env-only (`.env.local` or Vercel env vars)
+- **Infrastructure secrets** (`Supabase`, `Google OAuth`, shared `SIFU_OPENROUTER_API_KEY`) are env-only (`.env.local` or Vercel env vars)
 - **Personal provider keys** are encrypted before storage per user in Supabase, plaintext keys are never stored or logged
 - **Server-side encryption secret** (`API_KEY_ENCRYPTION_SECRET`) is managed by app operators only; end users never provide it
 - **GDPR compliant** — delete your account and all data with one click

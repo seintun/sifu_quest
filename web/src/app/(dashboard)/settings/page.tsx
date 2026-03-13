@@ -30,6 +30,7 @@ import {
 } from "@/lib/dojo-title";
 import { fetcher } from "@/lib/fetcher";
 import { startGuestGoogleUpgrade } from "@/lib/guest-upgrade";
+import { GuestExpiryBanner } from "@/components/dashboard/GuestExpiryBanner";
 import { getOnboardingPrefillName } from "@/lib/onboarding-name";
 import { validateFullName } from "@/lib/profile-name";
 import { cn } from "@/lib/utils";
@@ -37,7 +38,6 @@ import {
   Dice5,
   KeyRound,
   Loader2,
-  LogOut,
   ShieldAlert,
   ShieldCheck,
   UserRound,
@@ -396,16 +396,6 @@ function SettingsPageContent() {
     }
   };
 
-  const handleLinkGoogle = async () => {
-    const result = await startGuestGoogleUpgrade(window.location.origin);
-    if (!result.ok) {
-      setMessage({
-        text: `Failed to link account: ${result.error}`,
-        type: "error",
-      });
-    }
-  };
-
   const handleGuestUpgradeFromDialog = async () => {
     setIsUpgrading(true);
     const result = await startGuestGoogleUpgrade(window.location.origin);
@@ -529,11 +519,24 @@ function SettingsPageContent() {
                   : glassCardClass
               }
             >
-              <CardHeader className="space-y-2">
-                <CardTitle className="flex items-center gap-2">
-                  <UserRound className="h-4 w-4 text-streak" />
-                  {isGuest ? "Guest Session" : "Your Account"}
-                </CardTitle>
+              <CardHeader className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <UserRound className="h-4 w-4 text-streak" />
+                    {isGuest ? "Guest Session" : "Your Account"}
+                  </CardTitle>
+                  {!isGuest && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      onClick={handleSignOutClick}
+                    >
+                      <LogOut className="h-3.5 w-3.5" />
+                      <span>Sign out</span>
+                    </Button>
+                  )}
+                </div>
                 <CardDescription>
                   {isGuest
                     ? "You're browsing as a guest. Your progress is saved temporarily — it will be lost if you sign out without linking Google."
@@ -541,26 +544,13 @@ function SettingsPageContent() {
                       ? `Signed in as ${accountStatus.displayName}.`
                       : "Signed in with Google."}
                 </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 {isGuest && (
-                  <Button
-                    onClick={handleLinkGoogle}
-                    disabled={isAccountStatusLoading}
-                    className="w-full sm:w-auto"
-                  >
-                    Link Google Account
-                  </Button>
+                  <GuestExpiryBanner
+                    variant="banner"
+                    onSignOut={handleSignOutClick}
+                  />
                 )}
-                <Button
-                  variant="outline"
-                  className="flex w-full items-center gap-2 border-danger/30 text-danger hover:bg-danger/5 hover:text-danger sm:w-auto"
-                  onClick={handleSignOutClick}
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sign Out
-                </Button>
-              </CardContent>
+              </CardHeader>
             </Card>
           )}
 
