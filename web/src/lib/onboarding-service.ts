@@ -297,12 +297,18 @@ Format as clean markdown suitable for rendering.`
 async function createPlanContent(data: LegacyOnboardingPayload): Promise<string> {
   assertRequiredEnv(['ANTHROPIC_API_KEY'])
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 2048,
-    messages: [{ role: 'user', content: buildPlanPrompt(data) }],
-  })
-  return (response.content[0] as { type: 'text'; text: string }).text
+  
+  try {
+    const response = await client.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: buildPlanPrompt(data) }],
+    })
+    return (response.content[0] as { type: 'text'; text: string }).text
+  } catch (error) {
+    console.error('[createPlanContent] Error calling Anthropic API:', error)
+    throw error // Re-throw to be caught by runPlanJobForUser and recorded as plan_generation_failed
+  }
 }
 
 export async function persistCoreOnboardingFiles(
