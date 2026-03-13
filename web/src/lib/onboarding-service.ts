@@ -102,6 +102,16 @@ function toErrorCode(error: unknown): string {
   if (error instanceof MemoryWriteError && error.dbCode === '23503') {
     return 'identity_mismatch'
   }
+  
+  // Anthropic API specific errors
+  if (error instanceof Anthropic.APIError) {
+    if (error.status === 401) return 'anthropic_auth_error'
+    if (error.status === 429) return 'anthropic_rate_limit'
+    if (error.status === 400) return 'anthropic_invalid_request'
+    if (error.status && error.status >= 500) return 'anthropic_server_error'
+    return `anthropic_error_${error.status || 'unknown'}`
+  }
+
   if (error instanceof Error) {
     if (error.message.includes('ANTHROPIC_API_KEY')) {
       return 'planner_env_missing'
@@ -298,16 +308,22 @@ async function createPlanContent(data: LegacyOnboardingPayload): Promise<string>
   assertRequiredEnv(['ANTHROPIC_API_KEY'])
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   
+  console.log(`[createPlanContent] Initiating plan generation for ${data.name}...`)
+  
   try {
     const response = await client.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-3-5-sonnet-20241022', // Standardized to correct 3.5 Sonnet model ID
       max_tokens: 2048,
       messages: [{ role: 'user', content: buildPlanPrompt(data) }],
     })
+    console.log(`[createPlanContent] Successfully generated plan content for ${data.name}`)
     return (response.content[0] as { type: 'text'; text: string }).text
   } catch (error) {
-    console.error('[createPlanContent] Error calling Anthropic API:', error)
-    throw error // Re-throw to be caught by runPlanJobForUser and recorded as plan_generation_failed
+    console.error(`[createPlanContent] Error calling Anthropic API for ${data.name}:`, error)
+    if (error instanceof Anthropic.APIError) {
+      console.error(`Status code: ${error.status}, Type: ${error.type}`)
+    }
+    throw error // Re-throw to be caught by runPlanJobForUser
   }
 }
 
@@ -824,7 +840,15 @@ async function runPlanJobForUser(userId: string): Promise<boolean> {
     await markPlanJobSuccess(userId, nextAttempt)
     return true
   } catch (error) {
-    await markPlanJobFailure(userId, nextAttempt, toErrorCode(error))
+    const errorCode = toErrorCode(error)
+    console.error(`[onboarding-service] Plan generation JOB FAILED for user ${userId}:`)
+    console.error(`Error Code: ${errorCode}`)
+    console.error(`Full Error:`, error)
+    if (error instanceof Error && error.stack) {
+      console.error(`Stack trace:`, error.stack)
+    }
+    
+    await markPlanJobFailure(userId, nextAttempt, errorCode)
     return true
   }
 }
