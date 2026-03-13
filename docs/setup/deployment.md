@@ -40,8 +40,8 @@ Go to **Settings → Environment Variables** and add each variable:
 | `NEXT_PUBLIC_SUPABASE_URL`             | Supabase dashboard → Settings → API  | Production, Preview |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase dashboard → Settings → API  | Production, Preview |
 | `SUPABASE_SERVICE_ROLE_KEY`            | Supabase dashboard → Settings → API  | Production, Preview |
-| `OPENROUTER_API_KEY`                   | OpenRouter Keys                      | Production, Preview |
-| `ANTHROPIC_API_KEY`                    | Anthropic Console → API Keys         | Production, Preview |
+| `SIFU_OPENROUTER_API_KEY`               | OpenRouter Keys                      | Production, Preview |
+| `SIFU_ANTHROPIC_API_KEY`                | Anthropic Console → API Keys         | Production, Preview |
 | `API_KEY_ENCRYPTION_SECRET`            | `openssl rand -hex 32`               | Production, Preview |
 | `NEXTAUTH_SECRET`                      | `openssl rand -base64 32`            | Production, Preview |
 | `NEXTAUTH_URL`                         | Your Vercel URL                      | Production          |

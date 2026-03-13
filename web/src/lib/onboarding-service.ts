@@ -307,14 +307,14 @@ Format as clean markdown suitable for rendering.`
 
 async function createPlanContent(data: LegacyOnboardingPayload): Promise<string> {
   const provider = 'Anthropic' // Hardcoded for now, but ready for parameterization
-  assertRequiredEnv(['ANTHROPIC_API_KEY'])
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  assertRequiredEnv(['SIFU_ANTHROPIC_API_KEY'])
+  const client = new Anthropic({ apiKey: process.env.SIFU_ANTHROPIC_API_KEY })
   
   console.log(`[createPlanContent] [${provider}] Initiating plan generation for ${data.name}...`)
   
   try {
     const response = await client.messages.create({
-      model: 'claude-3-5-sonnet-20241022', // Fixed model ID (reverted by user previously)
+      model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       messages: [{ role: 'user', content: buildPlanPrompt(data) }],
     })
@@ -377,6 +377,7 @@ export async function queueOnboardingPlanJob(
       attempt_count: 0,
       available_at: now,
       last_error_code: null,
+      last_error_details: null,
       updated_at: now,
       completed_at: null,
     })
@@ -402,6 +403,7 @@ export async function queueOnboardingPlanJob(
       attempt_count: 0,
       available_at: now,
       last_error_code: null,
+      last_error_details: null,
       updated_at: now,
       completed_at: null,
     })
@@ -442,6 +444,7 @@ export async function queueOnboardingPlanJob(
         attempt_count: 0,
         available_at: now,
         last_error_code: null,
+        last_error_details: null,
         updated_at: now,
         completed_at: null,
       },
@@ -464,6 +467,7 @@ export async function markOnboardingPlanQueued(userId: string): Promise<void> {
     .update({
       onboarding_plan_status: 'queued',
       onboarding_plan_error_code: null,
+      onboarding_plan_error_details: null,
       onboarding_plan_retries: 0,
       onboarding_plan_last_attempt_at: null,
       last_active_at: now,
@@ -583,7 +587,7 @@ export async function loadOnboardingState(userId: string): Promise<{
   const supabaseAdmin = createAdminClient()
   const { data, error } = await supabaseAdmin
     .from('user_profiles')
-    .select('onboarding_version, onboarding_status, onboarding_completion_percent, onboarding_next_prompt_key, onboarding_draft, onboarding_plan_status, onboarding_plan_error_code')
+    .select('onboarding_version, onboarding_status, onboarding_completion_percent, onboarding_next_prompt_key, onboarding_draft, onboarding_plan_status, onboarding_plan_error_code, onboarding_plan_error_details')
     .eq('id', userId)
     .maybeSingle()
 
@@ -607,6 +611,7 @@ export async function loadOnboardingState(userId: string): Promise<{
     plan: {
       status: (data?.onboarding_plan_status as OnboardingPlanPayload['status']) ?? 'not_queued',
       lastErrorCode: data?.onboarding_plan_error_code ?? null,
+      errorDetails: data?.onboarding_plan_error_details ?? null,
     },
     draft,
   }
@@ -682,6 +687,7 @@ async function markPlanJobFailure(
   userId: string,
   attemptCount: number,
   errorCode: string,
+  errorDetails: Record<string, any> | null = null,
 ): Promise<void> {
   const supabaseAdmin = createAdminClient()
   const now = new Date().toISOString()
@@ -694,6 +700,7 @@ async function markPlanJobFailure(
       status: retryState.nextStatus,
       attempt_count: attemptCount,
       last_error_code: errorCode,
+      last_error_details: errorDetails,
       available_at: retryState.availableAtIso,
       updated_at: now,
     })
@@ -717,6 +724,7 @@ async function markPlanJobFailure(
     .update({
       onboarding_plan_status: exhausted ? 'failed' : 'queued',
       onboarding_plan_error_code: errorCode,
+      onboarding_plan_error_details: errorDetails,
       onboarding_plan_retries: attemptCount,
       onboarding_plan_last_attempt_at: now,
       last_active_at: now,
@@ -843,6 +851,14 @@ async function runPlanJobForUser(userId: string): Promise<boolean> {
     return true
   } catch (error) {
     const errorCode = toErrorCode(error)
+    const errorDetails = {
+      message: error instanceof Error ? error.message : String(error),
+      provider: 'Anthropic', // Parametrize later if needed
+      timestamp: new Date().toISOString(),
+      status: (error as any)?.status || (error as any)?.statusCode || null,
+      stack: error instanceof Error ? error.stack?.split('\n').slice(0, 3).join('\n') : null, // Truncated for DB space
+    }
+
     console.error(`[onboarding-service] Plan generation JOB FAILED for user ${userId}:`)
     console.error(`Error Code: ${errorCode}`)
     console.error(`Full Error:`, error)
@@ -850,7 +866,7 @@ async function runPlanJobForUser(userId: string): Promise<boolean> {
       console.error(`Stack trace:`, error.stack)
     }
     
-    await markPlanJobFailure(userId, nextAttempt, errorCode)
+    await markPlanJobFailure(userId, nextAttempt, errorCode, errorDetails)
     return true
   }
 }

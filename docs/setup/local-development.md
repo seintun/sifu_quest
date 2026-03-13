@@ -122,7 +122,7 @@ OpenRouter powers shared free-tier chat. Anthropic is optional for server-side A
 | Console Field | Environment Variable |
 | ------------- | -------------------- |
 | **OpenRouter API Key** | `OPENROUTER_API_KEY` |
-| **Anthropic API Key** *(optional for local dev)* | `ANTHROPIC_API_KEY` |
+| **Anthropic API Key** *(optional for local dev)* | `SIFU_ANTHROPIC_API_KEY` |
 
 > 💡 **Note:** `OPENROUTER_API_KEY` powers shared free-tier chat for guests and signed-in free users (current rollout limit: **10 user messages**). Users can add personal provider keys (OpenRouter and/or Anthropic) in Settings to access more models.
 
@@ -218,7 +218,7 @@ SUPABASE_SERVICE_ROLE_KEY=<paste-local-service-role-key>
 
 # ── LLM Provider Keys ──
 OPENROUTER_API_KEY=sk-or-v1-...
-ANTHROPIC_API_KEY=sk-ant-api03-...
+SIFU_ANTHROPIC_API_KEY=sk-ant-api03-...
 
 # ── App Secrets ──
 API_KEY_ENCRYPTION_SECRET=<paste-your-32-byte-hex>
@@ -291,7 +291,7 @@ npm run build
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`  | ✅       | ✅          | Supabase Dashboard    |
 | `SUPABASE_SERVICE_ROLE_KEY`             | ✅       | ❌          | Supabase Dashboard    |
 | `OPENROUTER_API_KEY`                    | ✅       | ❌          | OpenRouter Keys       |
-| `ANTHROPIC_API_KEY`                     | ✅       | ❌          | Anthropic Console     |
+| `SIFU_ANTHROPIC_API_KEY`                | ✅       | ❌          | Anthropic Console     |
 | `API_KEY_ENCRYPTION_SECRET`             | ✅       | ❌          | `openssl rand -hex 32`|
 | `NEXTAUTH_SECRET`                       | ✅       | ❌          | `openssl rand -base64 32` |
 | `NEXTAUTH_URL`                          | ✅       | ❌          | Your app URL          |

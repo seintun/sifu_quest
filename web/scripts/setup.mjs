@@ -77,15 +77,15 @@ async function main() {
   }
 
   // API key
-  if (!envVars.ANTHROPIC_API_KEY) {
-    console.log(c('  No ANTHROPIC_API_KEY found in web/.env.local.', YELLOW))
+  if (!envVars.SIFU_ANTHROPIC_API_KEY) {
+    console.log(c('  No SIFU_ANTHROPIC_API_KEY found in web/.env.local.', YELLOW))
     const apiKey = await rl.question(c('  Enter your Anthropic API key: ', BOLD))
     if (!apiKey.trim()) {
       console.log(c('\n  API key is required. Exiting.\n', YELLOW))
       rl.close()
       process.exit(1)
     }
-    envVars.ANTHROPIC_API_KEY = apiKey.trim()
+    envVars.SIFU_ANTHROPIC_API_KEY = apiKey.trim()
     console.log()
   }
 
@@ -154,7 +154,7 @@ async function main() {
   // ── Phase 4: Claude interview ─────────────────────────────────────────────────
 
   const { default: Anthropic } = await import('@anthropic-ai/sdk')
-  const client = new Anthropic({ apiKey: envVars.ANTHROPIC_API_KEY })
+  const client = new Anthropic({ apiKey: envVars.SIFU_ANTHROPIC_API_KEY })
 
   console.log(c("  Let's learn a bit about you so Claude can be a better thinking partner.", DIM))
   console.log(c('  Answer naturally — this should take about 5 minutes.', DIM))

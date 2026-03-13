@@ -6,7 +6,7 @@ export const runtime = 'nodejs'
 // Returns a stable AES-256 key derived from the API key.
 // Never persisted in the browser — only held in memory per page load.
 export async function GET() {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.SIFU_ANTHROPIC_API_KEY
   if (!apiKey) {
     return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
   }

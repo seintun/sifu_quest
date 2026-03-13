@@ -267,6 +267,7 @@ export interface OnboardingStatusPayload {
 export interface OnboardingPlanPayload {
   status: PlanStatus
   lastErrorCode: string | null
+  errorDetails?: Record<string, any> | null
 }
 
 export class OnboardingValidationError extends Error {
