@@ -38,14 +38,14 @@ export function GuestExpiryBanner({ variant = 'banner', onSignOut }: GuestExpiry
   const [isUpgrading, setIsUpgrading] = useState(false)
 
   const guestExpiresAt = accountStatus?.guestExpiresAt
+  const expiresAtMs = guestExpiresAt ? new Date(guestExpiresAt).getTime() : NaN
 
   useEffect(() => {
-    if (!guestExpiresAt) return
+    if (!Number.isFinite(expiresAtMs)) return
 
     const calculateTimeLeft = () => {
-      const expiresAt = new Date(guestExpiresAt).getTime()
       const now = new Date().getTime()
-      const diff = expiresAt - now
+      const diff = expiresAtMs - now
 
       if (diff <= 0) {
         return 'Expired'
@@ -66,15 +66,15 @@ export function GuestExpiryBanner({ variant = 'banner', onSignOut }: GuestExpiry
     }, 60000)
 
     return () => clearInterval(timer)
-  }, [guestExpiresAt])
+  }, [expiresAtMs])
 
-  if (!isGuest || !guestExpiresAt) return null
+  if (!isGuest || !guestExpiresAt || !Number.isFinite(expiresAtMs)) return null
 
   const formattedExpiry = new Intl.DateTimeFormat(undefined, {
     hour: 'numeric',
     minute: 'numeric',
     timeZoneName: 'short',
-  }).format(new Date(guestExpiresAt))
+  }).format(new Date(expiresAtMs))
 
   const handleUpgrade = async () => {
     setIsUpgrading(true)
