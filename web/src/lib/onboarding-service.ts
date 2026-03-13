@@ -310,7 +310,7 @@ async function createPlanContent(data: LegacyOnboardingPayload): Promise<string>
   assertRequiredEnv(['SIFU_ANTHROPIC_API_KEY'])
   const client = new Anthropic({ apiKey: process.env.SIFU_ANTHROPIC_API_KEY })
   
-  console.log(`[createPlanContent] [${provider}] Initiating plan generation for ${data.name}...`)
+  console.log(`[createPlanContent] [${provider}] Initiating plan generation...`)
   
   try {
     const response = await client.messages.create({
@@ -318,10 +318,10 @@ async function createPlanContent(data: LegacyOnboardingPayload): Promise<string>
       max_tokens: 2048,
       messages: [{ role: 'user', content: buildPlanPrompt(data) }],
     })
-    console.log(`[createPlanContent] [${provider}] Successfully generated plan content for ${data.name}`)
+    console.log(`[createPlanContent] [${provider}] Successfully generated plan content`)
     return (response.content[0] as { type: 'text'; text: string }).text
   } catch (error) {
-    console.error(`[createPlanContent] [${provider}] Error calling API for ${data.name}:`, error)
+    console.error(`[createPlanContent] [${provider}] Error calling API:`, error)
     if ((error as any)?.status) {
       console.error(`Status code: ${(error as any).status}`)
     }
@@ -687,7 +687,7 @@ async function markPlanJobFailure(
   userId: string,
   attemptCount: number,
   errorCode: string,
-  errorDetails: Record<string, any> | null = null,
+  errorDetails: Record<string, unknown> | null = null,
 ): Promise<void> {
   const supabaseAdmin = createAdminClient()
   const now = new Date().toISOString()
