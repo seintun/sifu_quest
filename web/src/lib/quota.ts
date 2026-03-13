@@ -1,1 +1,2 @@
-export const FREE_TIER_MAX_USER_MESSAGES = 10 // User turns on the shared free-tier key
+const envLimit = Number(process.env.NEXT_PUBLIC_FREE_TIER_MAX_MESSAGES)
+export const FREE_TIER_MAX_USER_MESSAGES = isNaN(envLimit) ? 25 : envLimit
