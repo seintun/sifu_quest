@@ -37,6 +37,7 @@ export interface ParsedPlan {
     headers: string[]
     rows: DashboardEntry[]
   }
+  weeklyRhythm: WeeklyRhythmEntry[]
   months: MonthSection[]
   redFlags: Array<{ symptom: string; fix: string }>
   immediateSteps: PlanItem[]
@@ -51,6 +52,7 @@ export function parsePlan(content: string): ParsedPlan {
   const metadata: PlanMetadata[] = []
   const dashboardHeaders: string[] = []
   const dashboardRows: DashboardEntry[] = []
+  const weeklyRhythm: WeeklyRhythmEntry[] = []
   const months: MonthSection[] = []
   const redFlags: Array<{ symptom: string; fix: string }> = []
   const immediateSteps: PlanItem[] = []
@@ -64,10 +66,13 @@ export function parsePlan(content: string): ParsedPlan {
   // Parse state
   let inDashboardTable = false
   let dashboardHeaderPassed = false
+  let inWeeklyRhythmTable = false
+  let weeklyRhythmHeaderPassed = false
+  let weeklyRhythmHeaders: string[] = []
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim()
-    if (!line && !inDashboardTable) continue
+    if (!line && !inDashboardTable && !inWeeklyRhythmTable) continue
 
     // Title: # Title
     const titleMatch = line.match(/^# (.+)/)
@@ -80,6 +85,45 @@ export function parsePlan(content: string): ParsedPlan {
     const metaMatch = line.match(/^>\s*\*\*([^:]+):\*\*\s*(.+)$/)
     if (metaMatch && currentSection === '') {
       metadata.push({ key: metaMatch[1].trim(), value: metaMatch[2].trim() })
+      continue
+    }
+
+    // Weekly Rhythm section header
+    if (line.match(/^##\s+Weekly Rhythm/i)) {
+      currentSection = 'weeklyrhythm'
+      inWeeklyRhythmTable = false
+      weeklyRhythmHeaderPassed = false
+      weeklyRhythmHeaders = []
+      continue
+    }
+
+    // Weekly Rhythm table
+    if (currentSection === 'weeklyrhythm' && line.startsWith('|') && !inWeeklyRhythmTable) {
+      const cells = line.split('|').map(c => c.trim()).filter(Boolean)
+      if (cells.length >= 2) {
+        inWeeklyRhythmTable = true
+        weeklyRhythmHeaderPassed = false
+        weeklyRhythmHeaders = cells.map(h => h.toLowerCase())
+      }
+      continue
+    }
+
+    if (inWeeklyRhythmTable) {
+      if (!line.startsWith('|')) {
+        inWeeklyRhythmTable = false
+      } else if (line.match(/^\|[:\-\s|]+\|$/)) {
+        weeklyRhythmHeaderPassed = true
+      } else if (weeklyRhythmHeaderPassed) {
+        const cells = line.split('|').map(c => c.trim()).filter(Boolean)
+        const dayIdx = weeklyRhythmHeaders.indexOf('day')
+        const focusIdx = weeklyRhythmHeaders.indexOf('focus')
+        const timeIdx = weeklyRhythmHeaders.indexOf('time')
+        weeklyRhythm.push({
+          day: cells[dayIdx >= 0 ? dayIdx : 0] || '',
+          focus: cells[focusIdx >= 0 ? focusIdx : 1] || '',
+          time: cells[timeIdx >= 0 ? timeIdx : 2] || '',
+        })
+      }
       continue
     }
 
@@ -242,6 +286,7 @@ export function parsePlan(content: string): ParsedPlan {
     title, 
     metadata, 
     dashboard: { headers: dashboardHeaders, rows: dashboardRows }, 
+    weeklyRhythm,
     months, 
     redFlags, 
     immediateSteps 
