@@ -525,6 +525,17 @@ function SettingsPageContent() {
                     <UserRound className="h-4 w-4 text-streak" />
                     {isGuest ? "Guest Session" : "Your Account"}
                   </CardTitle>
+                  {!isGuest && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      onClick={handleSignOutClick}
+                    >
+                      <LogOut className="h-3.5 w-3.5" />
+                      <span>Sign out</span>
+                    </Button>
+                  )}
                 </div>
                 <CardDescription>
                   {isGuest
@@ -533,7 +544,12 @@ function SettingsPageContent() {
                       ? `Signed in as ${accountStatus.displayName}.`
                       : "Signed in with Google."}
                 </CardDescription>
-                {isGuest && <GuestExpiryBanner variant="banner" onSignOut={handleSignOutClick} />}
+                {isGuest && (
+                  <GuestExpiryBanner
+                    variant="banner"
+                    onSignOut={handleSignOutClick}
+                  />
+                )}
               </CardHeader>
             </Card>
           )}
