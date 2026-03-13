@@ -38,6 +38,7 @@ import {
   Dice5,
   KeyRound,
   Loader2,
+  LogOut,
   ShieldAlert,
   ShieldCheck,
   UserRound,
