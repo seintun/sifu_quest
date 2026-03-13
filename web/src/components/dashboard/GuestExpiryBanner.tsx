@@ -78,8 +78,23 @@ export function GuestExpiryBanner({ variant = 'banner', onSignOut }: GuestExpiry
 
   const handleUpgrade = async () => {
     setIsUpgrading(true)
-    await startGuestGoogleUpgrade(window.location.origin)
-    setIsUpgrading(false)
+    try {
+      const result = await startGuestGoogleUpgrade(window.location.origin)
+      if (result && result.ok === false) {
+        // Handle non-successful upgrade attempt
+        console.error('Guest Google upgrade failed:', result)
+        if (typeof window !== 'undefined') {
+          window.alert('Unable to link your Google account. Please try again.')
+        }
+      }
+    } catch (error) {
+      console.error('Error during guest Google upgrade:', error)
+      if (typeof window !== 'undefined') {
+        window.alert('Something went wrong while linking your Google account. Please try again.')
+      }
+    } finally {
+      setIsUpgrading(false)
+    }
   }
 
   if (variant === 'card') {
