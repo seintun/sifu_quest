@@ -3,7 +3,7 @@
 import { useAuthStatus } from '@/context/AuthStatusContext'
 import { startGuestGoogleUpgrade } from '@/lib/guest-upgrade'
 import { cn } from '@/lib/utils'
-import { AlertCircle, Clock, User } from 'lucide-react'
+import { Clock, User } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 const GoogleIcon = () => (
