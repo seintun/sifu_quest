@@ -10,7 +10,7 @@ import type { ParsedPlan, PlanItem } from '@/lib/parsers/plan-parser'
 import { parsePlan } from '@/lib/parsers/plan-parser'
 import { DOMAIN_COLORS } from '@/lib/theme'
 import { normalizeMarkdownContent } from '@/lib/markdown-formatting'
-import { AlertTriangle, Calendar, CheckCircle2, RefreshCw, Target, LayoutDashboard, Info, Sparkles } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, RefreshCw, Target, LayoutDashboard, Info, Sparkles } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { fetcher } from '@/lib/fetcher'
@@ -120,7 +120,7 @@ function PlanActionButton({
           type="button"
           onClick={onQueuePlanRefresh}
           disabled={!canRequestRefresh || isQueueingPlanRefresh}
-          className={`inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 disabled:cursor-not-allowed disabled:opacity-50 ${className ?? ''}`}
+          className={`inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:opacity-50 ${className ?? ''}`}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${isQueueingPlanRefresh ? 'animate-spin' : ''}`} />
           {buttonLabel}
@@ -151,7 +151,7 @@ function PlanMetadataGrid({ metadata }: { metadata: { key: string; value: string
                   <Badge 
                     key={idx} 
                     variant="outline" 
-                    className="bg-elevated/40 text-[10px] py-0 px-2 h-5.5 border-border/30 text-foreground/90 font-semibold rounded-md shadow-sm ring-1 ring-inset ring-foreground/5 hover:bg-plan/10 hover:text-plan transition-colors"
+                    className="bg-elevated/40 text-[10px] py-0 px-2 h-[22px] border-border/30 text-foreground/90 font-semibold rounded-md shadow-sm ring-1 ring-inset ring-foreground/5 hover:bg-plan/10 hover:text-plan transition-colors"
                   >
                     {part}
                   </Badge>
@@ -394,7 +394,7 @@ export default function PlanPage() {
               {plan.months.map(month => {
                 const allItems = Object.values(month.categories).flat()
                 return (
-                  <TabsContent key={month.month} value={`month${month.month}`} className="space-y-4 animate-in fade-in slide-in-from-bottom-1 duration-400">
+                  <TabsContent key={month.month} value={`month${month.month}`} className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
                     <div className="relative overflow-hidden rounded-xl border border-border/30 bg-gradient-to-br from-surface to-elevated/40 p-4 sm:p-5 shadow-lg">
                       <div className="absolute top-0 right-0 p-4 text-plan/5 -mr-5 -mt-5">
                         <Sparkles className="w-24 h-24 rotate-12" />
@@ -421,7 +421,7 @@ export default function PlanPage() {
                           <Card key={category} className={`overflow-hidden border border-border/20 bg-surface/60 transition-all hover:bg-surface/80 hover:shadow-lg ${category.includes('Goals') ? 'md:col-span-2' : ''}`}>
                             <CardHeader className="py-2.5 px-4 border-b border-border/10 bg-elevated/20">
                               <CardTitle className="text-[12px] font-bold flex items-center gap-2">
-                                <div className={`p-1 rounded-md ${colors.bg} ${colors.text} shadow-sm ring-1 ${colors.border}`}>
+                                <div className={`p-1 rounded-md ${colors.bg} ${colors.text} shadow-sm border ${colors.border}`}>
                                   <CheckCircle2 className="h-3.5 w-3.5" />
                                 </div>
                                 {category}
@@ -472,7 +472,7 @@ export default function PlanPage() {
 
           {/* Red Flags */}
           {plan.redFlags.length > 0 && (
-            <Card className="border-danger/30 bg-danger/5/5 shadow-xl overflow-hidden">
+            <Card className="border-danger/30 bg-danger/5 shadow-xl overflow-hidden">
               <CardHeader className="py-2.5 px-4 bg-danger/10 border-b border-danger/20">
                 <CardTitle className="text-[12px] font-bold text-danger flex items-center gap-2">
                   <AlertTriangle className="h-3.5 w-3.5" />
