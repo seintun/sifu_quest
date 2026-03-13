@@ -10,7 +10,7 @@ import type { ParsedPlan, PlanItem } from '@/lib/parsers/plan-parser'
 import { parsePlan } from '@/lib/parsers/plan-parser'
 import { DOMAIN_COLORS } from '@/lib/theme'
 import { normalizeMarkdownContent } from '@/lib/markdown-formatting'
-import { AlertTriangle, Calendar, CheckCircle2, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Calendar, CheckCircle2, RefreshCw, Target, LayoutDashboard, Info, Sparkles } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { fetcher } from '@/lib/fetcher'
@@ -40,24 +40,15 @@ const CATEGORY_DOMAINS: Record<string, keyof typeof DOMAIN_COLORS> = {
   DSA: 'dsa',
   'System Design': 'design',
   'Job Search': 'jobs',
+  'Behavioral': 'coach',
 }
 
 type OnboardingPlanStatus = 'not_queued' | 'queued' | 'running' | 'ready' | 'failed'
 
-type OnboardingStatusResponse = {
-  plan: {
-    status: OnboardingPlanStatus
-    lastErrorCode: string | null
-  }
-}
-
 const PLAN_PLACEHOLDER_MARKER = 'being generated in the background'
 
 function shouldShowPlanStatusBanner(status: OnboardingPlanStatus | null): boolean {
-  if (!status) {
-    return false
-  }
-
+  if (!status) return false
   return status === 'not_queued' || status === 'queued' || status === 'running' || status === 'failed'
 }
 
@@ -68,10 +59,7 @@ function PlanRoadmapBadges({
   planStatus: OnboardingPlanStatus | null
   planErrorCode: string | null
 }) {
-  if (!planStatus) {
-    return null
-  }
-
+  if (!planStatus) return null
   const baseBadgeClass = 'h-6 cursor-default pointer-events-none px-2 text-[10px] font-medium'
 
   return (
@@ -82,23 +70,13 @@ function PlanRoadmapBadges({
         </Badge>
       )}
       {planStatus === 'not_queued' && (
-        <>
-          <Badge variant="outline" className={`${baseBadgeClass} border-info/40 bg-info/10 text-info`}>
-            New updates available
-          </Badge>
-          <Badge variant="outline" className={`${baseBadgeClass} border-border/60 bg-elevated/70 text-muted-foreground`}>
-            Status: Not queued
-          </Badge>
-        </>
-      )}
-      {planStatus === 'queued' && (
-        <Badge variant="outline" className={`${baseBadgeClass} border-warning/40 bg-warning/10 text-warning`}>
-          Status: Queued
+        <Badge variant="outline" className={`${baseBadgeClass} border-info/40 bg-info/10 text-info`}>
+          New updates available
         </Badge>
       )}
-      {planStatus === 'running' && (
-        <Badge variant="outline" className={`${baseBadgeClass} border-warning/40 bg-warning/10 text-warning`}>
-          Status: Running
+      {(planStatus === 'queued' || planStatus === 'running') && (
+        <Badge variant="outline" className={`${baseBadgeClass} border-warning/40 bg-warning/10 text-warning animate-pulse`}>
+          Status: {planStatus === 'queued' ? 'Queued' : 'Generating...'}
         </Badge>
       )}
       {planStatus === 'failed' && (
@@ -132,13 +110,8 @@ function PlanActionButton({
   const buttonLabel = isQueueingPlanRefresh
     ? 'Queueing update...'
     : isGenerating
-      ? 'Plan is being generated'
-      : planStatus === 'failed'
-        ? 'Retry Plan Generation'
-        : 'Generate Updated Plan'
-  const tooltipText = isGenerating
-    ? 'Plan regeneration is currently in progress. You can keep using the app while this runs.'
-    : 'Regenerates your game plan using your latest profile updates. Your checklist progress remains intact.'
+      ? 'Generating Plan'
+      : 'Refresh Game Plan'
 
   return (
     <TooltipProvider delay={180}>
@@ -147,88 +120,93 @@ function PlanActionButton({
           type="button"
           onClick={onQueuePlanRefresh}
           disabled={!canRequestRefresh || isQueueingPlanRefresh}
-          className={`inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${className ?? ''}`}
+          className={`inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-streak/60 bg-streak/20 px-3 text-xs font-semibold text-streak shadow-glow-streak transition-all duration-150 hover:-translate-y-px hover:bg-streak/30 disabled:cursor-not-allowed disabled:opacity-50 ${className ?? ''}`}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${isQueueingPlanRefresh ? 'animate-spin' : ''}`} />
           {buttonLabel}
         </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-[18rem] leading-snug">
-          {tooltipText}
+        <TooltipContent side="top" className="max-w-[18rem] bg-surface border-border/80 shadow-xl">
+          Regenerates your game plan using your latest profile updates. Progress remains intact.
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   )
 }
 
-function PlanHeader({
-  title,
-  mobileTitle,
-  subtitle,
-  planStatus,
-  planErrorCode,
-  showPlanAction,
-  canRequestRefresh,
-  isQueueingPlanRefresh,
-  onQueuePlanRefresh,
-}: {
-  title: string
-  mobileTitle: { heading: string; subtitle: string | null }
-  subtitle: string
-  planStatus: OnboardingPlanStatus | null
-  planErrorCode: string | null
-  showPlanAction: boolean
-  canRequestRefresh: boolean
-  isQueueingPlanRefresh: boolean
-  onQueuePlanRefresh: () => void
-}) {
+function PlanMetadataGrid({ metadata }: { metadata: { key: string; value: string }[] }) {
+  if (!metadata.length) return null
   return (
-    <div>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-display hidden text-2xl font-bold leading-tight sm:block">{title}</h1>
-          <h1 className="font-display text-[1.7rem] font-bold leading-tight sm:hidden">{mobileTitle.heading}</h1>
-          {mobileTitle.subtitle && <p className="mt-1 text-xs text-muted-foreground sm:hidden">{mobileTitle.subtitle}</p>}
-        </div>
-        {showPlanAction && (
-          <div className="hidden shrink-0 pt-0.5 sm:block">
-            <PlanActionButton
-              planStatus={planStatus}
-              canRequestRefresh={canRequestRefresh}
-              isQueueingPlanRefresh={isQueueingPlanRefresh}
-              onQueuePlanRefresh={onQueuePlanRefresh}
-            />
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
+      {metadata.map((item, i) => {
+        const isProfile = item.key.toLowerCase().includes('profile')
+        const parts = item.value.split('|').map(p => p.trim()).filter(Boolean)
+        const hasTags = parts.length > 1
+
+        return (
+          <div key={i} className={`flex flex-col p-2.5 rounded-xl border border-border/40 bg-surface/50 backdrop-blur-sm ${isProfile ? 'col-span-full shadow-sm' : ''}`}>
+            <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground/60 mb-1.5 ml-0.5">{item.key}</span>
+            {hasTags ? (
+              <div className="flex flex-wrap gap-1.5">
+                {parts.map((part, idx) => (
+                  <Badge 
+                    key={idx} 
+                    variant="outline" 
+                    className="bg-elevated/40 text-[10px] py-0 px-2 h-5.5 border-border/30 text-foreground/90 font-semibold rounded-md shadow-sm ring-1 ring-inset ring-foreground/5 hover:bg-plan/10 hover:text-plan transition-colors"
+                  >
+                    {part}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <span className="text-[12px] font-medium text-foreground leading-tight px-0.5 whitespace-normal break-words">{item.value}</span>
+            )}
           </div>
-        )}
-      </div>
-      <div className="mt-1 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">{subtitle}</p>
-        <PlanRoadmapBadges planStatus={planStatus} planErrorCode={planErrorCode} />
-      </div>
-      {showPlanAction && (
-        <div className="mt-2 sm:hidden">
-          <PlanActionButton
-            planStatus={planStatus}
-            canRequestRefresh={canRequestRefresh}
-            isQueueingPlanRefresh={isQueueingPlanRefresh}
-            onQueuePlanRefresh={onQueuePlanRefresh}
-            className="w-full"
-          />
-        </div>
-      )}
+        )
+      })}
     </div>
   )
 }
 
-function getMobileTitle(title: string): { heading: string; subtitle: string | null } {
-  if (title.length <= 48) {
-    return { heading: title, subtitle: null }
-  }
-
-  const truncated = title.length > 88 ? `${title.slice(0, 87).trimEnd()}...` : title
-  return {
-    heading: 'Your Game Plan',
-    subtitle: truncated,
-  }
+function PlanDashboardTable({ dashboard }: { dashboard: ParsedPlan['dashboard'] }) {
+  if (!dashboard.headers.length || !dashboard.rows.length) return null
+  return (
+    <Card className="border-border/30 bg-surface/40 backdrop-blur-md mb-4 overflow-hidden">
+      <CardHeader className="py-2 px-3 border-b border-border/20 bg-elevated/30">
+        <CardTitle className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 text-muted-foreground">
+          <LayoutDashboard className="h-3 w-3" />
+          Dashboard
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0 overflow-x-auto">
+        <table className="w-full text-[11px] text-left">
+          <thead>
+            <tr className="bg-elevated/10">
+              {dashboard.headers.map(h => (
+                <th key={h} className="px-3 py-1.5 border-r border-border/10 last:border-0 font-semibold text-muted-foreground">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/10">
+            {dashboard.rows.map((row, i) => (
+              <tr key={i} className="hover:bg-elevated/5 transition-colors">
+                {dashboard.headers.map(h => (
+                  <td key={h} className="px-3 py-1.5 border-r border-border/10 last:border-0 font-medium">
+                    {row[h].includes('🔴') || row[h].includes('🟡') || row[h].includes('🟢') ? (
+                      <Badge variant="outline" className="text-[9px] py-0 h-4 px-1 border-border/40 bg-surface">
+                        {row[h]}
+                      </Badge>
+                    ) : (
+                      row[h]
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  )
 }
 
 function PlanCheckItem({
@@ -247,15 +225,19 @@ function PlanCheckItem({
     setLoading(false)
   }
 
+  const isInfoItem = item.id.includes('-info-')
+
   return (
-    <div className="flex items-start gap-3 py-1.5">
-      <Checkbox
-        checked={item.checked}
-        onCheckedChange={handleToggle}
-        disabled={loading}
-        className="mt-0.5"
-      />
-      <div className={`text-sm ${item.checked ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+    <div className={`flex items-start gap-2 py-1 transition-opacity ${loading ? 'opacity-50' : ''}`}>
+      {!isInfoItem && (
+        <Checkbox
+          checked={item.checked}
+          onCheckedChange={handleToggle}
+          disabled={loading}
+          className="mt-1 h-3.5 w-3.5 rounded-sm border-muted-foreground/40 data-[state=checked]:bg-plan data-[state=checked]:border-plan"
+        />
+      )}
+      <div className={`text-[12px] leading-snug ${item.checked ? 'line-through text-muted-foreground/60' : 'text-foreground/90'} ${isInfoItem ? 'font-bold mt-1.5 text-foreground mb-0.5 tracking-tight' : ''}`}>
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={checklistItemMdComponents}>
           {normalizedItemText}
         </ReactMarkdown>
@@ -265,19 +247,22 @@ function PlanCheckItem({
 }
 
 function MonthProgress({ items }: { items: PlanItem[] }) {
-  const total = items.length
-  const done = items.filter(i => i.checked).length
+  const total = items.filter(i => !i.id.includes('-info-')).length
+  const done = items.filter(i => !i.id.includes('-info-') && i.checked).length
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
 
   return (
-    <div className="space-y-1.5 mb-4">
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>{done}/{total} completed</span>
-        <span>{pct}%</span>
+    <div className="space-y-1 mb-3 mt-1 p-2 px-3 rounded-lg border border-border/20 bg-elevated/20 shadow-inner">
+      <div className="flex justify-between items-center text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">
+        <span className="flex items-center gap-1">
+          <Sparkles className="h-2.5 w-2.5 text-plan" />
+          {done}/{total} Completed
+        </span>
+        <span className="text-plan">{pct}% Progress</span>
       </div>
-      <div className="h-1.5 rounded-full bg-elevated overflow-hidden">
+      <div className="h-1 rounded-full bg-surface/50 overflow-hidden ring-1 ring-border/5">
         <div
-          className="h-full rounded-full transition-all duration-500"
+          className="h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_5px_rgba(244,63,94,0.3)]"
           style={{
             width: `${pct}%`,
             background: `linear-gradient(to right, ${DOMAIN_COLORS.plan.hex}, #FB923C)`,
@@ -288,44 +273,27 @@ function MonthProgress({ items }: { items: PlanItem[] }) {
   )
 }
 
-function extractTitle(content: string): string {
-  const match = content.match(/^# (.+)/m)
-  return match ? match[1].trim() : 'My Plan'
-}
-
-function stripLeadingHeading(content: string): string {
-  return content.replace(/^# .+\n{1,2}/, '').trim()
-}
-
-function hasStructuredContent(plan: ParsedPlan): boolean {
-  return plan.months.length > 0 || plan.immediateSteps.length > 0 || (plan.weeklyRhythm?.length ?? 0) > 0
-}
-
-
-
 export default function PlanPage() {
   const [isQueueingPlanRefresh, setIsQueueingPlanRefresh] = useState(false)
   const [manualErrorCode, setManualErrorCode] = useState<string | null>(null)
 
-  // SWR automatically handles caching and deduplication
   const { data: statusData, mutate: mutateStatus } = useSWR('/api/onboarding/status', fetcher, {
     refreshInterval: (data: any) => {
       const status = data?.plan?.status
-      return status === 'queued' || status === 'running' ? 15000 : 0
+      return status === 'queued' || status === 'running' ? 10000 : 0
     }
   })
   
   const { data: rawData, mutate: mutatePlan } = useSWR('/api/memory?file=plan.md', fetcher, {
     refreshInterval: (data: any) => {
       const content = typeof data?.content === 'string' ? data.content : ''
-      const isPlaceholder = content.toLowerCase().includes(PLAN_PLACEHOLDER_MARKER)
       const status = statusData?.plan?.status
-      return status === 'queued' || status === 'running' || (isPlaceholder && status !== 'failed') ? 15000 : 0
+      return status === 'queued' || status === 'running' || (content.includes(PLAN_PLACEHOLDER_MARKER) && status !== 'failed') ? 10000 : 0
     }
   })
 
   const rawContent = typeof rawData?.content === 'string' ? rawData.content : ''
-  const plan = rawData ? parsePlan(rawContent) : null
+  const plan = useMemo(() => rawData ? parsePlan(rawContent) : null, [rawContent, rawData])
 
   const planStatus: OnboardingPlanStatus | null = statusData?.plan?.status ?? null
   const planErrorCode: string | null = manualErrorCode ?? (statusData?.plan?.lastErrorCode ?? null)
@@ -338,20 +306,13 @@ export default function PlanPage() {
   const queuePlanRefresh = useCallback(async () => {
     setIsQueueingPlanRefresh(true)
     try {
-      const res = await fetch('/api/onboarding/plan/refresh', {
-        method: 'POST',
-      })
-      const data = await res.json().catch(() => ({})) as {
-        error?: string
-        plan?: { status?: OnboardingPlanStatus }
-      }
+      const res = await fetch('/api/onboarding/plan/refresh', { method: 'POST' })
+      const data = await res.json().catch(() => ({})) as { error?: string }
       if (!res.ok) {
         setManualErrorCode(data.error ?? 'plan_refresh_failed')
         return
       }
-
       setManualErrorCode(null)
-      // Trigger immediate revalidation so the latest plan status and errors are reflected after queueing the refresh.
       void refreshPlanStatus()
     } finally {
       setIsQueueingPlanRefresh(false)
@@ -365,224 +326,177 @@ export default function PlanPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ itemId, checked }),
       })
-      if (res.ok) {
-        mutatePlan()
-      }
-    } catch {
-      // ignore
-    }
+      if (res.ok) mutatePlan()
+    } catch { /* ignore */ }
   }
 
-  const title = extractTitle(rawContent)
-  const mobileTitle = getMobileTitle(title)
+  if (!plan) return <div className="p-8"><div className="h-8 w-64 bg-muted animate-pulse rounded-md mb-4" /></div>
 
-  if (!plan) {
-    return (
-      <div className="max-w-4xl space-y-4 sm:space-y-6">
-        <div>
-          <div className="flex items-start justify-between gap-3 animate-pulse">
-            <div className="space-y-2">
-              <div className="h-8 w-64 bg-muted rounded-md" />
-              <div className="h-4 w-48 bg-muted/60 rounded-md" />
-            </div>
-            <div className="h-9 w-40 bg-muted/30 rounded-md hidden sm:block" />
-          </div>
-        </div>
-
-        <Card className="border-border bg-surface animate-pulse">
-          <CardHeader className="pb-3 border-b border-border/40">
-            <div className="h-5 w-32 bg-muted rounded" />
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-16 bg-muted/30 rounded-md" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-2 mt-4 animate-pulse">
-          <div className="h-10 w-full max-w-[400px] bg-muted/30 rounded-lg" />
-          <Card className="border-border bg-surface mt-4 h-64">
-            <CardHeader>
-              <div className="h-6 w-48 bg-muted rounded" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="h-2 w-full bg-muted/50 rounded-full" />
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex gap-3">
-                  <div className="h-4 w-4 bg-muted rounded shrink-0" />
-                  <div className="h-4 w-full bg-muted/40 rounded" />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
-  }
   const firstMonthValue = plan.months[0] ? `month${plan.months[0].month}` : ''
   const canRequestRefresh = planStatus !== null && planStatus !== 'queued' && planStatus !== 'running'
-  const showPlanStatusBanner = shouldShowPlanStatusBanner(planStatus)
-  const fallbackMarkdownContent = stripLeadingHeading(rawContent)
-  const normalizedFallbackMarkdownContent = normalizeMarkdownContent(fallbackMarkdownContent)
-
-  // AI-generated plan: fall back to markdown rendering
-  if (!hasStructuredContent(plan)) {
-    return (
-      <div className="max-w-4xl space-y-4 sm:space-y-6">
-        <PlanHeader
-          title={title}
-          mobileTitle={mobileTitle}
-          subtitle="Your personalized roadmap"
-          planStatus={planStatus}
-          planErrorCode={planErrorCode}
-          showPlanAction={showPlanStatusBanner}
-          canRequestRefresh={canRequestRefresh}
-          isQueueingPlanRefresh={isQueueingPlanRefresh}
-          onQueuePlanRefresh={() => void queuePlanRefresh()}
-        />
-        {fallbackMarkdownContent ? (
-          <Card className="border-border bg-surface mt-8 sm:mt-10 p-6 py-8 sm:p-10 sm:py-12">
-            <CardContent className="p-0 [&>*:first-child]:!mt-0">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-                {normalizedFallbackMarkdownContent}
-              </ReactMarkdown>
-            </CardContent>
-          </Card>
-        ) : (
-          <p className="text-muted-foreground text-sm">No plan yet. Complete onboarding to generate your personalized game plan.</p>
-        )}
-      </div>
-    )
-  }
+  const isStructured = plan.months.length > 0 || plan.immediateSteps.length > 0
+  const normalizedFallbackContent = normalizeMarkdownContent(rawContent.replace(/^# .+\n{1,2}/, '').trim())
 
   return (
-    <div className="max-w-4xl space-y-4 sm:space-y-6">
-      <PlanHeader
-        title={title}
-        mobileTitle={mobileTitle}
-        subtitle="Your structured roadmap to interview success"
-        planStatus={planStatus}
-        planErrorCode={planErrorCode}
-        showPlanAction={showPlanStatusBanner}
-        canRequestRefresh={canRequestRefresh}
-        isQueueingPlanRefresh={isQueueingPlanRefresh}
-        onQueuePlanRefresh={() => void queuePlanRefresh()}
-      />
+    <div className="max-w-4xl mx-auto space-y-4 pb-10">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 border-b border-border/20 pb-4 mb-4">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <Badge variant="outline" className="bg-plan/10 text-plan border-plan/20 text-[9px] font-bold h-4 px-1 uppercase tracking-wider">Roadmap</Badge>
+            <PlanRoadmapBadges planStatus={planStatus} planErrorCode={planErrorCode} />
+          </div>
+          <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">{plan.title}</h1>
+          <p className="text-[12px] text-muted-foreground flex items-center gap-1.5">
+            <Target className="h-3.5 w-3.5 text-streak" />
+            Your architected path to interview mastery
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          {shouldShowPlanStatusBanner(planStatus) && (
+            <PlanActionButton
+              planStatus={planStatus}
+              canRequestRefresh={canRequestRefresh}
+              isQueueingPlanRefresh={isQueueingPlanRefresh}
+              onQueuePlanRefresh={() => void queuePlanRefresh()}
+            />
+          )}
+        </div>
+      </div>
 
-      {/* Weekly Rhythm */}
-      {plan.weeklyRhythm?.length > 0 && (
-        <Card className="border-border bg-surface">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-streak" />
-              Weekly Rhythm
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-              {plan.weeklyRhythm.map(entry => (
-                <div key={entry.day} className="bg-elevated rounded-md p-2 text-center text-xs">
-                  <p className="font-medium text-foreground">{entry.day}</p>
-                  <p className="text-muted-foreground mt-0.5 truncate">{entry.focus}</p>
-                  <p className="text-dim text-[10px] mt-0.5">{entry.time}</p>
-                </div>
-              ))}
+      <PlanMetadataGrid metadata={plan.metadata} />
+      <PlanDashboardTable dashboard={plan.dashboard} />
+
+      {!isStructured ? (
+        <Card className="border-border/30 bg-surface p-6 sm:p-8 shadow-2xl">
+          <CardContent className="p-0 [&>*:first-child]:!mt-0 prose prose-invert prose-sm max-w-none">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+              {normalizedFallbackContent}
+            </ReactMarkdown>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-6">
+          {/* Month Tabs */}
+          {plan.months.length > 0 && (
+            <Tabs defaultValue={firstMonthValue} className="w-full">
+              <TabsList className="bg-elevated/50 p-0.5 rounded-lg mb-2 h-9 ring-1 ring-border/20">
+                {plan.months.map(month => (
+                  <TabsTrigger 
+                    key={month.month} 
+                    value={`month${month.month}`}
+                    className="rounded-md px-4 text-xs data-[state=active]:bg-surface data-[state=active]:shadow-md data-[state=active]:text-plan"
+                  >
+                    Month {month.month}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {plan.months.map(month => {
+                const allItems = Object.values(month.categories).flat()
+                return (
+                  <TabsContent key={month.month} value={`month${month.month}`} className="space-y-4 animate-in fade-in slide-in-from-bottom-1 duration-400">
+                    <div className="relative overflow-hidden rounded-xl border border-border/30 bg-gradient-to-br from-surface to-elevated/40 p-4 sm:p-5 shadow-lg">
+                      <div className="absolute top-0 right-0 p-4 text-plan/5 -mr-5 -mt-5">
+                        <Sparkles className="w-24 h-24 rotate-12" />
+                      </div>
+                      <div className="relative z-10">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-plan block mb-1">Focus</span>
+                        <h2 className="text-lg font-bold text-foreground mb-2 sm:text-xl tracking-tight">{month.title}</h2>
+                        {month.theme && (
+                          <div className="flex items-start gap-2.5 p-2 px-3 rounded-lg bg-surface/80 border border-border/40 shadow-sm">
+                            <Info className="h-4 w-4 text-plan shrink-0 mt-0.5" />
+                            <p className="text-[12px] leading-relaxed text-muted-foreground italic">&ldquo;{month.theme}&rdquo;</p>
+                          </div>
+                        )}
+                      </div>
+                      <MonthProgress items={allItems} />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {Object.entries(month.categories).map(([category, items]) => {
+                        const domain = CATEGORY_DOMAINS[category] || CATEGORY_DOMAINS[Object.keys(CATEGORY_DOMAINS).find(k => category.includes(k)) || ''] || 'streak'
+                        const colors = DOMAIN_COLORS[domain]
+
+                        return (
+                          <Card key={category} className={`overflow-hidden border border-border/20 bg-surface/60 transition-all hover:bg-surface/80 hover:shadow-lg ${category.includes('Goals') ? 'md:col-span-2' : ''}`}>
+                            <CardHeader className="py-2.5 px-4 border-b border-border/10 bg-elevated/20">
+                              <CardTitle className="text-[12px] font-bold flex items-center gap-2">
+                                <div className={`p-1 rounded-md ${colors.bg} ${colors.text} shadow-sm ring-1 ${colors.border}`}>
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                </div>
+                                {category}
+                                <Badge variant="outline" className="ml-auto text-[9px] h-5 border-border/40 bg-surface/50 font-bold tracking-tighter">
+                                  {items.filter(i => !i.id.includes('-info-') && i.checked).length}/{items.filter(i => !i.id.includes('-info-')).length}
+                                </Badge>
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="py-2 px-4">
+                              <div className="space-y-0">
+                                {items.map(item => (
+                                  <PlanCheckItem key={item.id} item={item} onToggle={handleToggle} />
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )
+                      })}
+                    </div>
+                  </TabsContent>
+                )
+              })}
+            </Tabs>
+          )}
+
+          {/* Immediate Steps */}
+          {plan.immediateSteps.length > 0 && (
+            <div className="pt-2">
+              <Card className="border-streak/40 bg-gradient-to-br from-streak/10 to-transparent overflow-hidden">
+                <CardHeader className="py-2.5 px-4 bg-streak/5 border-b border-streak/20">
+                  <CardTitle className="text-[12px] font-bold text-streak flex items-center gap-2">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Immediate Next Steps
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {plan.immediateSteps.map(item => (
+                      <div key={item.id} className="p-2 rounded-lg bg-surface/50 border border-streak/10 hover:border-streak/30 transition-all">
+                        <PlanCheckItem item={item} onToggle={handleToggle} />
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
 
-      {/* Month Tabs */}
-      {plan.months.length > 0 && (
-        <Tabs defaultValue={firstMonthValue}>
-          <TabsList className="bg-elevated">
-            {plan.months.map(month => (
-              <TabsTrigger key={month.month} value={`month${month.month}`}>
-                Month {month.month}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          {plan.months.map(month => {
-            const allItems = Object.values(month.categories).flat()
-            return (
-              <TabsContent key={month.month} value={`month${month.month}`} className="space-y-4 mt-4">
-                <div>
-                  <h2 className="font-display text-lg font-semibold">{month.title}</h2>
-                  {month.theme && <p className="text-sm text-muted-foreground">{month.theme}</p>}
+          {/* Red Flags */}
+          {plan.redFlags.length > 0 && (
+            <Card className="border-danger/30 bg-danger/5/5 shadow-xl overflow-hidden">
+              <CardHeader className="py-2.5 px-4 bg-danger/10 border-b border-danger/20">
+                <CardTitle className="text-[12px] font-bold text-danger flex items-center gap-2">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Red Flags
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {plan.redFlags.map((flag, i) => (
+                    <div key={i} className="flex gap-2 p-3 rounded-lg border border-border/20 bg-surface hover:shadow-md transition-all border-l-2 border-l-danger">
+                      <div className="space-y-1">
+                        <p className="text-[12px] font-bold text-foreground leading-tight">{flag.symptom}</p>
+                        <div className="flex items-start gap-1.5 text-[11px] text-muted-foreground/80 leading-snug bg-elevated/40 p-2 rounded-md border border-border/10">
+                          <CheckCircle2 className="h-3 w-3 mt-0.5 text-streak" />
+                          <span><span className="font-bold text-streak mr-1">Fix:</span> {flag.fix}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-
-                <MonthProgress items={allItems} />
-
-                {Object.entries(month.categories).map(([category, items]) => {
-                  const domain = CATEGORY_DOMAINS[category] || 'streak'
-                  const colors = DOMAIN_COLORS[domain]
-
-                  return (
-                    <Card key={category} className={`${colors.bg} border ${colors.border}`}>
-                      <CardHeader className="pb-2">
-                        <CardTitle className={`text-sm font-medium ${colors.text} flex items-center gap-2`}>
-                          <CheckCircle2 className="h-4 w-4" />
-                          {category}
-                          <Badge variant="outline" className="ml-auto text-xs">
-                            {items.filter(i => i.checked).length}/{items.length}
-                          </Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-0.5">
-                        {items.map(item => (
-                          <PlanCheckItem key={item.id} item={item} onToggle={handleToggle} />
-                        ))}
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </TabsContent>
-            )
-          })}
-        </Tabs>
-      )}
-
-      {/* Immediate Steps */}
-      {plan.immediateSteps.length > 0 && (
-        <Card className="border-plan/30 bg-plan/10">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-plan flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              Immediate Next Steps
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-0.5">
-            {plan.immediateSteps.map(item => (
-              <PlanCheckItem key={item.id} item={item} onToggle={handleToggle} />
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Red Flags */}
-      {plan.redFlags.length > 0 && (
-        <Card className="border-border bg-surface">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-warning flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              Red Flags to Watch
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {plan.redFlags.map((flag, i) => (
-                <div key={i} className="text-sm">
-                  <p className="text-foreground font-medium">{flag.symptom}</p>
-                  <p className="text-muted-foreground mt-0.5">{flag.fix}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
     </div>
   )
