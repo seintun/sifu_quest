@@ -5,19 +5,17 @@
 
 import * as Sentry from "@sentry/nextjs";
 
-const tracesSampleRate =
-  process.env.SENTRY_TRACES_SAMPLE_RATE !== undefined
-    ? Number(process.env.SENTRY_TRACES_SAMPLE_RATE)
-    : process.env.NODE_ENV === "production"
-      ? 0.2
-      : 1.0;
+const tracesSampleRate = process.env.SENTRY_TRACES_SAMPLE_RATE
+  ? Number(process.env.SENTRY_TRACES_SAMPLE_RATE)
+  : process.env.NODE_ENV === "production"
+    ? 0.1
+    : 1.0;
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-  // Adjust this value in production, or use tracesSampler for greater control
   tracesSampleRate,
 
-  // Setting this option to true will print useful information to the console while you're setting up Sentry.
-  debug: false,
+  // Only enable logs in development
+  enableLogs: process.env.NODE_ENV !== "production",
 });
