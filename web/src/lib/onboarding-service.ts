@@ -856,7 +856,6 @@ async function runPlanJobForUser(userId: string): Promise<boolean> {
       provider: 'Anthropic', // Parametrize later if needed
       timestamp: new Date().toISOString(),
       status: (error as any)?.status || (error as any)?.statusCode || null,
-      stack: error instanceof Error ? error.stack?.split('\n').slice(0, 3).join('\n') : null, // Truncated for DB space
     }
 
     console.error(`[onboarding-service] Plan generation JOB FAILED for user ${userId}:`)
