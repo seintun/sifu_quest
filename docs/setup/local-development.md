@@ -121,10 +121,10 @@ OpenRouter powers shared free-tier chat. Anthropic is optional for server-side A
 
 | Console Field | Environment Variable |
 | ------------- | -------------------- |
-| **OpenRouter API Key** | `OPENROUTER_API_KEY` |
+| **OpenRouter API Key** | `SIFU_OPENROUTER_API_KEY` |
 | **Anthropic API Key** *(optional for local dev)* | `SIFU_ANTHROPIC_API_KEY` |
 
-> 💡 **Note:** `OPENROUTER_API_KEY` powers shared free-tier chat for guests and signed-in free users (current rollout limit: **10 user messages**). Users can add personal provider keys (OpenRouter and/or Anthropic) in Settings to access more models.
+> 💡 **Note:** `SIFU_OPENROUTER_API_KEY` powers shared free-tier chat for guests and signed-in free users (current rollout limit: **10 user messages**). Users can add personal provider keys (OpenRouter and/or Anthropic) in Settings to access more models.
 
 ---
 
@@ -290,7 +290,7 @@ npm run build
 | `NEXT_PUBLIC_SUPABASE_URL`              | ✅       | ✅          | Supabase Dashboard    |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`  | ✅       | ✅          | Supabase Dashboard    |
 | `SUPABASE_SERVICE_ROLE_KEY`             | ✅       | ❌          | Supabase Dashboard    |
-| `OPENROUTER_API_KEY`                    | ✅       | ❌          | OpenRouter Keys       |
+| `SIFU_OPENROUTER_API_KEY`                    | ✅       | ❌          | OpenRouter Keys       |
 | `SIFU_ANTHROPIC_API_KEY`                | ✅       | ❌          | Anthropic Console     |
 | `API_KEY_ENCRYPTION_SECRET`             | ✅       | ❌          | `openssl rand -hex 32`|
 | `NEXTAUTH_SECRET`                       | ✅       | ❌          | `openssl rand -base64 32` |
