@@ -38,7 +38,6 @@ import {
   Dice5,
   KeyRound,
   Loader2,
-  LogOut,
   ShieldAlert,
   ShieldCheck,
   UserRound,
@@ -394,16 +393,6 @@ function SettingsPageContent() {
       setDeleteDialogOpen(false);
     } finally {
       setIsDeleting(false);
-    }
-  };
-
-  const handleLinkGoogle = async () => {
-    const result = await startGuestGoogleUpgrade(window.location.origin);
-    if (!result.ok) {
-      setMessage({
-        text: `Failed to link account: ${result.error}`,
-        type: "error",
-      });
     }
   };
 
