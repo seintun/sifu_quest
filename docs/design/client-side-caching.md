@@ -26,8 +26,8 @@ To enhance the visual responsiveness of SWR's cache hits:
 
 For mutations (e.g., submitting a job application or checking off a DSA problem status):
 
-*   The UI invokes the `mutate` callback provided by `useSWR`.
-*   This triggers an immediate optimistic update to the cache, tricking the client into believing the data was inherently synced prior to acknowledging the API response, maintaining a seamless visual experience.
+*   When called as `mutate()` with no data argument, SWR simply revalidates the resource while continuing to serve the last cached (stale) value, avoiding jarring loading states.
+*   For true optimistic UI, the mutation path uses `mutate(optimisticData, { revalidate: true | false })`, which immediately writes `optimisticData` into the cache so the UI reflects the expected result before the API response is confirmed.
 
 ## UX Principles Applied
 
