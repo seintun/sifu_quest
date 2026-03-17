@@ -117,7 +117,7 @@ RLS is **enabled on all tables** except `audit_log`. Each policy enforces `auth.
 | Concern                | Implementation                                                       |
 | ---------------------- | --------------------------------------------------------------------- |
 | **Data isolation**     | Supabase RLS on all user-facing tables (`auth.uid() = user_id`)       |
-| **API key storage**    | Users provide provider keys (for example `sk-ant-...`, `sk-or-...`). The app encrypts keys server-side with AES-256-CBC and a random 16-byte IV per key. `API_KEY_ENCRYPTION_SECRET` is env-only and operator-managed. Plaintext is **never stored or logged**. |
+| **API key storage**    | Users provide provider keys (for example `sk-ant-...`, `sk-or-...`). The app encrypts keys server-side with AES-256-GCM and a random 12-byte IV per key. Legacy CBC keys are still decrypted transparently. `API_KEY_ENCRYPTION_SECRET` is env-only and operator-managed. Plaintext is **never stored or logged**. |
 | **Trial limits**       | 2-hour window + 25 user-message cap for users without personal keys, enforced **server-side** in `/api/chat` |
 | **GDPR compliance**    | `DELETE /api/account` wipes all 7 tables + the `auth.users` row via Supabase Admin |
 | **Session management** | JWT-based via NextAuth. Tokens carry only the user UUID.              |

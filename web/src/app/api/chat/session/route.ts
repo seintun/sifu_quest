@@ -14,6 +14,8 @@ import { createAdminClient } from '@/lib/supabase-admin'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 
+import { chatSessionGetSchema, chatSessionPostSchema, validationErrorResponse } from '@/lib/api-validation'
+
 export const runtime = 'nodejs'
 const CHAT_SESSION_UNAVAILABLE_MESSAGE = 'We could not load your chat right now. Please refresh and try again.'
 
@@ -65,18 +67,20 @@ export async function GET(request: NextRequest) {
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
 
     const { searchParams } = new URL(request.url)
-    const mode = searchParams.get('mode')
-    const before = searchParams.get('before')
-    const beforeId = searchParams.get('beforeId')
-    const limitParam = searchParams.get('limit')
-    const parsedLimit = limitParam ? Number.parseInt(limitParam, 10) : null
-    const pageSize = Number.isFinite(parsedLimit) && parsedLimit && parsedLimit > 0
-      ? Math.min(parsedLimit, 100)
-      : null
-
-    if (!mode) {
-      return NextResponse.json({ error: 'Mode is required' }, { status: 400 })
+    const rawParams = {
+      mode: searchParams.get('mode'),
+      before: searchParams.get('before'),
+      beforeId: searchParams.get('beforeId'),
+      limit: searchParams.get('limit') ?? undefined,
     }
+
+    const parsedParams = chatSessionGetSchema.safeParse(rawParams)
+    if (!parsedParams.success) {
+      return NextResponse.json(validationErrorResponse(parsedParams.error), { status: 400 })
+    }
+
+    const { mode, before, beforeId, limit: parsedLimit } = parsedParams.data
+    const pageSize = parsedLimit ?? null
 
     const supabase = createAdminClient()
     const userProfile = await ensureUserProfile(userId, session.user.email)
@@ -316,16 +320,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
-    const { mode, title, provider, model } = (await request.json().catch(() => ({}))) as {
-      mode?: string
-      title?: string
-      provider?: string
-      model?: string
+    const rawBody = await request.json().catch(() => ({}))
+    const parsedBody = chatSessionPostSchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      return NextResponse.json(validationErrorResponse(parsedBody.error), { status: 400 })
     }
 
-    if (!mode) {
-      return NextResponse.json({ error: 'Mode is required' }, { status: 400 })
-    }
+    const { mode, title, provider, model } = parsedBody.data
 
     const supabase = createAdminClient()
     const userProfile = await ensureUserProfile(userId, session.user.email)

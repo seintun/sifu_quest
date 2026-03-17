@@ -57,7 +57,7 @@
 | LLM              | Multi-provider chat (OpenRouter + Anthropic; extensible) | —       |
 | Monitoring       | Sentry (`@sentry/nextjs`)               | 10.x       |
 | Hosting          | Vercel                                  | —          |
-| Encryption       | Node.js `crypto` (AES-256-CBC)          | built-in   |
+| Encryption       | Node.js `crypto` (AES-256-GCM)          | built-in   |
 
 
 ## API Route Reference
@@ -166,7 +166,7 @@ Located in `src/lib/`:
 | `supabase.ts`        | Creates a **server-side** Supabase client using `@supabase/ssr` with cookie-based auth. Only usable in Server Components and API routes. |
 | `supabase-browser.ts`| Creates a **browser-side** Supabase client using `createBrowserClient`. Used in Client Components (e.g., Settings page for `linkIdentity`). |
 | `memory.ts`          | Reads/writes memory files from Supabase. Reads mode files from the filesystem (`src/modes/`). |
-| `apikey.ts`          | Encrypts user-provided provider keys (for example `sk-ant-...`, `sk-or-...`) with **AES-256-CBC** before storage. Decrypts only at request-time. Uses a `randomBytes(16)` IV per encryption. |
+| `apikey.ts`          | Encrypts user-provided provider keys (for example `sk-ant-...`, `sk-or-...`) with **AES-256-GCM** before storage. Decrypts only at request-time. Supports legacy AES-256-CBC decryption. |
 | `progress.ts`        | Helper functions `logProgressEvent()` and `logAuditEvent()` for inserting rows into `progress_events` and `audit_log`. |
 | `metrics.ts`         | Computes dashboard metrics (current streak, total activity days) by querying `progress_events` from Supabase. |
 

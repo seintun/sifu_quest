@@ -28,6 +28,8 @@ import {
   streamOpenRouterWithFallback,
 } from '@/lib/chat/stream-providers'
 
+import { chatPostSchema, validationErrorResponse } from '@/lib/api-validation'
+
 import {
   type PersistTurnInput,
   persistChatTurn,
@@ -166,7 +168,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const payload = (await request.json().catch(() => ({}))) as ChatRequestPayload
+    const rawPayload = await request.json().catch(() => ({}))
+    const parsed = chatPostSchema.safeParse(rawPayload)
+    if (!parsed.success) {
+      return new Response(JSON.stringify(validationErrorResponse(parsed.error)), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    const payload = parsed.data as ChatRequestPayload
     const { mode, isGreeting, sessionId } = payload
     const sanitizedMessages = sanitizeIncomingChatMessages(payload.messages)
     if (sanitizedMessages.length === 0) {

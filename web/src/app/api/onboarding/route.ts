@@ -14,6 +14,8 @@ import { createAdminClient } from '@/lib/supabase-admin'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 
+import { onboardingLegacySchema, validationErrorResponse } from '@/lib/api-validation'
+
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
@@ -31,7 +33,13 @@ export async function POST(request: NextRequest) {
     }
 
     userId = await resolveCanonicalUserId(session.user.id, session.user.email)
-    const legacyPayload = await request.json()
+    const rawBody = await request.json()
+    const parsedBody = onboardingLegacySchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      return NextResponse.json(validationErrorResponse(parsedBody.error), { status: 400 })
+    }
+
+    const legacyPayload = parsedBody.data
     const draft = fromLegacyOnboardingPayload(legacyPayload)
 
     await persistCoreOnboardingFiles(userId, draft.core, draft.enrichment)

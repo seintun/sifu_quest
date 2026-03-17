@@ -2,6 +2,8 @@ import { createApiErrorResponse, createRequestId } from '@/lib/api-error-respons
 import { runOnboardingPlanJobs } from '@/lib/onboarding-service'
 import { NextRequest, NextResponse } from 'next/server'
 
+import { planJobsRunSchema, validationErrorResponse } from '@/lib/api-validation'
+
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
@@ -37,9 +39,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json().catch(() => ({}))
-    const limitRaw = typeof body?.limit === 'number' ? body.limit : 5
-    const limit = Math.min(20, Math.max(1, Math.floor(limitRaw)))
+    const rawBody = await request.json().catch(() => ({}))
+    const parsedBody = planJobsRunSchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      return NextResponse.json(validationErrorResponse(parsedBody.error), { status: 400 })
+    }
+
+    const limit = parsedBody.data.limit
 
     const result = await runOnboardingPlanJobs(limit)
     return NextResponse.json({ success: true, ...result })
