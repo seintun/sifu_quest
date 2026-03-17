@@ -30,6 +30,8 @@ import {
 
 import { chatPostSchema, validationErrorResponse } from '@/lib/api-validation'
 
+import { getCachedSystemPrompt, setCachedSystemPrompt } from '@/lib/chat/system-prompt-cache'
+
 import {
   type PersistTurnInput,
   persistChatTurn,
@@ -347,7 +349,11 @@ export async function POST(request: NextRequest) {
             `data: ${JSON.stringify({ type: 'status', status: 'thinking' })}\n\n`,
           )
 
-          const systemPrompt = await buildSystemPrompt(userId, mode, isGreeting)
+          let systemPrompt = getCachedSystemPrompt(userId, mode, isGreeting)
+          if (!systemPrompt) {
+            systemPrompt = await buildSystemPrompt(userId, mode, isGreeting)
+            setCachedSystemPrompt(userId, mode, isGreeting, systemPrompt)
+          }
 
           if (resolvedProvider === 'anthropic') {
             assistantResult = await streamAnthropic(
