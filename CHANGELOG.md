@@ -9,14 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 - **chat**: Add in-memory rate limiting to chat API (30 req/min per user) (2d0602f)
+- **api**: Add Zod input validation to all API route handlers (f0ca29b)
+- **db**: Add atomic memory file upsert RPC with row-level locking (8c92ead)
+- **admin**: Add expired guest session cleanup cron and admin endpoint (3135819)
 
 ### Bug Fixes
 - **security**: Migrate API key encryption to AES-256-GCM with CBC legacy fallback (aa1b2bc)
-- **docs**: Correct clone URLs (sifu_quest), guest quota (25 messages), and trial window (2 hours) across all documentation (005285d)
+- **docs**: Correct clone URLs (sifu_quest), guest quota (25 messages), and trial window (2 hours) across all documentation (005285d, f0ca29b)
+
+### Refactoring
+- **chat**: Decompose chat route and useChat hook into focused modules (db49878)
+  - Extract streaming providers into `lib/chat/stream-providers.ts`
+  - Extract persistence logic into `lib/chat/chat-persistence.ts`
+  - Decompose useChat into useChatSelection, useChatPagination, useChatStreaming sub-hooks
 
 ### Security
 - Add authenticated encryption (GCM) for stored API keys with auth tags
 - Fix writeMemoryFile race condition with atomic upsert RPC
+- Add Zod validation to prevent injection attacks on API routes
 
 ---
 
