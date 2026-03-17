@@ -21,6 +21,7 @@ import { getEncryptedProviderApiKey } from '@/lib/provider-api-keys'
 import { buildSifuMasterToneGuidelines } from '@/lib/brand'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
+import { checkRateLimit, CHAT_RATE_LIMIT } from '@/lib/rate-limiter'
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest } from 'next/server'
 
@@ -624,6 +625,26 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
+
+    // Rate limiting: 30 requests per minute per user
+    const rateLimitResult = checkRateLimit(userId, CHAT_RATE_LIMIT)
+    if (!rateLimitResult.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: 'rate_limited',
+          message: 'Too many requests. Please wait a moment before sending another message.',
+          retryAfterMs: rateLimitResult.retryAfterMs,
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(Math.ceil(rateLimitResult.retryAfterMs / 1000)),
+          },
+        },
+      )
+    }
+
     const payload = (await request.json().catch(() => ({}))) as ChatRequestPayload
     const { mode, isGreeting, sessionId } = payload
     const sanitizedMessages = sanitizeIncomingChatMessages(payload.messages)
