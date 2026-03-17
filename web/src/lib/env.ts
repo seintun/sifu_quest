@@ -74,6 +74,7 @@ export function getRuntimeConfigStatus() {
     'SENTRY_PROJECT',
     'SENTRY_TRACES_SAMPLE_RATE',
     'NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE',
+    'ADMIN_SECRET',
   ].map((key) => ({
     key,
     configured: Boolean(process.env[key] && process.env[key]!.trim().length > 0),
