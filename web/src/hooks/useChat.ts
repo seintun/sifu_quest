@@ -1,65 +1,40 @@
 'use client'
 
-import { consumeChatStream } from '@/lib/chat/stream-parser'
 import { applyQuotaOnChatError } from '@/lib/chat-quota-ui'
-import { buildSystemMeta, getSystemMessage, type ChatMessageMeta } from '@/lib/chat-system-messages'
-import { isChatProvider, type ChatProvider, type ModelAvailability } from '@/lib/chat-provider-config'
+import { buildSystemMeta, getSystemMessage } from '@/lib/chat-system-messages'
+import { type ChatProvider } from '@/lib/chat-provider-config'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  resolveSelection,
+  useChatSelection,
+  type ChatSelection,
+} from './chat/useChatSelection'
+import {
+  PAGE_SIZE,
+  useChatPagination,
+  type ChatSessionPaging,
+} from './chat/useChatPagination'
+import { useChatStreaming } from './chat/useChatStreaming'
+import type {
+  ChatMessage,
+  ChatModelGroupOption,
+  ChatModelOption,
+  ChatProviderOption,
+  FreeQuota,
+  SessionUsageMetrics,
+  StreamPhase,
+} from './chat/useChatTypes'
 
-export interface FreeQuota {
-  isFreeTier: boolean
-  remaining: number
-  total: number
-  isGuest?: boolean
-}
-
-export interface ChatMessage {
-  id?: string
-  createdAt?: string
-  role: 'user' | 'assistant'
-  content: string
-  meta?: ChatMessageMeta
-}
-
-export interface ChatProviderOption {
-  id: ChatProvider
-  label: string
-  availability: ModelAvailability
-  reason?: string
-}
-
-export interface ChatModelOption {
-  id: string
-  label: string
-  provider: ChatProvider
-  isFree: boolean
-  availability: ModelAvailability
-  recommendationRank?: number
-  reason?: string
-}
-
-export interface ChatModelGroupOption {
-  id: string
-  label: string
-  models: ChatModelOption[]
-  hasMore?: boolean
-}
-
-export interface SessionUsageMetrics {
-  userTurns: number
-  inputTokens: number
-  outputTokens: number
-  totalTokens: number
-  estimatedCostMicrousd: number
-}
-
-export type StreamPhase = 'idle' | 'thinking' | 'typing'
-
-type ChatSessionPaging = {
-  hasOlder?: boolean
-  nextBefore?: string | null
-  nextBeforeId?: string | null
-}
+// Re-export types for backward compatibility.
+export type {
+  ChatMessage,
+  ChatModelGroupOption,
+  ChatModelOption,
+  ChatProviderOption,
+  FreeQuota,
+  SessionUsageMetrics,
+  StreamPhase,
+} from './chat/useChatTypes'
 
 type ChatSessionResponse = {
   session?: { id: string } | null
@@ -70,57 +45,6 @@ type ChatSessionResponse = {
   paging?: ChatSessionPaging
 }
 
-const PAGE_SIZE = 40
-const CHAT_SELECTION_STORAGE_KEY = 'sifu-chat-selection-v1'
-
-type ChatSelection = {
-  provider: ChatProvider
-  model: string
-}
-
-function readStoredSelection(): ChatSelection | null {
-  if (typeof window === 'undefined') return null
-
-  try {
-    const raw = window.localStorage.getItem(CHAT_SELECTION_STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as { provider?: unknown; model?: unknown }
-    if (!isChatProvider(parsed.provider) || typeof parsed.model !== 'string') return null
-    return { provider: parsed.provider, model: parsed.model }
-  } catch {
-    return null
-  }
-}
-
-function persistSelection(selection: ChatSelection): void {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(CHAT_SELECTION_STORAGE_KEY, JSON.stringify(selection))
-  } catch {
-    // Ignore storage write failures (private mode / quota).
-  }
-}
-
-function resolveSelection(
-  candidate: ChatSelection | null,
-  modelsByProvider: Record<ChatProvider, ChatModelOption[]>,
-): ChatSelection | null {
-  if (!candidate) return null
-
-  const models = modelsByProvider[candidate.provider] ?? []
-  if (models.length === 0) return null
-
-  const exact = models.find((model) => model.id === candidate.model && model.availability === 'available')
-  if (exact) {
-    return { provider: candidate.provider, model: exact.id }
-  }
-
-  const fallback = models.find((model) => model.availability === 'available') ?? models[0]
-  if (!fallback) return null
-
-  return { provider: candidate.provider, model: fallback.id }
-}
-
 function toMicrousdDisplay(microusd: number): string {
   return `$${(microusd / 1_000_000).toFixed(4)}`
 }
@@ -129,30 +53,9 @@ function makeClientMessageId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-function getMessageSignature(message: ChatMessage): string {
-  return message.id
-    ? `id:${message.id}`
-    : `${message.role}|${message.createdAt ?? ''}|${message.content}`
-}
-
-function prependOlderMessages(current: ChatMessage[], older: ChatMessage[]): ChatMessage[] {
-  if (older.length === 0) return current
-  const seen = new Set(current.map(getMessageSignature))
-  const nextOlder = older.filter((message) => {
-    const signature = getMessageSignature(message)
-    if (seen.has(signature)) return false
-    seen.add(signature)
-    return true
-  })
-
-  if (nextOlder.length === 0) return current
-  return [...nextOlder, ...current]
-}
-
 export function useChat(mode: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [isStreaming, setIsStreaming] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
   const [bootstrapError, setBootstrapError] = useState<string | null>(null)
   const [upgradeRequired, setUpgradeRequired] = useState<string | null>(null)
@@ -166,42 +69,47 @@ export function useChat(mode: string) {
     openrouter: [],
     anthropic: [],
   })
-  const [selectedProvider, setSelectedProvider] = useState<ChatProvider>('openrouter')
-  const [selectedModel, setSelectedModel] = useState('')
   const [sessionMetrics, setSessionMetrics] = useState<SessionUsageMetrics | null>(null)
   const [hasProviderKey, setHasProviderKey] = useState<Record<ChatProvider, boolean>>({
     openrouter: false,
     anthropic: false,
   })
   const [isLoadingOpenRouterAllModels, setIsLoadingOpenRouterAllModels] = useState(false)
-  const [streamPhase, setStreamPhase] = useState<StreamPhase>('idle')
-  const [hasOlderMessages, setHasOlderMessages] = useState(false)
-  const [nextBefore, setNextBefore] = useState<string | null>(null)
-  const [nextBeforeId, setNextBeforeId] = useState<string | null>(null)
-  const [isLoadingOlder, setIsLoadingOlder] = useState(false)
-  const abortRef = useRef<AbortController | null>(null)
+
   const bootstrapAbortRef = useRef<AbortController | null>(null)
-  const olderAbortRef = useRef<AbortController | null>(null)
   const openRouterCatalogAbortRef = useRef<AbortController | null>(null)
-  const storedSelectionRef = useRef<ChatSelection | null | undefined>(undefined)
 
-  const applySelection = useCallback((provider: ChatProvider, model: string) => {
-    setSelectedProvider(provider)
-    setSelectedModel(model)
-  }, [])
+  // Sub-hooks
+  const {
+    selectedProvider,
+    setSelectedProvider,
+    selectedModel,
+    setSelectedModel,
+    applySelection,
+    getStoredSelection,
+  } = useChatSelection()
 
-  const getStoredSelection = useCallback((): ChatSelection | null => {
-    if (storedSelectionRef.current === undefined) {
-      storedSelectionRef.current = readStoredSelection()
-    }
-    return storedSelectionRef.current
-  }, [])
+  const {
+    hasOlderMessages,
+    isLoadingOlder,
+    applyPaging,
+    resetPaging,
+    loadOlderMessages,
+    abortOlder,
+  } = useChatPagination()
 
-  const applyPaging = useCallback((paging: ChatSessionPaging | null | undefined) => {
-    setHasOlderMessages(Boolean(paging?.hasOlder))
-    setNextBefore(paging?.nextBefore ?? null)
-    setNextBeforeId(paging?.nextBeforeId ?? null)
-  }, [])
+  const {
+    streamPhase,
+    isStreaming,
+    setIsStreaming,
+    abortRef,
+    processStreamResponse,
+    startStreaming,
+    stopStreaming,
+    resetStreaming,
+  } = useChatStreaming({
+    onApplySelection: applySelection,
+  })
 
   const loadBootstrap = useCallback(async () => {
     bootstrapAbortRef.current?.abort()
@@ -279,7 +187,7 @@ export function useChat(mode: string) {
   useEffect(() => {
     abortRef.current?.abort()
     bootstrapAbortRef.current?.abort()
-    olderAbortRef.current?.abort()
+    abortOlder()
     openRouterCatalogAbortRef.current?.abort()
     setIsStreaming(false)
     setSessionId(null)
@@ -290,18 +198,15 @@ export function useChat(mode: string) {
     setHasProviderKey({ openrouter: false, anthropic: false })
     setModelGroupsByProvider({ openrouter: [], anthropic: [] })
     setIsLoadingOpenRouterAllModels(false)
-    setStreamPhase('idle')
-    setHasOlderMessages(false)
-    setNextBefore(null)
-    setNextBeforeId(null)
-    setIsLoadingOlder(false)
+    resetStreaming()
+    resetPaging()
 
     void loadBootstrap()
 
     return () => {
       abortRef.current?.abort()
       bootstrapAbortRef.current?.abort()
-      olderAbortRef.current?.abort()
+      abortOlder()
       openRouterCatalogAbortRef.current?.abort()
     }
   }, [mode, loadBootstrap])
@@ -369,13 +274,6 @@ export function useChat(mode: string) {
     setSelectedModel(modelId)
   }, [])
 
-  useEffect(() => {
-    if (!selectedModel) return
-    const selection = { provider: selectedProvider, model: selectedModel }
-    storedSelectionRef.current = selection
-    persistSelection(selection)
-  }, [selectedProvider, selectedModel])
-
   const ensureSession = useCallback(async (): Promise<string> => {
     if (sessionId) return sessionId
     const res = await fetch('/api/chat/session', {
@@ -403,181 +301,9 @@ export function useChat(mode: string) {
     throw new Error(data.message || data.error || 'Failed to create session')
   }, [sessionId, mode, selectedProvider, selectedModel, applySelection, applyPaging])
 
-  const loadOlderMessages = useCallback(async () => {
-    if ((!nextBeforeId && !nextBefore) || isLoadingOlder) return
-
-    olderAbortRef.current?.abort()
-    const controller = new AbortController()
-    olderAbortRef.current = controller
-
-    setIsLoadingOlder(true)
-    try {
-      const searchParams = new URLSearchParams({
-        mode,
-        limit: String(PAGE_SIZE),
-      })
-      if (nextBeforeId) {
-        searchParams.set('beforeId', nextBeforeId)
-      } else if (nextBefore) {
-        searchParams.set('before', nextBefore)
-      }
-
-      const res = await fetch(`/api/chat/session?${searchParams.toString()}`, { signal: controller.signal })
-      const data = await res.json().catch(() => ({})) as ChatSessionResponse
-      if (olderAbortRef.current !== controller) return
-
-      if (!res.ok) {
-        return
-      }
-
-      const olderMessages = Array.isArray(data.messages) ? data.messages : []
-      setMessages((prev) => prependOlderMessages(prev, olderMessages))
-      applyPaging(data.paging)
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        return
-      }
-    } finally {
-      if (olderAbortRef.current === controller) {
-        olderAbortRef.current = null
-        setIsLoadingOlder(false)
-      }
-    }
-  }, [nextBefore, nextBeforeId, isLoadingOlder, mode, applyPaging])
-
-  const processStreamResponse = useCallback(async (
-    response: Response,
-    initialMessages: ChatMessage[],
-    onForbidden: (errorCode: string | null) => void,
-  ): Promise<'completed' | 'forbidden' | 'failed'> => {
-    if (!response.ok) {
-      let errorMessage = 'Unknown error'
-      let errorCode: string | null = null
-      try {
-        const errorData: { message?: string; error?: string } = await response.json()
-        errorMessage = errorData.message || errorData.error || errorMessage
-        errorCode = errorData.error ?? null
-      } catch {
-        // Ignore malformed error payloads.
-      }
-
-      if (response.status === 403) {
-        onForbidden(errorCode)
-        return 'forbidden'
-      }
-
-      const assistantMessage: ChatMessage =
-        response.status >= 500
-          ? {
-              role: 'assistant',
-              content: getSystemMessage('chat_temporary_error'),
-              meta: buildSystemMeta('chat_temporary_error'),
-            }
-          : {
-              role: 'assistant',
-              content: errorMessage,
-            }
-
-      setMessages([...initialMessages, assistantMessage])
-      setIsStreaming(false)
-      return 'failed'
-    }
-
-    const reader = response.body?.getReader()
-    if (!reader) {
-      setMessages([
-        ...initialMessages,
-        {
-          role: 'assistant',
-          content: getSystemMessage('chat_temporary_error'),
-          meta: buildSystemMeta('chat_temporary_error'),
-        },
-      ])
-      setIsStreaming(false)
-      return 'failed'
-    }
-
-    let assistantContent = ''
-    let usageApplied = false
-    let flushTimeout: ReturnType<typeof setTimeout> | null = null
-    let streamActive = true
-
-    const flushAssistant = () => {
-      if (!streamActive) return
-      setMessages((prev) => {
-        const updated = [...prev]
-        if (updated.length === 0 || updated[updated.length - 1].role !== 'assistant') {
-          updated.push({ id: makeClientMessageId('assistant'), role: 'assistant', content: assistantContent })
-        } else {
-          updated[updated.length - 1] = { ...updated[updated.length - 1], content: assistantContent }
-        }
-        return updated
-      })
-    }
-
-    const scheduleFlush = () => {
-      if (flushTimeout) return
-      flushTimeout = setTimeout(() => {
-        flushTimeout = null
-        flushAssistant()
-      }, 40)
-    }
-
-    try {
-      await consumeChatStream(reader, (parsed) => {
-        if (parsed.text) {
-          setStreamPhase('typing')
-          assistantContent += parsed.text
-          scheduleFlush()
-        }
-
-        if (parsed.type === 'usage') {
-          usageApplied = true
-          if (parsed.provider && parsed.model) {
-            applySelection(parsed.provider, parsed.model)
-          }
-          setSessionMetrics((prev) => ({
-            userTurns: (prev?.userTurns ?? 0) + 1,
-            inputTokens: (prev?.inputTokens ?? 0) + (parsed.inputTokens ?? 0),
-            outputTokens: (prev?.outputTokens ?? 0) + (parsed.outputTokens ?? 0),
-            totalTokens: (prev?.totalTokens ?? 0) + (parsed.totalTokens ?? 0),
-            estimatedCostMicrousd: (prev?.estimatedCostMicrousd ?? 0) + (parsed.estimatedCostMicrousd ?? 0),
-          }))
-        }
-
-        if (parsed.type === 'status' && parsed.status) {
-          setStreamPhase(parsed.status)
-        }
-
-        if (parsed.error) {
-          assistantContent += `\n\nError: ${parsed.error}`
-          scheduleFlush()
-        }
-      })
-    } catch (error) {
-      streamActive = false
-      throw error
-    } finally {
-      if (flushTimeout) {
-        clearTimeout(flushTimeout)
-        flushTimeout = null
-      }
-    }
-
-    flushAssistant()
-    streamActive = false
-
-    if (!usageApplied) {
-      setSessionMetrics((prev) => ({
-        userTurns: (prev?.userTurns ?? 0) + 1,
-        inputTokens: prev?.inputTokens ?? 0,
-        outputTokens: prev?.outputTokens ?? 0,
-        totalTokens: prev?.totalTokens ?? 0,
-        estimatedCostMicrousd: prev?.estimatedCostMicrousd ?? 0,
-      }))
-    }
-    return 'completed'
-  }, [applySelection])
+  const handleLoadOlderMessages = useCallback(async () => {
+    await loadOlderMessages(mode, setMessages)
+  }, [loadOlderMessages, mode])
 
   const sendMessage = useCallback(async (userMessage: string) => {
     const optimisticUser: ChatMessage = {
@@ -590,8 +316,7 @@ export function useChat(mode: string) {
 
     setMessages(newMessages)
     setUpgradeRequired(null)
-    setIsStreaming(true)
-    setStreamPhase('thinking')
+    startStreaming()
 
     const previousQuota = freeQuota
     const shouldEnforceQuota = Boolean(
@@ -648,7 +373,7 @@ export function useChat(mode: string) {
           },
         ])
         setIsStreaming(false)
-      })
+      }, setMessages, setSessionMetrics)
 
       if (streamResult === 'failed' && shouldEnforceQuota) {
         setFreeQuota(previousQuota)
@@ -671,17 +396,16 @@ export function useChat(mode: string) {
     } finally {
       if (abortRef.current === controller) {
         setIsStreaming(false)
-        setStreamPhase('idle')
+        resetStreaming()
         abortRef.current = null
       }
     }
-  }, [messages, mode, ensureSession, freeQuota, selectedProvider, selectedModel, hasProviderKey, processStreamResponse])
+  }, [messages, mode, ensureSession, freeQuota, selectedProvider, selectedModel, hasProviderKey, processStreamResponse, startStreaming, setIsStreaming, resetStreaming])
 
   const greet = useCallback(async () => {
     if (isStreaming) return
     setUpgradeRequired(null)
-    setIsStreaming(true)
-    setStreamPhase('thinking')
+    startStreaming()
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -710,7 +434,7 @@ export function useChat(mode: string) {
             : (errorCode || 'missing_api_key')
         setUpgradeRequired(normalizedUpgradeCode)
         setIsStreaming(false)
-      })
+      }, setMessages, setSessionMetrics)
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
         setMessages([
@@ -724,19 +448,17 @@ export function useChat(mode: string) {
     } finally {
       if (abortRef.current === controller) {
         setIsStreaming(false)
-        setStreamPhase('idle')
+        resetStreaming()
         abortRef.current = null
       }
     }
-  }, [isStreaming, mode, ensureSession, selectedProvider, selectedModel, processStreamResponse])
+  }, [isStreaming, mode, ensureSession, selectedProvider, selectedModel, processStreamResponse, startStreaming, setIsStreaming, resetStreaming])
 
   const clearHistory = useCallback(async () => {
     setMessages([])
     setSessionId(null)
     setSessionMetrics(null)
-    setHasOlderMessages(false)
-    setNextBefore(null)
-    setNextBeforeId(null)
+    resetPaging()
     try {
       const res = await fetch('/api/chat/session', {
         method: 'POST',
@@ -762,11 +484,7 @@ export function useChat(mode: string) {
     } catch (err) {
       console.error('Failed to clear history', err)
     }
-  }, [mode, selectedProvider, selectedModel, applySelection, applyPaging])
-
-  const stopStreaming = useCallback(() => {
-    abortRef.current?.abort()
-  }, [])
+  }, [mode, selectedProvider, selectedModel, applySelection, applyPaging, resetPaging])
 
   const selectedProviderInfo = providers.find((provider) => provider.id === selectedProvider) ?? null
   const selectedProviderGroups = modelGroupsByProvider[selectedProvider] ?? []
@@ -803,7 +521,7 @@ export function useChat(mode: string) {
     isLoadingOlder,
     isLoadingOpenRouterAllModels,
     loadAllOpenRouterModels,
-    loadOlderMessages,
+    loadOlderMessages: handleLoadOlderMessages,
     updateProviderSelection,
     updateModelSelection,
     formatMicrousd: toMicrousdDisplay,
