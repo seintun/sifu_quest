@@ -130,59 +130,90 @@ export async function readModeFile(filename: string): Promise<string> {
 }
 
 export async function writeMemoryFile(
-  userId: string, 
-  filename: string, 
+  userId: string,
+  filename: string,
   content: string,
-  changeSource: string = 'manual'
+  changeSource: string = 'manual',
 ): Promise<void> {
   validateMemoryFile(filename)
-  
+
   const supabase = createAdminClient()
-  
-  // We use Supabase RPC or upsert to bump the version, but the easiest Upsert is:
-  // 1. Get current version
-  // 2. Upsert with version + 1
-  
-  const { data: currentRecord } = await supabase
-    .from('memory_files')
-    .select('version')
-    .eq('user_id', userId)
-    .eq('filename', filename)
-    .single()
-    
-  const nextVersion = (currentRecord?.version || 0) + 1
 
-  const { error } = await supabase
-    .from('memory_files')
-    .upsert({
-      user_id: userId,
-      filename: filename,
-      content: content,
-      version: nextVersion,
-      updated_at: new Date().toISOString()
-    }, { 
-      onConflict: 'user_id,filename' 
-    })
+  // Use RPC for atomic version bump to avoid read-then-write race condition.
+  // If the RPC doesn't exist (legacy deployment), fall back to a retry-based approach.
+  const { error: rpcError } = await supabase.rpc('upsert_memory_file_atomic', {
+    user_id_param: userId,
+    filename_param: filename,
+    content_param: content,
+    change_source_param: changeSource,
+  })
 
-  if (error) {
+  if (!rpcError) {
+    return
+  }
+
+  // If RPC function doesn't exist, use retry-based fallback with optimistic concurrency
+  const missingRpc =
+    rpcError.code === '42883' ||
+    rpcError.code === 'PGRST202' ||
+    (rpcError.message ?? '').includes('upsert_memory_file_atomic')
+
+  if (!missingRpc) {
+    console.error(`Error writing memory file ${filename}:`, rpcError)
+    throw new MemoryWriteError(filename, rpcError.code, rpcError.message)
+  }
+
+  // Fallback: retry up to 3 times to handle concurrent writes
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const { data: currentRecord } = await supabase
+      .from('memory_files')
+      .select('version')
+      .eq('user_id', userId)
+      .eq('filename', filename)
+      .single()
+
+    const nextVersion = (currentRecord?.version || 0) + 1
+
+    const { error } = await supabase
+      .from('memory_files')
+      .upsert(
+        {
+          user_id: userId,
+          filename: filename,
+          content: content,
+          version: nextVersion,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'user_id,filename',
+        },
+      )
+
+    if (!error) {
+      await supabase.from('memory_file_versions').insert({
+        user_id: userId,
+        filename: filename,
+        content: content,
+        version: nextVersion,
+        change_source: changeSource,
+      })
+      return
+    }
+
+    // If it's a unique constraint violation (concurrent write won), retry
+    if (error.code === '23505' || attempt === 2) {
+      if (attempt === 2) {
+        console.error(`Error writing memory file ${filename} after ${attempt + 1} attempts:`, error)
+        throw new MemoryWriteError(filename, error.code, error.message)
+      }
+      // Small delay before retry
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      continue
+    }
+
     console.error(`Error writing memory file ${filename}:`, error)
     throw new MemoryWriteError(filename, error.code, error.message)
   }
-
-  // The database trigger 'snapshot_memory_version' will automatically record 
-  // the audit trail row into memory_file_versions. But since we need to pass
-  // the changeSource to the trigger via TG_ARGV (which isn't easy via REST), 
-  // we'll manually insert the audit row here instead of relying solely on the DB trigger for now.
-  
-  await supabase
-    .from('memory_file_versions')
-    .insert({
-      user_id: userId,
-      filename: filename,
-      content: content,
-      version: nextVersion,
-      change_source: changeSource
-    })
 }
 
 export async function writeMemoryFilesBatch(
