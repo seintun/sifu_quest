@@ -101,7 +101,7 @@ Sifu Quest operates a **dual-session model**: a Supabase session (cookie-based, 
 
 | Type | How signed in | `is_guest` flag | Session expires |
 |---|---|---|---|
-| **Guest** | Anonymous Supabase sign-in via NextAuth CredentialsProvider | `true` | 30 minutes |
+| **Guest** | Anonymous Supabase sign-in via NextAuth CredentialsProvider | `true` | 2 hours |
 | **Google** | Google OAuth via NextAuth + Supabase | `false` | NextAuth JWT expiry |
 
 ### Route Protection
@@ -242,7 +242,7 @@ flowchart TD
     
     %% Guest Flow
     CheckProfile -->|Guest| CheckExpiry{"Check Guest Expiry
-(> 30 mins?)"}
+(> 2 hours?)"}
     CheckExpiry -->|Expired| Error_Expired["403: session_expired"]
     CheckExpiry -->|Valid| SetFreeKey["Set API Key = Platform Key"]
     

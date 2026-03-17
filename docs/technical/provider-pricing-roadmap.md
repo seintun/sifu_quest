@@ -20,7 +20,7 @@ Selected options from the planning review:
 - `9A` Show session + user metrics in chat and settings
 - `10B` Increase free quota for rollout
 - `11A` Shared OpenRouter key with operator guardrails
-- `12A` Initial free quota set to 10 messages
+- `12A` Initial free quota set to 25 messages
 - `13A` New dedicated technical decision document
 - `14A` Two Mermaid diagrams (routing + telemetry/pricing flow)
 

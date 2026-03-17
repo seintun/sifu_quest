@@ -124,7 +124,7 @@ OpenRouter powers shared free-tier chat. Anthropic is optional for server-side A
 | **OpenRouter API Key** | `SIFU_OPENROUTER_API_KEY` |
 | **Anthropic API Key** *(optional for local dev)* | `SIFU_ANTHROPIC_API_KEY` |
 
-> 💡 **Note:** `SIFU_OPENROUTER_API_KEY` powers shared free-tier chat for guests and signed-in free users (current rollout limit: **10 user messages**). Users can add personal provider keys (OpenRouter and/or Anthropic) in Settings to access more models.
+> 💡 **Note:** `SIFU_OPENROUTER_API_KEY` powers shared free-tier chat for guests and signed-in free users (current rollout limit: **25 user messages**). Users can add personal provider keys (OpenRouter and/or Anthropic) in Settings to access more models.
 
 ---
 
@@ -189,8 +189,8 @@ Once you have all the keys from the sections above:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/seintun/sifu_quest_buddy.git
-cd sifu_quest_buddy
+git clone https://github.com/seintun/sifu_quest.git
+cd sifu_quest
 
 # 2. Start the local Supabase emulator (requires Docker running)
 npx supabase start
@@ -247,7 +247,7 @@ Open [http://localhost:3000](http://localhost:3000). You should be able to:
 
 ### Guest Sessions & Account Conversion
 
-A **guest session** is an anonymous Supabase sign-in with a 30-minute TTL. All data (messages, onboarding answers, memory files) is stored under the guest's user ID, so it survives page refreshes within the session window.
+A **guest session** is an anonymous Supabase sign-in with a 2-hour TTL. All data (messages, onboarding answers, memory files) is stored under the guest's user ID, so it survives page refreshes within the session window.
 
 #### Signing out as a guest
 

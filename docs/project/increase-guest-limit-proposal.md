@@ -2,7 +2,7 @@
 
 ## 1) Problem Statement
 
-- What problem exists today? The current guest limit is 10 messages, which might be too low for new users to fully experience the value of Sifu Quest before being prompted to log in.
+- What problem exists today? The current guest limit is 25 messages, which might be too low for new users to fully experience the value of Sifu Quest before being prompted to log in.
 - Who is affected? Potential new users who want to try the app as guests.
 - Why now? Increasing the limit allows for a more generous trial experience, potentially improving conversion from guest to registered users.
 
