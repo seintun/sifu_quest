@@ -120,7 +120,7 @@ export function useChat(mode: string) {
     try {
       const [providersRes, sessionRes] = await Promise.all([
         fetch('/api/chat/providers', { signal: controller.signal }),
-        fetch(`/api/chat/session?mode=${mode}&limit=${PAGE_SIZE}`, { signal: controller.signal }),
+        fetch(`/api/chat/session?mode=${mode}&limit=${PAGE_SIZE}&create_if_missing=1`, { signal: controller.signal }),
       ])
 
       const providerData = await providersRes.json().catch(() => ({})) as {
@@ -409,7 +409,8 @@ export function useChat(mode: string) {
     abortRef.current = controller
 
     try {
-      const activeSessionId = await ensureSession()
+      // Use existing sessionId from bootstrap (auto-created), or fallback to ensureSession
+      const activeSessionId = sessionId ?? await ensureSession()
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -450,7 +451,7 @@ export function useChat(mode: string) {
         abortRef.current = null
       }
     }
-  }, [isStreaming, mode, ensureSession, selectedProvider, selectedModel, processStreamResponse, startStreaming, setIsStreaming, resetStreaming]) // eslint-disable-line react-hooks/exhaustive-deps -- abortRef is a stable ref
+  }, [isStreaming, mode, sessionId, ensureSession, selectedProvider, selectedModel, processStreamResponse, startStreaming, setIsStreaming, resetStreaming]) // eslint-disable-line react-hooks/exhaustive-deps -- abortRef is a stable ref
 
   const clearHistory = useCallback(async () => {
     setMessages([])
@@ -523,5 +524,6 @@ export function useChat(mode: string) {
     updateProviderSelection,
     updateModelSelection,
     formatMicrousd: toMicrousdDisplay,
+    sessionId,
   }
 }

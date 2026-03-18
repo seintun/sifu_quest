@@ -21,6 +21,7 @@ export const chatSessionGetSchema = z.object({
   before: z.string().optional().nullable(),
   beforeId: z.string().optional().nullable(),
   limit: z.coerce.number().int().positive().max(100).optional().nullable(),
+  create_if_missing: z.string().optional().nullable(),
 })
 
 export const chatSessionPostSchema = z.object({

@@ -171,6 +171,7 @@ export default function CoachPage() {
     isLoadingOpenRouterAllModels,
     loadAllOpenRouterModels,
     formatMicrousd,
+    sessionId,
   } = useChat(mode);
 
   const [dismissedPrompt, setDismissedPrompt] = useState(false);
@@ -210,7 +211,9 @@ export default function CoachPage() {
   );
 
   useEffect(() => {
-    if (!isLoaded) return;
+    // Fire greeting as soon as sessionId is available (parallel with bootstrap)
+    // No need to wait for isLoaded - the session auto-creates during bootstrap
+    if (!sessionId) return;
 
     if (
       messages.length === 0 &&
@@ -237,9 +240,9 @@ export default function CoachPage() {
     }
   }, [
     mode,
+    sessionId,
     messages.length,
     greet,
-    isLoaded,
     upgradeRequired,
     isQuotaBlocked,
     setMessages,
