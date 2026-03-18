@@ -22,6 +22,7 @@ import { NextRequest } from 'next/server'
 import {
   type StreamResult,
   ClientStreamClosedError,
+  ProviderStreamError,
   enqueueSseFrame,
   closeSseStream,
   streamAnthropic,
@@ -41,6 +42,7 @@ import {
 export const runtime = 'nodejs'
 const CHAT_UNAVAILABLE_MESSAGE = 'We hit a temporary issue loading your workspace. Please try again in a moment.'
 const CHAT_STREAM_ERROR_MESSAGE = 'We hit a temporary issue generating a response. Please try again.'
+const CHAT_MODEL_UNAVAILABLE_MESSAGE = 'The selected AI model is temporarily unavailable. Switching to an alternative model...'
 
 const MODE_TO_FILES: Record<string, { mode: string; memory: string[] }> = {
   dsa: { mode: 'dsa.md', memory: ['profile.md', 'dsa-patterns.md', 'progress.md'] },
@@ -438,8 +440,12 @@ export async function POST(request: NextRequest) {
 
           if (!streamClosed) {
             console.error('Chat stream failed', error)
+            // Provide more specific error message for model unavailability (404)
+            const errorMessage = error instanceof ProviderStreamError && error.status === 404
+              ? CHAT_MODEL_UNAVAILABLE_MESSAGE
+              : CHAT_STREAM_ERROR_MESSAGE
             try {
-              enqueueSseFrame(controller, encoder, `data: ${JSON.stringify({ error: CHAT_STREAM_ERROR_MESSAGE })}\n\n`)
+              enqueueSseFrame(controller, encoder, `data: ${JSON.stringify({ error: errorMessage })}\n\n`)
             } catch (streamWriteError) {
               if (!(streamWriteError instanceof ClientStreamClosedError)) {
                 console.error('Failed to write stream error payload', streamWriteError)
