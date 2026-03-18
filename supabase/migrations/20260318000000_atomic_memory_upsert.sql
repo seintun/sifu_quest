@@ -1,6 +1,9 @@
 -- Atomic memory file upsert with automatic version bumping.
 -- Eliminates the read-then-write race condition in writeMemoryFile().
 -- Also inserts the audit trail row in a single transaction.
+--
+-- Security: Uses auth.uid() internally (not passed as parameter) so
+-- SECURITY DEFINER cannot be exploited to write to arbitrary user IDs.
 
 CREATE OR REPLACE FUNCTION upsert_memory_file_atomic(
   filename_param TEXT,
@@ -53,7 +56,7 @@ BEGIN
 END;
 $$;
 
--- Grant execute to authenticated users (function now uses auth.uid() internally,
+-- Grant execute to authenticated users (function uses auth.uid() internally,
 -- so users can only write their own memory files) and to service_role.
 GRANT EXECUTE ON FUNCTION upsert_memory_file_atomic TO authenticated;
 GRANT EXECUTE ON FUNCTION upsert_memory_file_atomic TO service_role;
