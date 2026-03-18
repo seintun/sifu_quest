@@ -28,8 +28,9 @@ export async function POST(request: NextRequest) {
     const updated = togglePlanItem(content, itemId, checked)
     await writeMemoryFile(userId, 'plan.md', updated, 'plan_toggle')
 
-    await logProgressEvent(userId, 'plan_item_checked', 'plan', { itemId, checked })
-    await logAuditEvent(userId, 'update_memory', 'plan.md', { action: 'toggled_plan_item', checked })
+    // Fire logging asynchronously — don't block the response
+    void logProgressEvent(userId, 'plan_item_checked', 'plan', { itemId, checked })
+    void logAuditEvent(userId, 'update_memory', 'plan.md', { action: 'toggled_plan_item', checked })
 
     return NextResponse.json({ success: true })
   } catch (error) {

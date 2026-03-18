@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ParsedPlan, PlanItem } from '@/lib/parsers/plan-parser'
-import { parsePlan } from '@/lib/parsers/plan-parser'
+import { parsePlan, togglePlanItem } from '@/lib/parsers/plan-parser'
 import { DOMAIN_COLORS } from '@/lib/theme'
 import { normalizeMarkdownContent } from '@/lib/markdown-formatting'
 import { AlertTriangle, CheckCircle2, RefreshCw, Target, LayoutDashboard, Info, Sparkles } from 'lucide-react'
@@ -229,25 +229,21 @@ function PlanCheckItem({
   item: PlanItem
   onToggle: (id: string, checked: boolean) => void
 }) {
-  const [loading, setLoading] = useState(false)
   const normalizedItemText = useMemo(() => normalizeMarkdownContent(item.text), [item.text])
 
-  const handleToggle = async () => {
-    setLoading(true)
-    await onToggle(item.id, !item.checked)
-    setLoading(false)
+  const handleToggle = () => {
+    onToggle(item.id, !item.checked)
   }
 
   const isInfoItem = item.id.includes('-info-')
 
   return (
-    <div className={`flex items-start gap-2 py-1 transition-opacity ${loading ? 'opacity-50' : ''}`}>
+    <div className="flex items-start gap-2 py-1 transition-all duration-200">
       {!isInfoItem && (
         <Checkbox
           checked={item.checked}
           onCheckedChange={handleToggle}
-          disabled={loading}
-          className="mt-1 h-3.5 w-3.5 rounded-sm border-muted-foreground/40 data-[state=checked]:bg-plan data-[state=checked]:border-plan"
+          className="mt-1 h-3.5 w-3.5 rounded-sm border-muted-foreground/40 data-[state=checked]:bg-plan data-[state=checked]:border-plan transition-colors duration-200"
         />
       )}
       <div className={`text-[12px] leading-snug ${item.checked ? 'line-through text-muted-foreground/60' : 'text-foreground/90'} ${isInfoItem ? 'font-bold mt-1.5 text-foreground mb-0.5 tracking-tight' : ''}`}>
@@ -358,16 +354,24 @@ export default function PlanPage() {
     }
   }, [refreshPlanStatus])
 
-  const handleToggle = async (itemId: string, checked: boolean) => {
-    try {
-      const res = await fetch('/api/plan/toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId, checked }),
+  const handleToggle = useCallback((itemId: string, checked: boolean) => {
+    // 1. Optimistic: toggle the checkbox line locally for instant UI
+    const updatedContent = togglePlanItem(rawContent, itemId, checked)
+    mutatePlan({ content: updatedContent }, { revalidate: false })
+
+    // 2. Fire API in background, rollback on failure
+    fetch('/api/plan/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemId, checked }),
+    })
+      .then(res => {
+        if (!res.ok) mutatePlan()
       })
-      if (res.ok) mutatePlan()
-    } catch { /* ignore */ }
-  }
+      .catch(() => {
+        mutatePlan()
+      })
+  }, [rawContent, mutatePlan])
 
   if (!plan) return <div className="p-8"><div className="h-8 w-64 bg-muted animate-pulse rounded-md mb-4" /></div>
 
