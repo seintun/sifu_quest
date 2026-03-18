@@ -52,6 +52,8 @@ export function useChatPagination() {
   }, [])
 
   const resetPaging = useCallback(() => {
+    olderAbortRef.current?.abort()
+    olderAbortRef.current = null
     setHasOlderMessages(false)
     setNextBefore(null)
     setNextBeforeId(null)

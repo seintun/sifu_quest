@@ -17,6 +17,16 @@ type CacheEntry = {
 const cache = new Map<string, CacheEntry>()
 
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+const MAX_CACHE_SIZE = 100
+
+function evictExpired() {
+  const now = Date.now()
+  for (const [key, entry] of cache) {
+    if (now > entry.expiresAt) {
+      cache.delete(key)
+    }
+  }
+}
 
 function makeCacheKey(userId: string, mode: string | undefined, isGreeting: boolean | undefined): string {
   return `${userId}:${mode ?? 'default'}:${isGreeting ? 'greeting' : 'normal'}`
@@ -56,6 +66,10 @@ export function setCachedSystemPrompt(
   // Don't cache greeting prompts
   if (isGreeting) {
     return
+  }
+
+  if (cache.size >= MAX_CACHE_SIZE) {
+    evictExpired()
   }
 
   const key = makeCacheKey(userId, mode, isGreeting)
