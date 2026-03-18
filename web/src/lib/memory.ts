@@ -152,7 +152,7 @@ export async function writeMemoryFile(
     return
   }
 
-  // If RPC function doesn't exist, use retry-based fallback with optimistic concurrency
+  // If RPC function doesn't exist, use optimistic retry on conflict (read-then-write with version check)
   const missingRpc =
     rpcError.code === '42883' ||
     rpcError.code === 'PGRST202' ||

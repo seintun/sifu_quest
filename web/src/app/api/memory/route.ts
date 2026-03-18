@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   }
   const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
 
-  const rawParams = { file: request.nextUrl.searchParams.get('file') }
+  const rawParams = { file: request.nextUrl.searchParams.get('file') ?? undefined }
   const parsedParams = memoryGetSchema.safeParse(rawParams)
   if (!parsedParams.success) {
     return NextResponse.json(validationErrorResponse(parsedParams.error), { status: 400 })
