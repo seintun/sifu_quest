@@ -91,9 +91,20 @@ async function buildSystemPrompt(
     return systemPrompt
   }
 
-  const [modeContent, memoryByFile] = await Promise.all([
+  const [modeContent, memoryByFile, onboardingData] = await Promise.all([
     readModeFile(modeConfig.mode),
     readMemoryFiles(userId, modeConfig.memory),
+    isGreeting
+      ? (async () => {
+          const supabaseAdmin = createAdminClient()
+          const { data } = await supabaseAdmin
+            .from('user_profiles')
+            .select('onboarding_status, onboarding_next_prompt_key')
+            .eq('id', userId)
+            .maybeSingle()
+          return data ?? null
+        })()
+      : Promise.resolve(null),
   ])
 
   if (modeContent) {
@@ -116,18 +127,8 @@ async function buildSystemPrompt(
 
   if (isGreeting) {
     let enrichmentQuestion: string | null = null
-    try {
-      const supabaseAdmin = createAdminClient()
-      const { data } = await supabaseAdmin
-        .from('user_profiles')
-        .select('onboarding_status, onboarding_next_prompt_key')
-        .eq('id', userId)
-        .maybeSingle()
-      if (data?.onboarding_status === 'core_complete') {
-        enrichmentQuestion = getEnrichmentCoachQuestion(data.onboarding_next_prompt_key)
-      }
-    } catch {
-      // No-op: greeting can continue without enrichment prompt.
+    if (onboardingData?.onboarding_status === 'core_complete') {
+      enrichmentQuestion = getEnrichmentCoachQuestion(onboardingData.onboarding_next_prompt_key)
     }
 
     const nameMatch = profileContent.match(/\*\*Name:\*\*\s*(.+)/)
@@ -352,9 +353,13 @@ export async function POST(request: NextRequest) {
           )
 
           let systemPrompt = getCachedSystemPrompt(userId, mode, isGreeting)
+          const cacheHit = Boolean(systemPrompt)
           if (!systemPrompt) {
             systemPrompt = await buildSystemPrompt(userId, mode, isGreeting)
             setCachedSystemPrompt(userId, mode, isGreeting, systemPrompt)
+          }
+          if (isGreeting) {
+            console.log(`[chat] greeting prompt cache ${cacheHit ? 'hit' : 'miss'} for user=${userId} mode=${mode}`)
           }
 
           if (resolvedProvider === 'anthropic') {

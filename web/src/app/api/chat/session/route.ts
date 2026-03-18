@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
       before: searchParams.get('before'),
       beforeId: searchParams.get('beforeId'),
       limit: searchParams.get('limit') ?? undefined,
+      create_if_missing: searchParams.get('create_if_missing'),
     }
 
     const parsedParams = chatSessionGetSchema.safeParse(rawParams)
@@ -79,8 +80,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(validationErrorResponse(parsedParams.error), { status: 400 })
     }
 
-    const { mode, before, beforeId, limit: parsedLimit } = parsedParams.data
+    const { mode, before, beforeId, limit: parsedLimit, create_if_missing } = parsedParams.data
     const pageSize = parsedLimit ?? null
+    const shouldCreateIfMissing = create_if_missing === '1'
 
     const supabase = createAdminClient()
     const userProfile = await ensureUserProfile(userId, session.user.email)
@@ -154,6 +156,87 @@ export async function GET(request: NextRequest) {
         }
 
     if (!chatSession) {
+      // Auto-create session if requested (optimization: saves a round trip on first visit)
+      if (shouldCreateIfMissing) {
+        // Archive any old sessions for this mode
+        await supabase
+          .from('chat_sessions')
+          .update({ is_archived: true })
+          .eq('user_id', userId)
+          .eq('mode', mode)
+          .eq('is_archived', false)
+
+        const modernInsert = await supabase
+          .from('chat_sessions')
+          .insert({
+            user_id: userId,
+            mode,
+            title: `Chat - ${mode}`,
+            provider: fallbackSelection.provider,
+            model: fallbackSelection.model,
+          })
+          .select(SESSION_SELECT_WITH_TELEMETRY)
+          .single()
+
+        if (!modernInsert.error) {
+          const newSession = modernInsert.data as SessionRow
+          return NextResponse.json({
+            session: {
+              ...newSession,
+              provider: fallbackSelection.provider,
+              model: fallbackSelection.model,
+            },
+            messages: [],
+            freeQuota,
+            selection: fallbackSelection,
+            metrics: {
+              userTurns: newSession?.user_turns_count ?? 0,
+              inputTokens: newSession?.input_tokens_total ?? 0,
+              outputTokens: newSession?.output_tokens_total ?? 0,
+              totalTokens: newSession?.total_tokens_total ?? 0,
+              estimatedCostMicrousd: newSession?.estimated_cost_microusd_total ?? 0,
+            },
+          })
+        }
+
+        // Fallback: try legacy insert if telemetry columns fail
+        if (isMissingSessionTelemetryColumnError(modernInsert.error)) {
+          const legacyInsert = await supabase
+            .from('chat_sessions')
+            .insert({
+              user_id: userId,
+              mode,
+              title: `Chat - ${mode}`,
+            })
+            .select(SESSION_SELECT_LEGACY)
+            .single()
+
+          if (!legacyInsert.error) {
+            const newSession = legacyInsert.data as SessionRow
+            return NextResponse.json({
+              session: {
+                ...newSession,
+                provider: fallbackSelection.provider,
+                model: fallbackSelection.model,
+              },
+              messages: [],
+              freeQuota,
+              selection: fallbackSelection,
+              metrics: {
+                userTurns: 0,
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+                estimatedCostMicrousd: 0,
+              },
+            })
+          }
+        }
+
+        // If creation failed, fall through to return null
+        console.error('Auto-create session failed', modernInsert.error)
+      }
+
       return NextResponse.json({
         session: null,
         messages: [],

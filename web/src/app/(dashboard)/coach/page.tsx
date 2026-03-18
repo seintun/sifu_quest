@@ -171,6 +171,7 @@ export default function CoachPage() {
     isLoadingOpenRouterAllModels,
     loadAllOpenRouterModels,
     formatMicrousd,
+    sessionId,
   } = useChat(mode);
 
   const [dismissedPrompt, setDismissedPrompt] = useState(false);
@@ -210,7 +211,10 @@ export default function CoachPage() {
   );
 
   useEffect(() => {
-    if (!isLoaded) return;
+    // Fire greeting as soon as possible:
+    // - Fast path: sessionId available from auto-created session (parallel with bootstrap)
+    // - Fallback: isLoaded ensures greeting fires even if auto-create failed
+    if (!sessionId && !isLoaded) return;
 
     if (
       messages.length === 0 &&
@@ -237,13 +241,16 @@ export default function CoachPage() {
     }
   }, [
     mode,
+    sessionId,
+    isLoaded,
     messages.length,
     greet,
-    isLoaded,
     upgradeRequired,
     isQuotaBlocked,
     setMessages,
     isGuest,
+    hasProviderKey,
+    selectedProvider,
   ]);
 
   const syncScrollState = useCallback(() => {

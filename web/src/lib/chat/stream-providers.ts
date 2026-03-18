@@ -98,7 +98,13 @@ export async function streamAnthropic(
   const stream = await client.messages.stream({
     model,
     max_tokens: 4096,
-    system: systemPrompt,
+    system: [
+      {
+        type: 'text',
+        text: systemPrompt,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
     messages: messages.map((m) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,

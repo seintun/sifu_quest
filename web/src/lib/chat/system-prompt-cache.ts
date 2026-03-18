@@ -1,8 +1,8 @@
 /**
  * In-memory cache for system prompts to avoid rebuilding on every request.
  *
- * Cache key: `${userId}:${mode}:${isGreeting}`
- * TTL: 5 minutes
+ * Cache key: `${userId}:${mode}:${isGreeting ? 'greeting' : 'normal'}`
+ * TTL: 5 minutes for normal prompts, 2 minutes for greetings
  *
  * NOTE: In serverless environments, cache is per-instance and resets on cold starts.
  * This is acceptable since rebuilding the prompt is cheap, and the cache mainly helps
@@ -16,7 +16,8 @@ type CacheEntry = {
 
 const cache = new Map<string, CacheEntry>()
 
-const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+const NORMAL_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+const GREETING_CACHE_TTL_MS = 2 * 60 * 1000 // 2 minutes (shorter since onboarding state can change)
 const MAX_CACHE_SIZE = 100
 
 function evictExpired() {
@@ -28,7 +29,11 @@ function evictExpired() {
   }
 }
 
-function makeCacheKey(userId: string, mode: string | undefined, isGreeting: boolean | undefined): string {
+function makeCacheKey(
+  userId: string,
+  mode: string | undefined,
+  isGreeting: boolean | undefined,
+): string {
   return `${userId}:${mode ?? 'default'}:${isGreeting ? 'greeting' : 'normal'}`
 }
 
@@ -37,11 +42,6 @@ export function getCachedSystemPrompt(
   mode: string | undefined,
   isGreeting: boolean | undefined,
 ): string | null {
-  // Never cache greeting prompts - they depend on dynamic onboarding state
-  if (isGreeting) {
-    return null
-  }
-
   const key = makeCacheKey(userId, mode, isGreeting)
   const entry = cache.get(key)
 
@@ -63,19 +63,16 @@ export function setCachedSystemPrompt(
   isGreeting: boolean | undefined,
   prompt: string,
 ): void {
-  // Don't cache greeting prompts
-  if (isGreeting) {
-    return
-  }
-
   if (cache.size >= MAX_CACHE_SIZE) {
     evictExpired()
   }
 
   const key = makeCacheKey(userId, mode, isGreeting)
+  const ttl = isGreeting ? GREETING_CACHE_TTL_MS : NORMAL_CACHE_TTL_MS
+
   cache.set(key, {
     prompt,
-    expiresAt: Date.now() + CACHE_TTL_MS,
+    expiresAt: Date.now() + ttl,
   })
 }
 
@@ -87,6 +84,19 @@ export function invalidateSystemPromptCache(userId: string): void {
   const prefix = `${userId}:`
   for (const key of cache.keys()) {
     if (key.startsWith(prefix)) {
+      cache.delete(key)
+    }
+  }
+}
+
+/**
+ * Invalidate only greeting cache entries for a user.
+ * Use when onboarding status changes.
+ */
+export function invalidateGreetingCacheForUser(userId: string): void {
+  const prefix = `${userId}:`
+  for (const key of cache.keys()) {
+    if (key.startsWith(prefix) && key.endsWith(':greeting')) {
       cache.delete(key)
     }
   }
