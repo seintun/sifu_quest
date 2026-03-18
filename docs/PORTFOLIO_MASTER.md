@@ -19,7 +19,7 @@ Sifu Quest is an AI-powered career coaching platform demonstrating full-stack en
 **Tables**: `user_profiles`, `memory_files`, `memory_file_versions`, `chat_sessions`, `chat_messages`, `progress_events`, `audit_log`, `plan_jobs`
 - **RLS Policies**: Every table enforces `auth.uid() = user_id` for complete data isolation
 - **Composite Indexes**: Optimized for common query patterns (e.g., `idx_chat_sessions_user_mode_archived_created`)
-- **Atomic Operations**: PostgreSQL functions for batch operations (`persist_chat_turn_rpc`)
+- **Atomic Operations**: PostgreSQL functions for batch operations (`persist_chat_turn`)
 - **Migration Strategy**: Versioned SQL migrations with zero-downtime compatibility layer (`lib/chat-schema-compat.ts`)
 
 ### API Route Structure
@@ -105,7 +105,7 @@ Sifu Quest is an AI-powered career coaching platform demonstrating full-stack en
 **Five Layered Optimizations**:
 1. **Parallelization**: `Promise.all` for profile fetch + file reads (~30-50ms saved)
 2. **App-Level Caching**: `system-prompt-cache.ts` with TTL strategies
-3. **Anthropic Prompt Caching**: `cache_control: { type: 'ephemoral' }` header (90% reduction on hits)
+3. **Anthropic Prompt Caching**: `cache_control: { type: 'ephemeral' }` header (90% reduction on hits)
 4. **Session Bootstrap RTT**: `create_if_missing=1` flag eliminates POST round-trip
 5. **Eager Greeting Trigger**: Fire greeting on sessionId availability, not full bootstrap
 
@@ -696,7 +696,7 @@ The AI generates structured `plan.md` using hierarchical format:
 
 ### 3. Provider Selection & Model Routing
 **Resolution**: `resolveProviderSelection` in `lib/chat-selection.ts`
-**Key Fetch**: `user_provider_keys` table → `decryptKey` → stream handlers
+**Key Fetch**: `user_api_keys` table → `decryptKey` → stream handlers
 **Fallback**: `streamOpenRouterWithFallback` attempts primary model, falls back to free router on 404/429/5xx
 
 ### 4. Streaming Response (SSE)
