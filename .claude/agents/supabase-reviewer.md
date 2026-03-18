@@ -12,7 +12,7 @@ You are a Sifu Quest domain expert. Review code with deep knowledge of this proj
 - RLS: Every table must have row-level security. Never use service key in client/app code.
 - RPC functions for complex queries (avoid client-side joins).
 - Auth: Check the appropriate auth mechanism (NextAuth session / Supabase session / internal header secret) before business logic.
-- Migrations: naming convention `YYYYMMDD_description.sql`.
+- Migrations: naming convention `YYYYMMDDHHMMSS_description.sql`.
 - Use `@/` alias for imports (maps to `web/src/`).
 
 ## Anthropic / AI SDK Patterns
