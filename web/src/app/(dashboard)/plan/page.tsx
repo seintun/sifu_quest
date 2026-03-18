@@ -43,6 +43,19 @@ const CATEGORY_DOMAINS: Record<string, keyof typeof DOMAIN_COLORS> = {
   'Behavioral': 'coach',
 }
 
+/**
+ * Extract category name and time budget from category string
+ * "DSA (4 hrs)" → { name: "DSA", timeBudget: "4 hrs" }
+ * "System Design" → { name: "System Design", timeBudget: null }
+ */
+function parseCategoryInfo(category: string): { name: string; timeBudget: string | null } {
+  const timeMatch = category.match(/^(.+?)\s*\(([^)]+(?:hrs?|hours?|mins?|minutes?)[^)]*)\)\s*$/i)
+  if (timeMatch) {
+    return { name: timeMatch[1].trim(), timeBudget: timeMatch[2].trim() }
+  }
+  return { name: category, timeBudget: null }
+}
+
 type OnboardingPlanStatus = 'not_queued' | 'queued' | 'running' | 'ready' | 'failed'
 
 const PLAN_PLACEHOLDER_MARKER = 'being generated in the background'
@@ -461,18 +474,24 @@ export default function PlanPage() {
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {Object.entries(week.categories).map(([category, items]) => {
-                                  const domain = CATEGORY_DOMAINS[category] || CATEGORY_DOMAINS[Object.keys(CATEGORY_DOMAINS).find(k => category.includes(k)) || ''] || 'streak'
+                                  const { name: categoryName, timeBudget } = parseCategoryInfo(category)
+                                  const domain = CATEGORY_DOMAINS[categoryName] || CATEGORY_DOMAINS[Object.keys(CATEGORY_DOMAINS).find(k => categoryName.includes(k)) || ''] || 'streak'
                                   const colors = DOMAIN_COLORS[domain]
 
                                   return (
-                                    <Card key={category} className={`overflow-hidden border border-border/20 bg-surface/60 transition-all hover:bg-surface/80 hover:shadow-lg ${category.includes('Goals') ? 'md:col-span-2' : ''}`}>
+                                    <Card key={category} className={`overflow-hidden border border-border/20 bg-surface/60 transition-all hover:bg-surface/80 hover:shadow-lg ${categoryName.includes('Goals') ? 'md:col-span-2' : ''}`}>
                                       <CardHeader className="py-2.5 px-4 border-b border-border/10 bg-elevated/20">
                                         <CardTitle className="text-[12px] font-bold flex items-center gap-2">
                                           <div className={`p-1 rounded-md ${colors.bg} ${colors.text} shadow-sm border ${colors.border}`}>
                                             <CheckCircle2 className="h-3.5 w-3.5" />
                                           </div>
-                                          {category}
-                                          <Badge variant="outline" className="ml-auto text-[9px] h-5 border-border/40 bg-surface/50 font-bold tracking-tighter">
+                                          <span className="truncate">{categoryName}</span>
+                                          {timeBudget && (
+                                            <Badge variant="outline" className="shrink-0 text-[9px] h-4 px-1.5 border-plan/30 bg-plan/10 text-plan font-semibold tracking-tight">
+                                              {timeBudget}
+                                            </Badge>
+                                          )}
+                                          <Badge variant="outline" className="shrink-0 ml-auto text-[9px] h-5 border-border/40 bg-surface/50 font-bold tracking-tighter">
                                             {items.filter(i => !i.id.includes('-info-') && i.checked).length}/{items.filter(i => !i.id.includes('-info-')).length}
                                           </Badge>
                                         </CardTitle>
@@ -495,18 +514,24 @@ export default function PlanPage() {
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {Object.entries(month.categories).map(([category, items]) => {
-                          const domain = CATEGORY_DOMAINS[category] || CATEGORY_DOMAINS[Object.keys(CATEGORY_DOMAINS).find(k => category.includes(k)) || ''] || 'streak'
+                          const { name: categoryName, timeBudget } = parseCategoryInfo(category)
+                          const domain = CATEGORY_DOMAINS[categoryName] || CATEGORY_DOMAINS[Object.keys(CATEGORY_DOMAINS).find(k => categoryName.includes(k)) || ''] || 'streak'
                           const colors = DOMAIN_COLORS[domain]
 
                           return (
-                            <Card key={category} className={`overflow-hidden border border-border/20 bg-surface/60 transition-all hover:bg-surface/80 hover:shadow-lg ${category.includes('Goals') ? 'md:col-span-2' : ''}`}>
+                            <Card key={category} className={`overflow-hidden border border-border/20 bg-surface/60 transition-all hover:bg-surface/80 hover:shadow-lg ${categoryName.includes('Goals') ? 'md:col-span-2' : ''}`}>
                               <CardHeader className="py-2.5 px-4 border-b border-border/10 bg-elevated/20">
                                 <CardTitle className="text-[12px] font-bold flex items-center gap-2">
                                   <div className={`p-1 rounded-md ${colors.bg} ${colors.text} shadow-sm border ${colors.border}`}>
                                     <CheckCircle2 className="h-3.5 w-3.5" />
                                   </div>
-                                  {category}
-                                  <Badge variant="outline" className="ml-auto text-[9px] h-5 border-border/40 bg-surface/50 font-bold tracking-tighter">
+                                  <span className="truncate">{categoryName}</span>
+                                  {timeBudget && (
+                                    <Badge variant="outline" className="shrink-0 text-[9px] h-4 px-1.5 border-plan/30 bg-plan/10 text-plan font-semibold tracking-tight">
+                                      {timeBudget}
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="shrink-0 ml-auto text-[9px] h-5 border-border/40 bg-surface/50 font-bold tracking-tighter">
                                     {items.filter(i => !i.id.includes('-info-') && i.checked).length}/{items.filter(i => !i.id.includes('-info-')).length}
                                   </Badge>
                                 </CardTitle>
