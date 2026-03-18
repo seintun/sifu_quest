@@ -10,7 +10,7 @@ import type { ParsedPlan, PlanItem } from '@/lib/parsers/plan-parser'
 import { parsePlan } from '@/lib/parsers/plan-parser'
 import { DOMAIN_COLORS } from '@/lib/theme'
 import { normalizeMarkdownContent } from '@/lib/markdown-formatting'
-import { AlertTriangle, CheckCircle2, Clock, RefreshCw, Target, LayoutDashboard, Info, Sparkles } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, RefreshCw, Target, LayoutDashboard, Info, Sparkles } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { fetcher } from '@/lib/fetcher'
@@ -54,28 +54,6 @@ function parseCategoryInfo(category: string): { name: string; timeBudget: string
     return { name: timeMatch[1].trim(), timeBudget: timeMatch[2].trim() }
   }
   return { name: category, timeBudget: null }
-}
-
-function parseHours(budget: string | null): number {
-  if (!budget) return 0
-  const match = budget.match(/([\d.]+)\s*(?:hrs?|hours?)/i)
-  return match ? parseFloat(match[1]) : 0
-}
-
-function TimeBudgetBanner({ budgets }: { budgets: Array<{ name: string; timeBudget: string | null }> }) {
-  if (budgets.length === 0) return null
-  const totalHours = budgets.reduce((sum, b) => sum + parseHours(b.timeBudget), 0)
-  if (totalHours === 0) return null
-
-  return (
-    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-plan/25 bg-plan/[0.06]">
-      <Clock className="h-3.5 w-3.5 text-plan shrink-0" />
-      <span className="text-[11px] font-bold text-plan uppercase tracking-wider">Weekly Budget</span>
-      <div className="h-3 w-px bg-plan/25 shrink-0" />
-      <span className="text-[12px] font-bold text-plan">{totalHours}h total</span>
-      <span className="text-[11px] text-muted-foreground/70">across {budgets.length} {budgets.length === 1 ? 'category' : 'categories'}</span>
-    </div>
-  )
 }
 
 type OnboardingPlanStatus = 'not_queued' | 'queued' | 'running' | 'ready' | 'failed'
@@ -489,16 +467,11 @@ export default function PlanPage() {
 
                         {month.weeks.map(week => {
                           const weekItems = Object.values(week.categories).flat()
-                          const weekBudgets = Object.entries(week.categories)
-                            .map(([cat]) => parseCategoryInfo(cat))
-                            .filter(c => c.timeBudget)
 
                           return (
                             <TabsContent key={week.week} value={`week${week.week}`} className="space-y-3">
                               <div className="text-xs text-muted-foreground mb-1">{week.title}</div>
                               <WeekProgress items={weekItems} />
-
-                              <TimeBudgetBanner budgets={weekBudgets} />
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {Object.entries(week.categories).map(([category, items]) => {

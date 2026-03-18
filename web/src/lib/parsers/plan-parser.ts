@@ -222,8 +222,9 @@ export function parsePlan(content: string): ParsedPlan {
     }
 
     // H4 Category headers within weeks (#### 🔧 System Design (2 hrs) or #### Category Name)
+    // Skip "Time Budget" lines — these are metadata, not categories
     const h4CatMatch = line.match(/^####\s*(?:[^\w\s]+\s*)?(.+)/)
-    if (h4CatMatch && currentWeek && currentMonth) {
+    if (h4CatMatch && currentWeek && currentMonth && !h4CatMatch[1].trim().toLowerCase().startsWith('time budget')) {
       currentWeekCategory = h4CatMatch[1].trim()
       // Also set currentCategory for backward compatibility with existing item addition logic
       currentCategory = currentWeekCategory
@@ -237,8 +238,9 @@ export function parsePlan(content: string): ParsedPlan {
     }
 
     // Bold category headers within weeks (**DSA (4 hrs)** or **Category Name**)
+    // Skip "Time Budget" lines — these are metadata, not categories
     const boldCatMatch = line.match(/^\*\*([^*]+)\*\*\s*$/)
-    if (boldCatMatch && currentWeek && currentMonth) {
+    if (boldCatMatch && currentWeek && currentMonth && !boldCatMatch[1].trim().toLowerCase().startsWith('time budget')) {
       currentWeekCategory = boldCatMatch[1].trim()
       // Also set currentCategory for backward compatibility
       currentCategory = currentWeekCategory
@@ -252,8 +254,9 @@ export function parsePlan(content: string): ParsedPlan {
     }
 
     // Category headers (### DSA, ### System Design, ### Job Search, or with emojis) - for non-week format
+    // Skip "Time Budget" lines — these are metadata, not categories
     const catMatch = line.match(/^###\s*(?:[^\w\s]+\s*)?(.+)/)
-    if (catMatch && currentSection === 'month' && !currentWeek) {
+    if (catMatch && currentSection === 'month' && !currentWeek && !catMatch[1].trim().toLowerCase().startsWith('time budget')) {
       currentCategory = catMatch[1].trim()
       if (currentMonth) {
         currentMonth.categories[currentCategory] = []
