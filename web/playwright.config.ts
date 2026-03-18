@@ -15,7 +15,7 @@ export default defineConfig({
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
-        command: 'npm run dev',
+        command: 'bun run dev',
         port: 3000,
         reuseExistingServer: true,
         timeout: 120_000,
