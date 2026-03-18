@@ -32,7 +32,7 @@ test('assertRequiredEnv throws with missing env keys', () => {
     assertRequiredEnv(['TEST_REQUIRED'])
   } catch (error) {
     assert.ok(error instanceof MissingEnvironmentVariableError)
-    assert.equal(error.message, 'Server configuration is incomplete.')
+    assert.equal(error.message, 'Server configuration is incomplete. Missing keys: TEST_REQUIRED')
     assert.deepEqual(error.missingKeys, ['TEST_REQUIRED'])
   }
 })
