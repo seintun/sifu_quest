@@ -594,6 +594,14 @@ export default function PlanPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* AI Disclaimer */}
+          <div className="mt-6 flex items-start gap-2 p-3 rounded-lg border border-border/15 bg-elevated/20">
+            <Info className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
+            <p className="text-[11px] leading-relaxed text-muted-foreground/60">
+              This game plan is AI-generated based on your profile and preferences. Some information may be outdated or not entirely relevant to your current situation. Links and recommendations are provided as guidance — please verify details independently before acting on them.
+            </p>
+          </div>
         </div>
       )}
     </div>
