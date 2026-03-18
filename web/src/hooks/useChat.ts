@@ -7,7 +7,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   resolveSelection,
   useChatSelection,
-  type ChatSelection,
 } from './chat/useChatSelection'
 import {
   PAGE_SIZE,
@@ -22,7 +21,6 @@ import type {
   ChatProviderOption,
   FreeQuota,
   SessionUsageMetrics,
-  StreamPhase,
 } from './chat/useChatTypes'
 
 // Re-export types for backward compatibility.
@@ -209,7 +207,7 @@ export function useChat(mode: string) {
       abortOlder()
       openRouterCatalogAbortRef.current?.abort()
     }
-  }, [mode, loadBootstrap])
+  }, [mode, loadBootstrap]) // eslint-disable-line react-hooks/exhaustive-deps -- stable setState helpers and refs intentionally omitted
 
   const reload = useCallback(() => {
     void loadBootstrap()
@@ -228,7 +226,7 @@ export function useChat(mode: string) {
       const firstAvailable = models.find((model) => model.availability === 'available')
       return firstAvailable?.id ?? models[0]?.id ?? ''
     })
-  }, [modelGroupsByProvider, modelsByProvider])
+  }, [modelGroupsByProvider, modelsByProvider]) // eslint-disable-line react-hooks/exhaustive-deps -- setSelectedProvider/setSelectedModel are stable state setters
 
   const loadAllOpenRouterModels = useCallback(async () => {
     if (isLoadingOpenRouterAllModels || !hasProviderKey.openrouter) return
@@ -272,7 +270,7 @@ export function useChat(mode: string) {
   const updateModelSelection = useCallback((modelId: string) => {
     setUpgradeRequired(null)
     setSelectedModel(modelId)
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- setSelectedModel is a stable state setter
 
   const ensureSession = useCallback(async (): Promise<string> => {
     if (sessionId) return sessionId
@@ -400,7 +398,7 @@ export function useChat(mode: string) {
         abortRef.current = null
       }
     }
-  }, [messages, mode, ensureSession, freeQuota, selectedProvider, selectedModel, hasProviderKey, processStreamResponse, startStreaming, setIsStreaming, resetStreaming])
+  }, [messages, mode, ensureSession, freeQuota, selectedProvider, selectedModel, hasProviderKey, processStreamResponse, startStreaming, setIsStreaming, resetStreaming]) // eslint-disable-line react-hooks/exhaustive-deps -- abortRef is a stable ref
 
   const greet = useCallback(async () => {
     if (isStreaming) return
@@ -452,7 +450,7 @@ export function useChat(mode: string) {
         abortRef.current = null
       }
     }
-  }, [isStreaming, mode, ensureSession, selectedProvider, selectedModel, processStreamResponse, startStreaming, setIsStreaming, resetStreaming])
+  }, [isStreaming, mode, ensureSession, selectedProvider, selectedModel, processStreamResponse, startStreaming, setIsStreaming, resetStreaming]) // eslint-disable-line react-hooks/exhaustive-deps -- abortRef is a stable ref
 
   const clearHistory = useCallback(async () => {
     setMessages([])
