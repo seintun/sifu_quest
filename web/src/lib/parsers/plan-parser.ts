@@ -19,6 +19,13 @@ export interface MonthSection {
   title: string
   theme: string
   categories: Record<string, PlanItem[]>
+  weeks: WeekSection[]
+}
+
+export interface WeekSection {
+  week: number
+  title: string
+  categories: Record<string, PlanItem[]>
 }
 
 export interface PlanMetadata {
@@ -62,6 +69,8 @@ export function parsePlan(content: string): ParsedPlan {
   let currentCategory = ''
   let currentSection = ''
   let itemCounters: Record<string, number> = {}
+  let currentWeek: WeekSection | null = null
+  let currentWeekCategory: string = ''
 
   // Parse state
   let inDashboardTable = false
@@ -162,9 +171,11 @@ export function parsePlan(content: string): ParsedPlan {
         title: monthMatch[2].trim(),
         theme: '',
         categories: {},
+        weeks: []
       }
       months.push(currentMonth)
       currentCategory = ''
+      currentWeek = null // Reset week tracking for new month
       itemCounters = {}
       currentSection = 'month'
       continue
@@ -176,9 +187,56 @@ export function parsePlan(content: string): ParsedPlan {
       continue
     }
 
-    // Category headers (### DSA, ### System Design, ### Job Search, or with emojis)
+    // Week headers (### Week N — Title or ### Week N: Title)
+    const weekMatch = line.match(/^###\s*Week\s+(\d+)\s*[:—–-]\s*(.+)$/i)
+    if (weekMatch && currentMonth) {
+      const week = parseInt(weekMatch[1])
+      const title = weekMatch[2].trim()
+
+      currentWeek = {
+        week,
+        title,
+        categories: {}
+      }
+      currentMonth.weeks.push(currentWeek)
+      currentWeekCategory = ''
+      currentCategory = '' // Reset category since we're now in a week structure
+      continue
+    }
+
+    // H4 Category headers within weeks (#### 🔧 System Design (2 hrs) or #### Category Name)
+    const h4CatMatch = line.match(/^####\s*(?:[^\w\s]+\s*)?(.+)/)
+    if (h4CatMatch && currentWeek && currentMonth) {
+      currentWeekCategory = h4CatMatch[1].trim()
+      // Also set currentCategory for backward compatibility with existing item addition logic
+      currentCategory = currentWeekCategory
+      if (!currentWeek.categories[currentWeekCategory]) {
+        currentWeek.categories[currentWeekCategory] = []
+      }
+      if (!currentMonth.categories[currentWeekCategory]) {
+        currentMonth.categories[currentWeekCategory] = []
+      }
+      continue
+    }
+
+    // Bold category headers within weeks (**DSA (4 hrs)** or **Category Name**)
+    const boldCatMatch = line.match(/^\*\*([^*]+)\*\*\s*$/)
+    if (boldCatMatch && currentWeek && currentMonth) {
+      currentWeekCategory = boldCatMatch[1].trim()
+      // Also set currentCategory for backward compatibility
+      currentCategory = currentWeekCategory
+      if (!currentWeek.categories[currentWeekCategory]) {
+        currentWeek.categories[currentWeekCategory] = []
+      }
+      if (!currentMonth.categories[currentWeekCategory]) {
+        currentMonth.categories[currentWeekCategory] = []
+      }
+      continue
+    }
+
+    // Category headers (### DSA, ### System Design, ### Job Search, or with emojis) - for non-week format
     const catMatch = line.match(/^###\s*(?:[^\w\s]+\s*)?(.+)/)
-    if (catMatch && currentSection === 'month') {
+    if (catMatch && currentSection === 'month' && !currentWeek) {
       currentCategory = catMatch[1].trim()
       if (currentMonth) {
         currentMonth.categories[currentCategory] = []
@@ -236,7 +294,8 @@ export function parsePlan(content: string): ParsedPlan {
         if (!itemCounters[counterKey]) itemCounters[counterKey] = 0
         const index = itemCounters[counterKey]++
 
-        const weekPart = week ? `-week${week}` : ''
+        const weekNum = week || (currentWeek ? currentWeek.week : null)
+        const weekPart = weekNum ? `-week${weekNum}` : ''
         const id = `month${currentMonth.month}-${categorySlug}${weekPart}-${index}`
 
         const item: PlanItem = {
@@ -245,39 +304,72 @@ export function parsePlan(content: string): ParsedPlan {
           checked,
           category: currentCategory,
           month: currentMonth.month,
-          week,
+          week: weekNum,
           lineIndex: i,
         }
 
+        // Always add to month categories for backward compatibility
         if (!currentMonth.categories[currentCategory]) {
           currentMonth.categories[currentCategory] = []
         }
         currentMonth.categories[currentCategory].push(item)
+
+        // Add to week categories if we have a week number
+        if (weekNum !== null) {
+          // Find or create the week section
+          let targetWeek = currentMonth.weeks.find(w => w.week === weekNum)
+          if (!targetWeek) {
+            targetWeek = {
+              week: weekNum,
+              title: `Week ${weekNum}`,
+              categories: {}
+            }
+            currentMonth.weeks.push(targetWeek)
+          }
+
+          // Ensure category exists in week
+          if (!targetWeek.categories[currentCategory]) {
+            targetWeek.categories[currentCategory] = []
+          }
+          targetWeek.categories[currentCategory].push(item)
+
+          // Also sync to month.categories (already done above) for backward compatibility
+        }
       }
       continue
     }
 
-    // Bold subheaders within months to be captured as informational items (without checkbox)
+    // Bold subheaders within months/weeks to be captured as informational items (without checkbox)
     if (currentMonth && currentCategory && line.match(/^\s*\*\*([^*]+)\*\*\s*$/)) {
       const text = line.trim()
       const categorySlug = slugify(currentCategory)
       const counterKey = `month${currentMonth.month}-${categorySlug}`
       if (!itemCounters[counterKey]) itemCounters[counterKey] = 0
       const index = itemCounters[counterKey]++
-      
+
       const id = `month${currentMonth.month}-${categorySlug}-info-${index}`
-      
+
       const item: PlanItem = {
         id,
         text,
         checked: false, // Informational items can't be "checked" in the traditional sense
         category: currentCategory,
         month: currentMonth.month,
-        week: null,
+        week: currentWeek ? currentWeek.week : null,
         lineIndex: i,
       }
-      
+
+      // Add to month categories for backward compatibility
       currentMonth.categories[currentCategory].push(item)
+
+      // Also add to week categories if we have currentWeek
+      if (currentWeek) {
+        if (!currentWeek.categories[currentCategory]) {
+          currentWeek.categories[currentCategory] = []
+        }
+        currentWeek.categories[currentCategory].push(item)
+      }
+
       continue
     }
   }
