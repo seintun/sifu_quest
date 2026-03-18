@@ -15,7 +15,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test --experimental-strip-types --experimental-specifier-resolution=node src/**/*.test.mts",
+    "test": "bun test src/**/*.test.mts",
     "test:e2e": "playwright test",
     "setup": "node scripts/setup.mjs"
   },
