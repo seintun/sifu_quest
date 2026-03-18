@@ -10,7 +10,7 @@ import type { ParsedPlan, PlanItem, WeekSection } from '@/lib/parsers/plan-parse
 import { parsePlan } from '@/lib/parsers/plan-parser'
 import { DOMAIN_COLORS } from '@/lib/theme'
 import { normalizeMarkdownContent } from '@/lib/markdown-formatting'
-import { AlertTriangle, CheckCircle2, RefreshCw, Target, LayoutDashboard, Info, Sparkles } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock, RefreshCw, Target, LayoutDashboard, Info, Sparkles } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { fetcher } from '@/lib/fetcher'
@@ -486,11 +486,6 @@ export default function PlanPage() {
                                             <CheckCircle2 className="h-3.5 w-3.5" />
                                           </div>
                                           <span className="truncate">{categoryName}</span>
-                                          {timeBudget && (
-                                            <Badge variant="outline" className="shrink-0 text-[9px] h-4 px-1.5 border-plan/30 bg-plan/10 text-plan font-semibold tracking-tight">
-                                              {timeBudget}
-                                            </Badge>
-                                          )}
                                           <Badge variant="outline" className="shrink-0 ml-auto text-[9px] h-5 border-border/40 bg-surface/50 font-bold tracking-tighter">
                                             {items.filter(i => !i.id.includes('-info-') && i.checked).length}/{items.filter(i => !i.id.includes('-info-')).length}
                                           </Badge>
@@ -503,6 +498,14 @@ export default function PlanPage() {
                                           ))}
                                         </div>
                                       </CardContent>
+                                      {timeBudget && (
+                                        <div className="px-4 py-1.5 border-t border-border/10 bg-elevated/10">
+                                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70">
+                                            <Clock className="h-3 w-3 opacity-50" />
+                                            <span className="font-medium">{timeBudget}</span>
+                                          </div>
+                                        </div>
+                                      )}
                                     </Card>
                                   )
                                 })}
@@ -526,11 +529,6 @@ export default function PlanPage() {
                                     <CheckCircle2 className="h-3.5 w-3.5" />
                                   </div>
                                   <span className="truncate">{categoryName}</span>
-                                  {timeBudget && (
-                                    <Badge variant="outline" className="shrink-0 text-[9px] h-4 px-1.5 border-plan/30 bg-plan/10 text-plan font-semibold tracking-tight">
-                                      {timeBudget}
-                                    </Badge>
-                                  )}
                                   <Badge variant="outline" className="shrink-0 ml-auto text-[9px] h-5 border-border/40 bg-surface/50 font-bold tracking-tighter">
                                     {items.filter(i => !i.id.includes('-info-') && i.checked).length}/{items.filter(i => !i.id.includes('-info-')).length}
                                   </Badge>
@@ -543,6 +541,14 @@ export default function PlanPage() {
                                   ))}
                                 </div>
                               </CardContent>
+                              {timeBudget && (
+                                <div className="px-4 py-1.5 border-t border-border/10 bg-elevated/10">
+                                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70">
+                                    <Clock className="h-3 w-3 opacity-50" />
+                                    <span className="font-medium">{timeBudget}</span>
+                                  </div>
+                                </div>
+                              )}
                             </Card>
                           )
                         })}
