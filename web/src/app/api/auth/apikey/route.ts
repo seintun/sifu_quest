@@ -36,13 +36,6 @@ function extractDbErrorCode(error: unknown): string | null {
   return typeof maybeCode === 'string' ? maybeCode : null
 }
 
-function parseProvider(value: unknown): 'anthropic' | 'openrouter' | null {
-  if (value === 'anthropic' || value === 'openrouter') {
-    return value
-  }
-  return null
-}
-
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()

@@ -278,14 +278,14 @@ export default function PlanPage() {
   const [manualErrorCode, setManualErrorCode] = useState<string | null>(null)
 
   const { data: statusData, mutate: mutateStatus } = useSWR('/api/onboarding/status', fetcher, {
-    refreshInterval: (data: any) => {
+    refreshInterval: (data: { plan?: { status?: string } } | undefined) => {
       const status = data?.plan?.status
       return status === 'queued' || status === 'running' ? 10000 : 0
     }
   })
-  
+
   const { data: rawData, mutate: mutatePlan } = useSWR('/api/memory?file=plan.md', fetcher, {
-    refreshInterval: (data: any) => {
+    refreshInterval: (data: { content?: unknown } | undefined) => {
       const content = typeof data?.content === 'string' ? data.content : ''
       const status = statusData?.plan?.status
       return status === 'queued' || status === 'running' || (content.includes(PLAN_PLACEHOLDER_MARKER) && status !== 'failed') ? 10000 : 0

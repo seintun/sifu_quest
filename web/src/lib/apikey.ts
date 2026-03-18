@@ -3,8 +3,6 @@ import { getApiKeyEncryptionSecret } from './env'
 
 const getSecret = () => getApiKeyEncryptionSecret()
 
-// GCM tag length in bytes
-const GCM_TAG_LENGTH = 16
 // GCM IV length in bytes (recommended 12)
 const GCM_IV_LENGTH = 12
 

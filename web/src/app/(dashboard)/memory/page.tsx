@@ -163,6 +163,7 @@ export default function MemoryPage() {
   useEffect(() => {
     if (files.length > 0 && !selectedFile) {
       const preferredFile = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('file') : null
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- initial file selection
       setSelectedFile(selectInitialFile(files, preferredFile))
     }
   }, [files, selectedFile])
@@ -229,7 +230,7 @@ export default function MemoryPage() {
 
   const handleSelectFile = useCallback((file: string) => {
     setSelectedFile(file)
-  }, [])
+  }, [setSelectedFile])
 
   return (
     <div data-testid="memory-shell" className="flex min-h-[calc(100dvh-3rem)] flex-col">

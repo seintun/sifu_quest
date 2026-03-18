@@ -1,4 +1,4 @@
-export const fetcher = async (url: string): Promise<any> => {
+export const fetcher = async (url: string): Promise<unknown> => {
   const res = await fetch(url)
 
   const text = await res.text()
@@ -13,13 +13,13 @@ export const fetcher = async (url: string): Promise<any> => {
   }
 
   if (!res.ok) {
-    const body = data as any
+    const body = data as Record<string, unknown> | null
     const message =
-      (body && (body.error || body.message)) ||
+      (body && (String(body.error || body.message))) ||
       res.statusText ||
       'Request failed'
 
-    const error: any = new Error(message)
+    const error = new Error(message) as Error & { status: number; data: unknown }
     error.status = res.status
     error.data = data
 

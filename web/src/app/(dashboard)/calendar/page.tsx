@@ -153,6 +153,7 @@ export default function CalendarPage() {
           break
         }
       }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- computing streak from data
     setStreak(s)
   }, [activitiesData])
 

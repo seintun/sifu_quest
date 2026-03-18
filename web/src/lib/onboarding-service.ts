@@ -104,6 +104,7 @@ function toErrorCode(error: unknown): string {
   }
   
   // Generic provider error detection based on status codes (Anthropic, OpenAI, etc.)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error shape varies by provider
   const status = (error as any)?.status || (error as any)?.statusCode
   if (typeof status === 'number') {
     if (status === 401) return 'provider_auth_error'
@@ -322,7 +323,9 @@ async function createPlanContent(data: LegacyOnboardingPayload): Promise<string>
     return (response.content[0] as { type: 'text'; text: string }).text
   } catch (error) {
     console.error(`[createPlanContent] [${provider}] Error calling API:`, error)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error shape varies
     if ((error as any)?.status) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error shape varies
       console.error(`Status code: ${(error as any).status}`)
     }
     throw error 
@@ -855,6 +858,7 @@ async function runPlanJobForUser(userId: string): Promise<boolean> {
       message: error instanceof Error ? error.message : String(error),
       provider: 'Anthropic', // Parametrize later if needed
       timestamp: new Date().toISOString(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error shape varies by provider
       status: (error as any)?.status || (error as any)?.statusCode || null,
     }
 

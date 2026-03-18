@@ -23,6 +23,7 @@ export function useMemoryFile(filename: string) {
   }, [filename])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch pattern
     refetch()
   }, [refetch])
 
@@ -43,6 +44,7 @@ export function useProgress() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch pattern
     refetch()
   }, [refetch])
 
