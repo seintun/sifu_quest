@@ -194,7 +194,7 @@ export function parsePlan(content: string): ParsedPlan {
       const title = weekMatch[2].trim()
 
       // Check if week already exists to avoid duplicates
-      let existingWeek = currentMonth.weeks.find(w => w.week === week)
+      const existingWeek = currentMonth.weeks.find(w => w.week === week)
       if (existingWeek) {
         // Update title if it changed (preserve existing categories)
         existingWeek.title = title

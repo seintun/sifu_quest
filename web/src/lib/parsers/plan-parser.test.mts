@@ -169,7 +169,7 @@ describe('plan-parser comprehensive suite', () => {
 
     it('should convert regular bullet to [ ]', () => {
       const plan = parsePlan(COMPLEX_PLAN)
-      const target = plan.months[0].categories['Week 1 — Setup'][2] // 'Solve 5 problems on HashMaps'
+      const target = plan.months[0].weeks[0].categories['Core DSA'][1] // 'Solve 5 problems on HashMaps'
       const updated = togglePlanItem(COMPLEX_PLAN, target.id, false)
       assert.ok(updated.includes('- [ ] Solve 5 problems on HashMaps'))
     })

@@ -475,7 +475,7 @@ export default function PlanPage() {
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {Object.entries(week.categories).map(([category, items]) => {
-                                  const { name: categoryName } = parseCategoryInfo(category)
+                                  const { name: categoryName, timeBudget } = parseCategoryInfo(category)
                                   const domain = CATEGORY_DOMAINS[categoryName] || CATEGORY_DOMAINS[Object.keys(CATEGORY_DOMAINS).find(k => categoryName.includes(k)) || ''] || 'streak'
                                   const colors = DOMAIN_COLORS[domain]
 
@@ -487,6 +487,11 @@ export default function PlanPage() {
                                             <CheckCircle2 className="h-3.5 w-3.5" />
                                           </div>
                                           <span className="truncate">{categoryName}</span>
+                                          {timeBudget && (
+                                            <Badge variant="outline" className="shrink-0 text-[9px] h-5 border-plan/30 bg-plan/10 text-plan font-medium">
+                                              {timeBudget}
+                                            </Badge>
+                                          )}
                                           <Badge variant="outline" className="shrink-0 ml-auto text-[9px] h-5 border-border/40 bg-surface/50 font-bold tracking-tighter">
                                             {items.filter(i => !i.id.includes('-info-') && i.checked).length}/{items.filter(i => !i.id.includes('-info-')).length}
                                           </Badge>
@@ -510,7 +515,7 @@ export default function PlanPage() {
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {Object.entries(month.categories).map(([category, items]) => {
-                            const { name: categoryName } = parseCategoryInfo(category)
+                            const { name: categoryName, timeBudget } = parseCategoryInfo(category)
                             const domain = CATEGORY_DOMAINS[categoryName] || CATEGORY_DOMAINS[Object.keys(CATEGORY_DOMAINS).find(k => categoryName.includes(k)) || ''] || 'streak'
                             const colors = DOMAIN_COLORS[domain]
 
@@ -522,6 +527,11 @@ export default function PlanPage() {
                                       <CheckCircle2 className="h-3.5 w-3.5" />
                                     </div>
                                     <span className="truncate">{categoryName}</span>
+                                    {timeBudget && (
+                                      <Badge variant="outline" className="shrink-0 text-[9px] h-5 border-plan/30 bg-plan/10 text-plan font-medium">
+                                        {timeBudget}
+                                      </Badge>
+                                    )}
                                     <Badge variant="outline" className="shrink-0 ml-auto text-[9px] h-5 border-border/40 bg-surface/50 font-bold tracking-tighter">
                                       {items.filter(i => !i.id.includes('-info-') && i.checked).length}/{items.filter(i => !i.id.includes('-info-')).length}
                                     </Badge>
