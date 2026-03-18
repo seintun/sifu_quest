@@ -421,7 +421,7 @@ export default function PlanPage() {
                   <TabsTrigger 
                     key={month.month} 
                     value={`month${month.month}`}
-                    className="rounded-md px-4 text-xs data-[state=active]:bg-surface data-[state=active]:shadow-md data-[state=active]:text-plan"
+                    className="rounded-md px-4 text-xs cursor-pointer data-[state=active]:bg-surface data-[state=active]:shadow-md data-[state=active]:text-plan"
                   >
                     Month {month.month}
                   </TabsTrigger>
@@ -458,7 +458,7 @@ export default function PlanPage() {
                             <TabsTrigger
                               key={week.week}
                               value={`week${week.week}`}
-                              className="rounded-md px-3 text-[11px] data-[state=active]:bg-surface data-[state=active]:shadow-md data-[state=active]:text-plan"
+                              className="rounded-md px-3 text-[11px] cursor-pointer data-[state=active]:bg-surface data-[state=active]:shadow-md data-[state=active]:text-plan"
                             >
                               Week {week.week}
                             </TabsTrigger>
