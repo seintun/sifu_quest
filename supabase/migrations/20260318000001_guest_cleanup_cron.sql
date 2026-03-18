@@ -37,7 +37,9 @@ BEGIN
     -- Delete audit log entries for this user
     DELETE FROM audit_log WHERE user_id = expired_user.id;
 
-    -- Delete the user profile (cascades to auth.users via FK)
+    -- Delete the user profile
+    -- Note: auth.users must be deleted separately via admin API (e.g., supabase.auth.admin.deleteUser)
+    -- since the FK runs from user_profiles -> auth.users, not the reverse.
     DELETE FROM user_profiles WHERE id = expired_user.id;
 
     cleaned_count := cleaned_count + 1;
