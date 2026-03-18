@@ -242,13 +242,31 @@ function PlanMetadataGrid({
                     variant="outline"
                     className="bg-elevated/40 text-[10px] py-0 px-2 h-[22px] border-border/30 text-foreground/90 font-semibold rounded-md shadow-sm ring-1 ring-inset ring-foreground/5 hover:bg-plan/10 hover:text-plan transition-colors"
                   >
-                    {part}
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <>{children}</>,
+                        strong: ({ children }) => (
+                          <strong className="font-semibold">{children}</strong>
+                        ),
+                      }}
+                    >
+                      {part}
+                    </ReactMarkdown>
                   </Badge>
                 ))}
               </div>
             ) : (
               <span className="text-[12px] font-medium text-foreground leading-tight px-0.5 whitespace-normal break-words">
-                {item.value}
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => <>{children}</>,
+                    strong: ({ children }) => (
+                      <strong className="font-semibold">{children}</strong>
+                    ),
+                  }}
+                >
+                  {item.value}
+                </ReactMarkdown>
               </span>
             )}
           </div>

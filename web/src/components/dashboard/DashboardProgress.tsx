@@ -6,6 +6,7 @@ import { DOMAIN_COLORS } from '@/lib/theme'
 import type { DashboardMetrics } from '@/lib/metrics'
 import { ArrowRight, Briefcase, Calendar, CheckCircle2, Code2, Flame, Network } from 'lucide-react'
 import Link from 'next/link'
+import ReactMarkdown from 'react-markdown'
 
 function MetricCard({
   title,
@@ -173,7 +174,18 @@ export function DashboardProgress({ metrics, planLabel }: DashboardProgressProps
                       )}
                     >
                       <p className="font-medium">{entry.day}</p>
-                      <p className="truncate mt-0.5">{entry.focus}</p>
+                      <p className="truncate mt-0.5">
+                        <ReactMarkdown
+                          components={{
+                            p: ({ children }) => <>{children}</>,
+                            strong: ({ children }) => (
+                              <strong className="font-semibold">{children}</strong>
+                            ),
+                          }}
+                        >
+                          {entry.focus}
+                        </ReactMarkdown>
+                      </p>
                     </div>
                   )
                 })}
