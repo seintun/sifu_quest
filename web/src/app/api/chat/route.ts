@@ -353,13 +353,13 @@ export async function POST(request: NextRequest) {
           )
 
           let systemPrompt = getCachedSystemPrompt(userId, mode, isGreeting)
+          const cacheHit = Boolean(systemPrompt)
           if (!systemPrompt) {
             systemPrompt = await buildSystemPrompt(userId, mode, isGreeting)
             setCachedSystemPrompt(userId, mode, isGreeting, systemPrompt)
           }
           if (isGreeting) {
-            // Greeting prompts are now cached with a short TTL; log for debugging
-            console.log(`[chat] greeting prompt cache ${systemPrompt ? 'miss' : 'built'} for user=${userId} mode=${mode}`)
+            console.log(`[chat] greeting prompt cache ${cacheHit ? 'hit' : 'miss'} for user=${userId} mode=${mode}`)
           }
 
           if (resolvedProvider === 'anthropic') {

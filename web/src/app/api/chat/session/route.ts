@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
       before: searchParams.get('before'),
       beforeId: searchParams.get('beforeId'),
       limit: searchParams.get('limit') ?? undefined,
+      create_if_missing: searchParams.get('create_if_missing'),
     }
 
     const parsedParams = chatSessionGetSchema.safeParse(rawParams)

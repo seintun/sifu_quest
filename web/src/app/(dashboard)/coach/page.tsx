@@ -211,9 +211,10 @@ export default function CoachPage() {
   );
 
   useEffect(() => {
-    // Fire greeting as soon as sessionId is available (parallel with bootstrap)
-    // No need to wait for isLoaded - the session auto-creates during bootstrap
-    if (!sessionId) return;
+    // Fire greeting as soon as possible:
+    // - Fast path: sessionId available from auto-created session (parallel with bootstrap)
+    // - Fallback: isLoaded ensures greeting fires even if auto-create failed
+    if (!sessionId && !isLoaded) return;
 
     if (
       messages.length === 0 &&
@@ -241,12 +242,15 @@ export default function CoachPage() {
   }, [
     mode,
     sessionId,
+    isLoaded,
     messages.length,
     greet,
     upgradeRequired,
     isQuotaBlocked,
     setMessages,
     isGuest,
+    hasProviderKey,
+    selectedProvider,
   ]);
 
   const syncScrollState = useCallback(() => {

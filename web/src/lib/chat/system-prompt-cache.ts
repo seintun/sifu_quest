@@ -1,7 +1,7 @@
 /**
  * In-memory cache for system prompts to avoid rebuilding on every request.
  *
- * Cache key: `${userId}:${mode}:${type}:${onboardingStatus}`
+ * Cache key: `${userId}:${mode}:${isGreeting ? 'greeting' : 'normal'}`
  * TTL: 5 minutes for normal prompts, 2 minutes for greetings
  *
  * NOTE: In serverless environments, cache is per-instance and resets on cold starts.
