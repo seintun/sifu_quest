@@ -95,12 +95,11 @@ describe('plan-parser comprehensive suite', () => {
 
     it('should parse items with various formats correctly', () => {
       const goals = plan.months[0].categories['Month 1 Goals']
-      const week1 = plan.months[0].categories['Week 1 — Setup']
 
       // Checklist item
       assert.strictEqual(goals[0].text, 'Complete 50 Easy LeetCode problems')
       assert.strictEqual(goals[0].checked, false)
-      
+
       // Checked item
       assert.strictEqual(goals[1].text, 'Review Big O notation basics')
       assert.strictEqual(goals[1].checked, true)
@@ -109,14 +108,25 @@ describe('plan-parser comprehensive suite', () => {
       assert.strictEqual(goals[2].text, 'Set up a study tracker')
       assert.strictEqual(goals[2].checked, false)
 
-      // Bold info item
-      const infoItem = week1[0]
-      assert.strictEqual(infoItem.text, '**Core DSA**')
-      assert.strictEqual(infoItem.checked, false)
-      assert.ok(infoItem.id.includes('-info-'))
+      // Week structure
+      const week1 = plan.months[0].weeks[0]
+      assert.strictEqual(week1.week, 1)
+      assert.strictEqual(week1.title, 'Setup')
+      assert.ok(week1.categories['Core DSA'])
 
-      // Week extraction
-      const diagTest = week1[3]
+      const coreDsaItems = week1.categories['Core DSA']
+      assert.strictEqual(coreDsaItems.length, 3)
+
+      // First item: checklist unchecked
+      assert.strictEqual(coreDsaItems[0].text, 'Array and String basics')
+      assert.strictEqual(coreDsaItems[0].checked, false)
+
+      // Second item: regular list item (unchecked)
+      assert.strictEqual(coreDsaItems[1].text, 'Solve 5 problems on HashMaps')
+      assert.strictEqual(coreDsaItems[1].checked, false)
+
+      // Third item: week extraction from text
+      const diagTest = coreDsaItems[2]
       assert.strictEqual(diagTest.text, 'Week 1: Diagnostic test')
       assert.strictEqual(diagTest.week, 1)
     })
@@ -159,7 +169,7 @@ describe('plan-parser comprehensive suite', () => {
 
     it('should convert regular bullet to [ ]', () => {
       const plan = parsePlan(COMPLEX_PLAN)
-      const target = plan.months[0].categories['Week 1 — Setup'][2] // 'Solve 5 problems on HashMaps'
+      const target = plan.months[0].weeks[0].categories['Core DSA'][1] // 'Solve 5 problems on HashMaps'
       const updated = togglePlanItem(COMPLEX_PLAN, target.id, false)
       assert.ok(updated.includes('- [ ] Solve 5 problems on HashMaps'))
     })
