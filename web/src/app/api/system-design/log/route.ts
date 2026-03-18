@@ -4,6 +4,7 @@ import { logAuditEvent, logProgressEvent } from '@/lib/progress'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { systemDesignLogSchema, validationErrorResponse } from '@/lib/api-validation'
 
 export const runtime = 'nodejs'
 
@@ -15,15 +16,13 @@ export async function POST(request: NextRequest) {
     }
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
 
-    const body = await request.json()
-    const { concept, depthCovered, notes } = body
-
-    if (!concept || !depthCovered) {
-      return NextResponse.json(
-        { error: 'concept and depthCovered are required' },
-        { status: 400 }
-      )
+    const rawBody = await request.json()
+    const parsedBody = systemDesignLogSchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      return NextResponse.json(validationErrorResponse(parsedBody.error), { status: 400 })
     }
+
+    const { concept, depthCovered, notes } = parsedBody.data
 
     const content = await readMemoryFile(userId, 'system-design.md')
     const date = new Date().toISOString().split('T')[0]

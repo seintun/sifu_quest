@@ -19,7 +19,7 @@ test('mobile nav splits primary and secondary destinations', () => {
   const primary = selectMobilePrimaryNavItems().map((item) => item.id)
   const secondary = selectMobileSecondaryNavItems().map((item) => item.id)
 
-  assert.deepEqual(primary, ['coach', 'plan', 'dashboard'])
+  assert.deepEqual(primary, ['dashboard', 'coach', 'plan'])
   assert.ok(secondary.includes('settings'))
   assert.equal(secondary.includes('coach'), false)
 })

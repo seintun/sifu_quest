@@ -4,6 +4,7 @@ import { updateProfileNameInMarkdown, validateFullName } from '@/lib/profile-nam
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { accountPatchSchema, validationErrorResponse } from '@/lib/api-validation'
 
 export const runtime = 'nodejs'
 
@@ -14,8 +15,13 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = (await request.json().catch(() => ({}))) as { fullName?: unknown }
-    const fullNameRaw = typeof body.fullName === 'string' ? body.fullName : ''
+    const rawBody = await request.json().catch(() => ({}))
+    const parsedBody = accountPatchSchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      return NextResponse.json(validationErrorResponse(parsedBody.error), { status: 400 })
+    }
+
+    const fullNameRaw = parsedBody.data.fullName
     const validated = validateFullName(fullNameRaw)
     if (!validated.ok) {
       return NextResponse.json({ error: validated.error }, { status: 400 })

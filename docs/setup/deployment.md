@@ -23,7 +23,7 @@ npx supabase db push
 
 1. Go to [vercel.com](https://vercel.com) and sign in.
 2. Click **Add New → Project**.
-3. Select the `sifu_quest_buddy` GitHub repository.
+3. Select the `sifu_quest` GitHub repository.
 4. Under **Configure Project**:
    - **Root Directory**: `web`
    - **Framework Preset**: `Next.js`
@@ -73,7 +73,7 @@ After adding all environment variables, trigger a redeploy:
 
 - [ ] Visit `https://your-app.vercel.app` — landing page loads
 - [ ] Click **Login with Google** — redirects to Google, returns authenticated
-- [ ] Start without a personal key — shared OpenRouter free path is available and free quota is enforced (current rollout: 10 messages)
+- [ ] Start without a personal key — shared OpenRouter free path is available and free quota is enforced (current rollout: 25 messages)
 - [ ] Save an API key in Settings — verify it encrypts and round-trips
 - [ ] Delete your account — confirm all data is wiped (GDPR)
 - [ ] Check Sentry dashboard — errors and traces appear

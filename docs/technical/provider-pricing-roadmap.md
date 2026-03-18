@@ -20,7 +20,7 @@ Selected options from the planning review:
 - `9A` Show session + user metrics in chat and settings
 - `10B` Increase free quota for rollout
 - `11A` Shared OpenRouter key with operator guardrails
-- `12A` Initial free quota set to 10 messages
+- `12A` Initial free quota set to 25 messages
 - `13A` New dedicated technical decision document
 - `14A` Two Mermaid diagrams (routing + telemetry/pricing flow)
 
@@ -39,7 +39,7 @@ Notes:
 
 ## Pricing and Quota Policy
 
-- Free-tier quota: `10` user messages per policy window (initial rollout setting).
+- Free-tier quota: `25` user messages per policy window (initial rollout setting).
 - Shared OpenRouter key serves free usage for guests and signed-in free users.
 - Anthropic usage requires user-provided Anthropic key (BYOK).
 - This is target-state policy for rollout; current production limits may differ until migration cutover completes.
@@ -97,7 +97,7 @@ SSE addition in `/api/chat` stream:
 5. Telemetry verification:
    - Validate token/cost aggregation correctness and no double-counting.
 6. Quota tuning:
-   - Start at 10 messages and adjust after observing production telemetry.
+   - Start at 25 messages and adjust after observing production telemetry.
 
 ## Risks and Mitigations
 
@@ -151,7 +151,7 @@ flowchart LR
   K --> C
   K --> D
 
-  L[Quota engine: 10 free messages] --> M[Free-tier eligibility]
+  L[Quota engine: 25 free messages] --> M[Free-tier eligibility]
   M --> A
 ```
 

@@ -12,6 +12,8 @@ import {
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 
+import { onboardingEnrichmentSchema, validationErrorResponse } from '@/lib/api-validation'
+
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
@@ -29,7 +31,13 @@ export async function POST(request: NextRequest) {
     }
 
     userId = await resolveCanonicalUserId(session.user.id, session.user.email)
-    const body = await request.json()
+    const rawBody = await request.json()
+    const parsedBody = onboardingEnrichmentSchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      return NextResponse.json(validationErrorResponse(parsedBody.error), { status: 400 })
+    }
+
+    const body = parsedBody.data
     const state = await loadOnboardingState(userId)
 
     if (state.onboarding.status === 'not_started' || state.onboarding.status === 'in_progress') {

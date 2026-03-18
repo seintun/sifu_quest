@@ -4,7 +4,7 @@
 
 ## Context
 
-Sifu Quest repo is a markdown-based Claude Code coaching workspace (no existing code). The goal is to build a local web app (Next.js) that serves as a visual diary and dashboard for the job search journey — showing progress metrics, a calendar, domain-specific trackers, an interactive plan, and an integrated coaching chat. All data lives in the existing `/memory/*.md` files, which the app reads and selectively updates through structured UI interactions. The Memory Viewer page is **read-only** — no freeform editing. Updates to memory happen only through structured UI actions (plan checkboxes, DSA problem logging, job app forms) and the coaching chat.
+Sifu Quest is a **fully-implemented** AI-powered career coaching platform built with Next.js 16 (App Router), Supabase (PostgreSQL with RLS), and multi-provider LLM support (OpenRouter + Anthropic). It serves as a persistent, state-aware dashboard for interview preparation — showing progress metrics, a calendar, domain-specific trackers, an interactive plan, and an integrated coaching chat. Data is stored in Supabase `memory_files` table (migrated from original markdown files). The Memory Viewer page is **read-only** — no freeform editing. Updates to memory happen only through structured UI actions (plan checkboxes, DSA problem logging, job app forms) and the coaching chat.
 
 Related onboarding references:
 - `docs/project/onboarding-v2-plan-revision.md`
@@ -16,11 +16,12 @@ Related onboarding references:
 
 - **Framework:** Next.js 16 (App Router), TypeScript
 - **Styling:** Tailwind CSS + shadcn/ui + `@tailwindcss/typography`
-- **Markdown:** `gray-matter` + `react-markdown` + `remark-gfm`
-- **Date utils:** `date-fns`
-- **Claude API:** `@anthropic-ai/sdk` (claude-sonnet-4-6)
+- **Database:** Supabase (PostgreSQL with Row Level Security)
+- **Auth:** NextAuth.js v5 + Supabase Auth (Google OAuth + Anonymous)
+- **AI/LLM:** Multi-provider: OpenRouter + Anthropic (extensible provider architecture)
 - **Icons:** `lucide-react`
 - **Fonts:** `next/font` — Geist (headings) + Inter (body) + Geist Mono (code)
+- **Monitoring:** Sentry (client, server, edge)
 - App lives at `/web` inside the repo, runs locally at `localhost:3000`
 
 ---
@@ -404,12 +405,16 @@ sifu_quest/
 
 ## Data Storage
 
-All data lives in the existing `/memory/*.md` markdown files — **no database**. The web app:
+All user data is persisted in **Supabase PostgreSQL** with Row Level Security (RLS) policies enforcing `auth.uid() = user_id` on every table. Key tables:
 
-- Reads files via Next.js server-side API routes (`GET /api/memory?file=X`)
-- Writes back only through structured UI actions (plan checkboxes, DSA log forms, job app forms, onboarding wizard)
-- The Memory Viewer page is purely read-only — no edit controls, no PUT endpoint exposed
-- The coaching chat can suggest memory updates, but the user manually confirms by using the structured forms
+- `memory_files` — User-specific markdown content (replaces original `/memory/*.md` files)
+- `memory_file_versions` — Audit trail for every memory file mutation
+- `chat_sessions` / `chat_messages` — Coach conversation history
+- `user_profiles` — User metadata, onboarding state, preferences
+- `progress_events` — Dashboard streak calendar and activity tracking
+- `audit_log` — Tamper-evident record of sensitive operations
+
+Memory files are read via `readMemoryFile(userId, filename)` in `web/src/lib/memory.ts` and written through structured UI actions or the coaching chat.
 
 ---
 

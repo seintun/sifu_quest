@@ -278,13 +278,15 @@ export default function PlanPage() {
   const [manualErrorCode, setManualErrorCode] = useState<string | null>(null)
 
   const { data: statusData, mutate: mutateStatus } = useSWR('/api/onboarding/status', fetcher, {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SWR callback type
     refreshInterval: (data: any) => {
       const status = data?.plan?.status
       return status === 'queued' || status === 'running' ? 10000 : 0
     }
   })
-  
+
   const { data: rawData, mutate: mutatePlan } = useSWR('/api/memory?file=plan.md', fetcher, {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SWR callback type
     refreshInterval: (data: any) => {
       const content = typeof data?.content === 'string' ? data.content : ''
       const status = statusData?.plan?.status

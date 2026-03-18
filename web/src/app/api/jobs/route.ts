@@ -4,6 +4,7 @@ import { logAuditEvent, logProgressEvent } from '@/lib/progress'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { jobsPostSchema, validationErrorResponse } from '@/lib/api-validation'
 
 export const runtime = 'nodejs'
 
@@ -15,16 +16,19 @@ export async function POST(request: NextRequest) {
     }
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
 
-    const body = await request.json()
+    const rawBody = await request.json()
+    const parsedBody = jobsPostSchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      return NextResponse.json(validationErrorResponse(parsedBody.error), { status: 400 })
+    }
+
+    const body = parsedBody.data
     const { action } = body
 
     let content = await readMemoryFile(userId, 'job-search.md')
 
     if (action === 'add') {
       const { company, role, status, dateApplied, notes } = body
-      if (!company || !role) {
-        return NextResponse.json({ error: 'Missing company or role' }, { status: 400 })
-      }
       content = addApplication(content, {
         company,
         role,
@@ -36,14 +40,9 @@ export async function POST(request: NextRequest) {
       await logAuditEvent(userId, 'update_memory', 'job-search.md', { action: 'added_job' })
     } else if (action === 'updateStatus') {
       const { company, role, newStatus } = body
-      if (!company || !role || !newStatus) {
-        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-      }
       content = updateApplicationStatus(content, company, role, newStatus)
       await logProgressEvent(userId, 'job_application_updated', 'jobs', { company, role, newStatus })
       await logAuditEvent(userId, 'update_memory', 'job-search.md', { action: 'updated_job_status' })
-    } else {
-      return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
     }
 
     await writeMemoryFile(userId, 'job-search.md', content, 'job_app')

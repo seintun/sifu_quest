@@ -5,6 +5,7 @@ import { deleteEncryptedProviderApiKey, upsertEncryptedProviderApiKey } from '@/
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { apiKeyPostSchema, apiKeyDeleteSchema, validationErrorResponse } from '@/lib/api-validation'
 
 export const runtime = 'nodejs'
 
@@ -35,13 +36,6 @@ function extractDbErrorCode(error: unknown): string | null {
   return typeof maybeCode === 'string' ? maybeCode : null
 }
 
-function parseProvider(value: unknown): 'anthropic' | 'openrouter' | null {
-  if (value === 'anthropic' || value === 'openrouter') {
-    return value
-  }
-  return null
-}
-
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
@@ -49,9 +43,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    const { apiKey, provider } = await request.json().catch(() => ({})) as { apiKey?: unknown; provider?: unknown }
-    const normalizedApiKey = typeof apiKey === 'string' ? apiKey.trim() : ''
-    const normalizedProvider = parseProvider(provider)
+    const rawBody = await request.json().catch(() => ({}))
+    const parsedBody = apiKeyPostSchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      return NextResponse.json(validationErrorResponse(parsedBody.error), { status: 400 })
+    }
+
+    const { apiKey, provider } = parsedBody.data
+    const normalizedApiKey = apiKey.trim()
+    const normalizedProvider = provider
 
     if (!normalizedProvider) {
       return NextResponse.json({ error: 'Provider is required.' }, { status: 400 })
@@ -119,10 +119,12 @@ export async function DELETE(request: NextRequest) {
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
     const supabase = createAdminClient()
     const { searchParams } = new URL(request.url)
-    const normalizedProvider = parseProvider(searchParams.get('provider'))
-    if (!normalizedProvider) {
-      return NextResponse.json({ error: 'Provider is required.' }, { status: 400 })
+    const rawProvider = { provider: searchParams.get('provider') }
+    const parsedProvider = apiKeyDeleteSchema.safeParse(rawProvider)
+    if (!parsedProvider.success) {
+      return NextResponse.json(validationErrorResponse(parsedProvider.error), { status: 400 })
     }
+    const normalizedProvider = parsedProvider.data.provider
     await deleteEncryptedProviderApiKey(userId, normalizedProvider)
     
     await supabase.from('audit_log').insert({

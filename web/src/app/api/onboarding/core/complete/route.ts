@@ -16,6 +16,8 @@ import { createAdminClient } from '@/lib/supabase-admin'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 
+import { onboardingCoreCompleteSchema, validationErrorResponse } from '@/lib/api-validation'
+
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
@@ -52,13 +54,16 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const body = await request.json()
+    const rawBody = await request.json()
+    const parsedBody = onboardingCoreCompleteSchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      return NextResponse.json(validationErrorResponse(parsedBody.error), { status: 400 })
+    }
+
+    const body = parsedBody.data
     const core = validateCoreAnswers(body?.core)
     const enrichment = normalizeEnrichmentAnswers(body?.enrichment)
-    const currentStep =
-      typeof body?.currentStep === 'number' && Number.isFinite(body.currentStep)
-        ? Math.max(0, Math.floor(body.currentStep))
-        : 0
+    const currentStep = body?.currentStep ?? 0
 
     await persistCoreOnboardingFiles(userId, core, enrichment)
 

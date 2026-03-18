@@ -4,6 +4,7 @@ import { logAuditEvent, logProgressEvent } from '@/lib/progress'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { planToggleSchema, validationErrorResponse } from '@/lib/api-validation'
 
 export const runtime = 'nodejs'
 
@@ -15,11 +16,13 @@ export async function POST(request: NextRequest) {
     }
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
 
-    const { itemId, checked } = await request.json()
-
-    if (!itemId || typeof checked !== 'boolean') {
-      return NextResponse.json({ error: 'Missing itemId or checked' }, { status: 400 })
+    const rawBody = await request.json()
+    const parsedBody = planToggleSchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      return NextResponse.json(validationErrorResponse(parsedBody.error), { status: 400 })
     }
+
+    const { itemId, checked } = parsedBody.data
 
     const content = await readMemoryFile(userId, 'plan.md')
     const updated = togglePlanItem(content, itemId, checked)

@@ -2,27 +2,41 @@ import { auth } from '@/auth'
 import { decryptKey } from '@/lib/apikey'
 import { ensureUserProfile, touchUserLastActiveAt } from '@/lib/account-state'
 import { sanitizeIncomingChatMessages } from '@/lib/chat-message-sanitizer'
-import { estimateCostMicrousd, normalizeTokenUsage, parseUsdToMicrousd, type TokenUsage } from '@/lib/chat-usage'
 import { loadChatEntitlements } from '@/lib/chat-entitlements'
 import {
-  isMissingMessageTelemetryColumnError,
   isMissingSessionTelemetryColumnError,
-  isMissingSessionUsageRpcError,
 } from '@/lib/chat-schema-compat'
 import { resolveProviderSelection } from '@/lib/chat-selection'
 import {
-  OPENROUTER_FREE_ROUTER_MODEL,
   isOpenRouterFreeModel,
-  type ChatProvider,
 } from '@/lib/chat-provider-config'
-import { getQuotaError, incrementFreeUserMessagesUsed, shouldEnforceProviderQuota } from '@/lib/free-quota'
+import { getQuotaError, shouldEnforceProviderQuota } from '@/lib/free-quota'
 import { readMemoryFiles, readModeFile } from '@/lib/memory'
 import { getEncryptedProviderApiKey } from '@/lib/provider-api-keys'
 import { buildSifuMasterToneGuidelines } from '@/lib/brand'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
-import Anthropic from '@anthropic-ai/sdk'
+import { checkRateLimit, CHAT_RATE_LIMIT } from '@/lib/rate-limiter'
 import { NextRequest } from 'next/server'
+
+import {
+  type StreamResult,
+  ClientStreamClosedError,
+  enqueueSseFrame,
+  closeSseStream,
+  streamAnthropic,
+  streamOpenRouterWithFallback,
+} from '@/lib/chat/stream-providers'
+
+import { chatPostSchema, validationErrorResponse } from '@/lib/api-validation'
+
+import { getCachedSystemPrompt, setCachedSystemPrompt } from '@/lib/chat/system-prompt-cache'
+
+import {
+  type PersistTurnInput,
+  persistChatTurn,
+  resolveCostMicrousd,
+} from '@/lib/chat/chat-persistence'
 
 export const runtime = 'nodejs'
 const CHAT_UNAVAILABLE_MESSAGE = 'We hit a temporary issue loading your workspace. Please try again in a moment.'
@@ -51,15 +65,6 @@ function getEnrichmentCoachQuestion(promptKey: string | null): string | null {
   }
 }
 
-type StreamResult = {
-  assistantContent: string
-  usage: TokenUsage
-  providerReportedCostMicrousd: number | null
-  requestId: string | null
-  latencyMs: number
-  modelUsed: string
-}
-
 type ChatRequestPayload = {
   messages?: Array<{ role: string; content: string }>
   mode?: string
@@ -67,263 +72,6 @@ type ChatRequestPayload = {
   sessionId?: string | null
   provider?: string
   model?: string
-}
-
-class ProviderStreamError extends Error {
-  streamStarted: boolean
-  status?: number
-
-  constructor(message: string, streamStarted: boolean, status?: number) {
-    super(message)
-    this.name = 'ProviderStreamError'
-    this.streamStarted = streamStarted
-    this.status = status
-  }
-}
-
-class ClientStreamClosedError extends Error {
-  constructor() {
-    super('Client stream is already closed.')
-    this.name = 'ClientStreamClosedError'
-  }
-}
-
-function isControllerAlreadyClosedError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false
-  }
-
-  const maybeCode = (error as Error & { code?: string }).code
-  return maybeCode === 'ERR_INVALID_STATE' || error.message.includes('Controller is already closed')
-}
-
-function enqueueSseFrame(
-  controller: ReadableStreamDefaultController<Uint8Array>,
-  encoder: TextEncoder,
-  payload: string,
-): void {
-  try {
-    controller.enqueue(encoder.encode(payload))
-  } catch (error) {
-    if (isControllerAlreadyClosedError(error)) {
-      throw new ClientStreamClosedError()
-    }
-    throw error
-  }
-}
-
-function closeSseStream(controller: ReadableStreamDefaultController<Uint8Array>): void {
-  try {
-    controller.close()
-  } catch (error) {
-    if (!isControllerAlreadyClosedError(error)) {
-      throw error
-    }
-  }
-}
-
-function isMissingRpcFunctionError(
-  error: { code?: string; message?: string } | null | undefined,
-  functionName: string,
-): boolean {
-  if (!error) return false
-  return error.code === 'PGRST202' || Boolean(error.message?.includes(functionName)) || Boolean(error.message?.includes('Could not find the function'))
-}
-
-function resolveCostMicrousd(
-  provider: ChatProvider,
-  model: string,
-  usage: TokenUsage,
-  providerReportedCostMicrousd: number | null,
-): number | null {
-  return providerReportedCostMicrousd ?? estimateCostMicrousd(provider, model, usage)
-}
-
-type PersistTurnInput = {
-  supabase: ReturnType<typeof createAdminClient>
-  sessionId: string
-  userId: string
-  userContent: string
-  assistantContent: string
-  provider: ChatProvider
-  model: string
-  usage: TokenUsage
-  latencyMs: number
-  estimatedCostMicrousd: number | null
-  requestId: string | null
-  enforceQuota: boolean
-}
-
-async function persistChatTurnLegacy(input: PersistTurnInput): Promise<void> {
-  const {
-    supabase,
-    sessionId,
-    userId,
-    userContent,
-    assistantContent,
-    provider,
-    model,
-    usage,
-    latencyMs,
-    estimatedCostMicrousd,
-    requestId,
-    enforceQuota,
-  } = input
-
-  const { data: ownedSession } = await supabase
-    .from('chat_sessions')
-    .select('id')
-    .eq('id', sessionId)
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (!ownedSession) {
-    return
-  }
-
-  const { error: userInsertError } = await supabase.from('chat_messages').insert({
-    session_id: sessionId,
-    user_id: userId,
-    role: 'user',
-    content: userContent,
-    provider,
-    model,
-  })
-  if (userInsertError) {
-    if (!isMissingMessageTelemetryColumnError(userInsertError)) {
-      console.error('Failed to persist user chat message', userInsertError)
-    }
-    return
-  }
-
-  const { error: assistantInsertError } = await supabase.from('chat_messages').insert({
-    session_id: sessionId,
-    user_id: userId,
-    role: 'assistant',
-    content: assistantContent,
-    provider,
-    model,
-    input_tokens: usage.inputTokens,
-    output_tokens: usage.outputTokens,
-    total_tokens: usage.totalTokens,
-    tokens_used: usage.totalTokens,
-    latency_ms: latencyMs,
-    estimated_cost_microusd: estimatedCostMicrousd,
-    request_id: requestId,
-  })
-  if (assistantInsertError) {
-    if (!isMissingMessageTelemetryColumnError(assistantInsertError)) {
-      console.error('Failed to persist assistant chat message', assistantInsertError)
-    }
-    return
-  }
-
-  const { error: incrementSessionMessagesError } = await supabase.rpc('increment_session_messages', {
-    session_id_param: sessionId,
-    increment_by: 2,
-  })
-  if (incrementSessionMessagesError && !isMissingSessionTelemetryColumnError(incrementSessionMessagesError)) {
-    console.error('Failed to increment session messages via RPC', incrementSessionMessagesError)
-  }
-
-  const { error: incrementChatSessionUsageError } = await supabase.rpc('increment_chat_session_usage', {
-    session_id_param: sessionId,
-    provider_param: provider,
-    model_param: model,
-    user_turn_increment: 1,
-    input_tokens_increment: usage.inputTokens ?? 0,
-    output_tokens_increment: usage.outputTokens ?? 0,
-    total_tokens_increment: usage.totalTokens ?? 0,
-    cost_increment: estimatedCostMicrousd ?? 0,
-  })
-  if (incrementChatSessionUsageError && !isMissingSessionUsageRpcError(incrementChatSessionUsageError)) {
-    console.error('Failed to increment chat session usage via RPC', incrementChatSessionUsageError)
-  }
-
-  const { data: currentDefaults, error: profileDefaultsError } = await supabase
-    .from('user_profiles')
-    .select('default_provider, default_model')
-    .eq('id', userId)
-    .maybeSingle()
-
-  if (profileDefaultsError) {
-    console.warn('Unable to load current default provider/model on profile', profileDefaultsError)
-  } else {
-    const shouldUpdateDefaults = currentDefaults?.default_provider !== provider || currentDefaults?.default_model !== model
-
-    if (shouldUpdateDefaults) {
-      const { error: profileUpdateError } = await supabase
-        .from('user_profiles')
-        .update({
-          default_provider: provider,
-          default_model: model,
-        })
-        .eq('id', userId)
-      if (profileUpdateError) {
-        console.warn('Unable to persist default provider/model on profile', profileUpdateError)
-      }
-    }
-  }
-
-  if (enforceQuota) {
-    try {
-      await incrementFreeUserMessagesUsed(userId, 1)
-    } catch (quotaError) {
-      console.error('Failed to increment free quota usage', quotaError)
-    }
-  }
-}
-
-async function persistChatTurn(input: PersistTurnInput): Promise<void> {
-  const {
-    supabase,
-    sessionId,
-    userId,
-    userContent,
-    assistantContent,
-    provider,
-    model,
-    usage,
-    latencyMs,
-    estimatedCostMicrousd,
-    requestId,
-    enforceQuota,
-  } = input
-
-  const { data, error } = await supabase.rpc('persist_chat_turn', {
-    session_id_param: sessionId,
-    user_id_param: userId,
-    user_content_param: userContent,
-    assistant_content_param: assistantContent,
-    provider_param: provider,
-    model_param: model,
-    input_tokens_param: usage.inputTokens ?? 0,
-    output_tokens_param: usage.outputTokens ?? 0,
-    total_tokens_param: usage.totalTokens ?? 0,
-    latency_ms_param: latencyMs,
-    estimated_cost_param: estimatedCostMicrousd ?? 0,
-    request_id_param: requestId,
-  })
-
-  if (error) {
-    if (isMissingRpcFunctionError(error, 'persist_chat_turn')) {
-      await persistChatTurnLegacy(input)
-      return
-    }
-    throw new Error(error.message)
-  }
-
-  if (!data) {
-    return
-  }
-
-  if (enforceQuota) {
-    try {
-      await incrementFreeUserMessagesUsed(userId, 1)
-    } catch (quotaError) {
-      console.error('Failed to increment free quota usage', quotaError)
-    }
-  }
 }
 
 async function buildSystemPrompt(
@@ -394,228 +142,6 @@ async function buildSystemPrompt(
   return systemPrompt
 }
 
-function extractOpenRouterDeltaText(delta: unknown): string {
-  if (typeof delta === 'string') {
-    return delta
-  }
-
-  if (!Array.isArray(delta)) {
-    return ''
-  }
-
-  return delta
-    .map((part) => {
-      if (!part || typeof part !== 'object') return ''
-      const typed = part as { type?: string; text?: string }
-      if (typed.type === 'text' && typeof typed.text === 'string') {
-        return typed.text
-      }
-      return ''
-    })
-    .join('')
-}
-
-async function streamAnthropic(
-  apiKey: string,
-  model: string,
-  systemPrompt: string,
-  messages: Array<{ role: string; content: string }>,
-  controller: ReadableStreamDefaultController<Uint8Array>,
-  encoder: TextEncoder,
-): Promise<StreamResult> {
-  const startedAt = Date.now()
-  const client = new Anthropic({ apiKey })
-  const stream = await client.messages.stream({
-    model,
-    max_tokens: 4096,
-    system: systemPrompt,
-    messages: messages.map((m) => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    })),
-  })
-
-  let assistantMessageContent = ''
-  for await (const event of stream) {
-    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-      assistantMessageContent += event.delta.text
-      enqueueSseFrame(controller, encoder, `data: ${JSON.stringify({ text: event.delta.text })}\n\n`)
-    }
-  }
-
-  let usage = normalizeTokenUsage(null, null, null)
-  let requestId: string | null = null
-  try {
-    const finalMessage = await stream.finalMessage()
-    usage = normalizeTokenUsage(finalMessage.usage?.input_tokens, finalMessage.usage?.output_tokens, null)
-    requestId = finalMessage.id ?? null
-  } catch (error) {
-    console.warn('Unable to resolve Anthropic final usage payload', error)
-  }
-
-  return {
-    assistantContent: assistantMessageContent,
-    usage,
-    providerReportedCostMicrousd: null,
-    requestId,
-    latencyMs: Date.now() - startedAt,
-    modelUsed: model,
-  }
-}
-
-async function streamOpenRouterModel(
-  apiKey: string,
-  model: string,
-  systemPrompt: string,
-  messages: Array<{ role: string; content: string }>,
-  controller: ReadableStreamDefaultController<Uint8Array>,
-  encoder: TextEncoder,
-): Promise<StreamResult> {
-  const startedAt = Date.now()
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      stream: true,
-      stream_options: { include_usage: true },
-      max_tokens: 4096,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages,
-      ],
-    }),
-    cache: 'no-store',
-    signal: AbortSignal.timeout(35000),
-  })
-
-  if (!response.ok) {
-    throw new ProviderStreamError(`OpenRouter request failed with ${response.status}`, false, response.status)
-  }
-
-  const reader = response.body?.getReader()
-  if (!reader) {
-    throw new ProviderStreamError('OpenRouter returned an empty response stream.', false)
-  }
-
-  const requestId = response.headers.get('x-request-id')
-  const decoder = new TextDecoder()
-  let buffered = ''
-  let assistantMessageContent = ''
-  let streamStarted = false
-  let usage = normalizeTokenUsage(null, null, null)
-  let providerReportedCostMicrousd: number | null = null
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-
-    buffered += decoder.decode(value, { stream: true })
-    const lines = buffered.split('\n')
-    buffered = lines.pop() ?? ''
-
-    for (const rawLine of lines) {
-      const line = rawLine.trim()
-      if (!line.startsWith('data:')) continue
-      const payload = line.slice(5).trim()
-      if (payload === '[DONE]') {
-        continue
-      }
-
-      let parsed: Record<string, unknown>
-      try {
-        parsed = JSON.parse(payload) as Record<string, unknown>
-      } catch {
-        continue
-      }
-
-      if (parsed.error) {
-        throw new ProviderStreamError('OpenRouter stream returned an error payload.', streamStarted)
-      }
-
-      const choices = Array.isArray(parsed.choices) ? parsed.choices : []
-      const firstChoice = choices[0] as { delta?: { content?: unknown } } | undefined
-      const deltaText = extractOpenRouterDeltaText(firstChoice?.delta?.content)
-      if (deltaText) {
-        streamStarted = true
-        assistantMessageContent += deltaText
-        enqueueSseFrame(controller, encoder, `data: ${JSON.stringify({ text: deltaText })}\n\n`)
-      }
-
-      const usagePayload = parsed.usage as {
-        prompt_tokens?: unknown
-        completion_tokens?: unknown
-        total_tokens?: unknown
-        cost?: unknown
-        total_cost?: unknown
-      } | undefined
-      if (usagePayload) {
-        usage = normalizeTokenUsage(
-          usagePayload.prompt_tokens,
-          usagePayload.completion_tokens,
-          usagePayload.total_tokens,
-        )
-        const liveCostMicrousd = parseUsdToMicrousd(usagePayload.cost) ?? parseUsdToMicrousd(usagePayload.total_cost)
-        if (liveCostMicrousd !== null) {
-          providerReportedCostMicrousd = liveCostMicrousd
-        }
-      }
-    }
-  }
-
-  return {
-    assistantContent: assistantMessageContent,
-    usage,
-    providerReportedCostMicrousd,
-    requestId,
-    latencyMs: Date.now() - startedAt,
-    modelUsed: model,
-  }
-}
-
-async function streamOpenRouterWithFallback(
-  apiKey: string,
-  requestedModel: string,
-  systemPrompt: string,
-  messages: Array<{ role: string; content: string }>,
-  controller: ReadableStreamDefaultController<Uint8Array>,
-  encoder: TextEncoder,
-): Promise<StreamResult> {
-  const candidates = [requestedModel]
-  if (requestedModel !== OPENROUTER_FREE_ROUTER_MODEL) {
-    candidates.push(OPENROUTER_FREE_ROUTER_MODEL)
-  }
-
-  let lastError: unknown = null
-  for (let index = 0; index < candidates.length; index += 1) {
-    const candidate = candidates[index]
-    try {
-      return await streamOpenRouterModel(apiKey, candidate, systemPrompt, messages, controller, encoder)
-    } catch (error) {
-      lastError = error
-      if (error instanceof ClientStreamClosedError) {
-        throw error
-      }
-      const isFinalCandidate = index === candidates.length - 1
-      if (isFinalCandidate) {
-        throw error
-      }
-
-      if (error instanceof ProviderStreamError) {
-        const shouldFallback = !error.streamStarted && (error.status === 429 || (error.status ?? 0) >= 500)
-        if (!shouldFallback) {
-          throw error
-        }
-      }
-    }
-  }
-
-  throw lastError ?? new Error('OpenRouter stream failed.')
-}
-
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
@@ -624,7 +150,36 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
-    const payload = (await request.json().catch(() => ({}))) as ChatRequestPayload
+
+    // Rate limiting: 30 requests per minute per user
+    const rateLimitResult = checkRateLimit(userId, CHAT_RATE_LIMIT)
+    if (!rateLimitResult.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: 'rate_limited',
+          message: 'Too many requests. Please wait a moment before sending another message.',
+          retryAfterMs: rateLimitResult.retryAfterMs,
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(Math.ceil(rateLimitResult.retryAfterMs / 1000)),
+          },
+        },
+      )
+    }
+
+    const rawPayload = await request.json().catch(() => ({}))
+    const parsed = chatPostSchema.safeParse(rawPayload)
+    if (!parsed.success) {
+      return new Response(JSON.stringify(validationErrorResponse(parsed.error)), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    const payload = parsed.data as ChatRequestPayload
     const { mode, isGreeting, sessionId } = payload
     const sanitizedMessages = sanitizeIncomingChatMessages(payload.messages)
     if (sanitizedMessages.length === 0) {
@@ -794,7 +349,11 @@ export async function POST(request: NextRequest) {
             `data: ${JSON.stringify({ type: 'status', status: 'thinking' })}\n\n`,
           )
 
-          const systemPrompt = await buildSystemPrompt(userId, mode, isGreeting)
+          let systemPrompt = getCachedSystemPrompt(userId, mode, isGreeting)
+          if (!systemPrompt) {
+            systemPrompt = await buildSystemPrompt(userId, mode, isGreeting)
+            setCachedSystemPrompt(userId, mode, isGreeting, systemPrompt)
+          }
 
           if (resolvedProvider === 'anthropic') {
             assistantResult = await streamAnthropic(

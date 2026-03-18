@@ -14,6 +14,8 @@ import {
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 
+import { onboardingDraftSchema, validationErrorResponse } from '@/lib/api-validation'
+
 export const runtime = 'nodejs'
 
 function hasAnyCoreAnswer(core: ReturnType<typeof normalizeCoreAnswers>): boolean {
@@ -50,15 +52,18 @@ export async function PATCH(request: NextRequest) {
     }
 
     userId = await resolveCanonicalUserId(session.user.id, session.user.email)
-    const body = await request.json()
+    const rawBody = await request.json()
+    const parsedBody = onboardingDraftSchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      return NextResponse.json(validationErrorResponse(parsedBody.error), { status: 400 })
+    }
+
+    const body = parsedBody.data
     const empty = createEmptyOnboardingDraftPayload()
 
     const core = normalizeCoreAnswers(body?.core)
     const enrichment = normalizeEnrichmentAnswers(body?.enrichment)
-    const currentStep =
-      typeof body?.currentStep === 'number' && Number.isFinite(body.currentStep)
-        ? Math.max(0, Math.floor(body.currentStep))
-        : 0
+    const currentStep = body?.currentStep ?? 0
 
     const draft = {
       schemaVersion: ONBOARDING_SCHEMA_VERSION,

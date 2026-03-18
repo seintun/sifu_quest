@@ -6,6 +6,7 @@ import type { MasteryLevel } from '@/lib/theme'
 import { resolveCanonicalUserId } from '@/lib/user-identity'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { dsaLogSchema, validationErrorResponse } from '@/lib/api-validation'
 
 export const runtime = 'nodejs'
 
@@ -17,11 +18,13 @@ export async function POST(request: NextRequest) {
     }
     const userId = await resolveCanonicalUserId(session.user.id, session.user.email)
 
-    const attempt: ProblemAttempt = await request.json()
-
-    if (!attempt.problem || !attempt.pattern || !attempt.date) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    const rawBody = await request.json()
+    const parsedBody = dsaLogSchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      return NextResponse.json(validationErrorResponse(parsedBody.error), { status: 400 })
     }
+
+    const attempt = parsedBody.data as ProblemAttempt
 
     let content = await readMemoryFile(userId, 'dsa-patterns.md')
     content = appendProblemToHistory(content, attempt)

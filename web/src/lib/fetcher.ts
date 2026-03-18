@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- SWR requires any for flexible typing
 export const fetcher = async (url: string): Promise<any> => {
   const res = await fetch(url)
 
@@ -13,12 +14,13 @@ export const fetcher = async (url: string): Promise<any> => {
   }
 
   if (!res.ok) {
-    const body = data as any
+    const body = data as Record<string, unknown> | null
     const message =
-      (body && (body.error || body.message)) ||
+      (body && (String(body.error || body.message))) ||
       res.statusText ||
       'Request failed'
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error augmentation pattern
     const error: any = new Error(message)
     error.status = res.status
     error.data = data

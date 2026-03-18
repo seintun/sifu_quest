@@ -43,7 +43,7 @@ A visual dashboard shows your current streak, DSA patterns mastered, system desi
 
 ### 🔒 Your Data, Your Keys
 
-- **Free mode** uses a shared server OpenRouter key for users without a personal key (guest or signed-in): **10 user messages**
+- **Free mode** uses a shared server OpenRouter key for users without a personal key (guest or signed-in): **25 user messages**
 - **Provider BYOK** — add your own OpenRouter and/or Anthropic API keys in **Settings**
 - **Infrastructure secrets** (`Supabase`, `Google OAuth`, shared `SIFU_OPENROUTER_API_KEY`) are env-only (`.env.local` or Vercel env vars)
 - **Personal provider keys** are encrypted before storage per user in Supabase, plaintext keys are never stored or logged
@@ -65,10 +65,10 @@ Sifu Quest was designed from day one with data privacy and security as non-negot
 
 | Layer                    | How It's Protected                                                                                                                                                                                                      |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **API Key Storage**      | Users provide provider keys (for example `sk-ant-...`, `sk-or-...`). Keys are encrypted server-side with **AES-256-CBC** and a unique random IV before storage. Plaintext keys are **never stored, logged, or shared**. |
+| **API Key Storage**      | Users provide provider keys (for example `sk-ant-...`, `sk-or-...`). Keys are encrypted server-side with **AES-256-GCM** (authenticated encryption) and a unique random IV before storage. Legacy CBC keys are supported for decryption. Plaintext keys are **never stored, logged, or shared**. |
 | **Data Isolation**       | Every database table uses Supabase **Row Level Security (RLS)**, guaranteeing that User A can never access User B's data — even through direct database queries.                                                        |
 | **Authentication**       | Google OAuth 2.0 via NextAuth.js with JWT-based sessions. Tokens carry only the user's UUID — no sensitive data in the session payload.                                                                                 |
-| **Free-tier Guardrails** | Accounts without personal provider keys are sandboxed to **10 user messages** on shared OpenRouter free models, enforced server-side in chat entitlement checks.                                                        |
+| **Free-tier Guardrails** | Accounts without personal provider keys are sandboxed to **25 user messages** on shared OpenRouter free models, enforced server-side in chat entitlement checks.                                                        |
 | **GDPR Compliance**      | One-click account deletion wipes **all** user data across every table (profile, chat history, memory files, progress, audit logs) and removes the authentication record entirely.                                       |
 | **Audit Trail**          | Sensitive operations — API key changes, account deletions, plan generation — are logged to a tamper-evident `audit_log` table for full traceability.                                                                    |
 | **Error Monitoring**     | Sentry captures errors across client, server, and edge runtimes with configurable sampling rates, providing observability without exposing user data.                                                                   |
@@ -105,8 +105,8 @@ Visit the deployed app and start a Guest session — no account needed.
 ### Run It Yourself
 
 ```bash
-git clone https://github.com/seintun/sifu-quest.git
-cd sifu-quest/web
+git clone https://github.com/seintun/sifu_quest.git
+cd sifu_quest/web
 npm install
 npm run dev
 ```
@@ -138,7 +138,7 @@ npm run dev
 | AI         | Multi-provider: OpenRouter + Anthropic (extensible provider architecture) |
 | Auth       | NextAuth.js + Supabase Auth (Google OAuth + Anonymous)                    |
 | Monitoring | Sentry                                                                    |
-| Encryption | AES-256-CBC for stored API keys                                           |
+| Encryption | AES-256-GCM for stored API keys (CBC legacy fallback)                     |
 
 ---
 
