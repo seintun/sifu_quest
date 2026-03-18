@@ -467,14 +467,31 @@ export default function PlanPage() {
 
                         {month.weeks.map(week => {
                           const weekItems = Object.values(week.categories).flat()
+                          const weekBudgets = Object.entries(week.categories)
+                            .map(([cat]) => parseCategoryInfo(cat))
+                            .filter(c => c.timeBudget)
+
                           return (
                             <TabsContent key={week.week} value={`week${week.week}`} className="space-y-3">
                               <div className="text-xs text-muted-foreground mb-1">{week.title}</div>
                               <WeekProgress items={weekItems} />
 
+                              {weekBudgets.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg border border-plan/15 bg-plan/5">
+                                  <Clock className="h-3 w-3 text-plan/60 shrink-0" />
+                                  {weekBudgets.map((b, i) => (
+                                    <span key={i} className="inline-flex items-center gap-1 text-[11px]">
+                                      {i > 0 && <span className="text-plan/30 mx-0.5">·</span>}
+                                      <span className="font-semibold text-plan/80">{b.name}</span>
+                                      <span className="text-muted-foreground/60">{b.timeBudget}</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {Object.entries(week.categories).map(([category, items]) => {
-                                  const { name: categoryName, timeBudget } = parseCategoryInfo(category)
+                                  const { name: categoryName } = parseCategoryInfo(category)
                                   const domain = CATEGORY_DOMAINS[categoryName] || CATEGORY_DOMAINS[Object.keys(CATEGORY_DOMAINS).find(k => categoryName.includes(k)) || ''] || 'streak'
                                   const colors = DOMAIN_COLORS[domain]
 
@@ -498,14 +515,6 @@ export default function PlanPage() {
                                           ))}
                                         </div>
                                       </CardContent>
-                                      {timeBudget && (
-                                        <div className="px-4 py-1.5 border-t border-border/10 bg-elevated/10">
-                                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70">
-                                            <Clock className="h-3 w-3 opacity-50" />
-                                            <span className="font-medium">{timeBudget}</span>
-                                          </div>
-                                        </div>
-                                      )}
                                     </Card>
                                   )
                                 })}
@@ -515,44 +524,55 @@ export default function PlanPage() {
                         })}
                       </Tabs>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {Object.entries(month.categories).map(([category, items]) => {
-                          const { name: categoryName, timeBudget } = parseCategoryInfo(category)
-                          const domain = CATEGORY_DOMAINS[categoryName] || CATEGORY_DOMAINS[Object.keys(CATEGORY_DOMAINS).find(k => categoryName.includes(k)) || ''] || 'streak'
-                          const colors = DOMAIN_COLORS[domain]
+                      <>
+                        {(() => {
+                          const monthBudgets = Object.entries(month.categories)
+                            .map(([cat]) => parseCategoryInfo(cat))
+                            .filter(c => c.timeBudget)
+                          return monthBudgets.length > 0 ? (
+                            <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg border border-plan/15 bg-plan/5">
+                              <Clock className="h-3 w-3 text-plan/60 shrink-0" />
+                              {monthBudgets.map((b, i) => (
+                                <span key={i} className="inline-flex items-center gap-1 text-[11px]">
+                                  {i > 0 && <span className="text-plan/30 mx-0.5">·</span>}
+                                  <span className="font-semibold text-plan/80">{b.name}</span>
+                                  <span className="text-muted-foreground/60">{b.timeBudget}</span>
+                                </span>
+                              ))}
+                            </div>
+                          ) : null
+                        })()}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {Object.entries(month.categories).map(([category, items]) => {
+                            const { name: categoryName } = parseCategoryInfo(category)
+                            const domain = CATEGORY_DOMAINS[categoryName] || CATEGORY_DOMAINS[Object.keys(CATEGORY_DOMAINS).find(k => categoryName.includes(k)) || ''] || 'streak'
+                            const colors = DOMAIN_COLORS[domain]
 
-                          return (
-                            <Card key={category} className={`overflow-hidden border border-border/20 bg-surface/60 transition-all hover:bg-surface/80 hover:shadow-lg ${categoryName.includes('Goals') ? 'md:col-span-2' : ''}`}>
-                              <CardHeader className="py-2.5 px-4 border-b border-border/10 bg-elevated/20">
-                                <CardTitle className="text-[12px] font-bold flex items-center gap-2">
-                                  <div className={`p-1 rounded-md ${colors.bg} ${colors.text} shadow-sm border ${colors.border}`}>
-                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                            return (
+                              <Card key={category} className={`overflow-hidden border border-border/20 bg-surface/60 transition-all hover:bg-surface/80 hover:shadow-lg ${categoryName.includes('Goals') ? 'md:col-span-2' : ''}`}>
+                                <CardHeader className="py-2.5 px-4 border-b border-border/10 bg-elevated/20">
+                                  <CardTitle className="text-[12px] font-bold flex items-center gap-2">
+                                    <div className={`p-1 rounded-md ${colors.bg} ${colors.text} shadow-sm border ${colors.border}`}>
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                    </div>
+                                    <span className="truncate">{categoryName}</span>
+                                    <Badge variant="outline" className="shrink-0 ml-auto text-[9px] h-5 border-border/40 bg-surface/50 font-bold tracking-tighter">
+                                      {items.filter(i => !i.id.includes('-info-') && i.checked).length}/{items.filter(i => !i.id.includes('-info-')).length}
+                                    </Badge>
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="py-2 px-4">
+                                  <div className="space-y-0">
+                                    {items.map(item => (
+                                      <PlanCheckItem key={item.id} item={item} onToggle={handleToggle} />
+                                    ))}
                                   </div>
-                                  <span className="truncate">{categoryName}</span>
-                                  <Badge variant="outline" className="shrink-0 ml-auto text-[9px] h-5 border-border/40 bg-surface/50 font-bold tracking-tighter">
-                                    {items.filter(i => !i.id.includes('-info-') && i.checked).length}/{items.filter(i => !i.id.includes('-info-')).length}
-                                  </Badge>
-                                </CardTitle>
-                              </CardHeader>
-                              <CardContent className="py-2 px-4">
-                                <div className="space-y-0">
-                                  {items.map(item => (
-                                    <PlanCheckItem key={item.id} item={item} onToggle={handleToggle} />
-                                  ))}
-                                </div>
-                              </CardContent>
-                              {timeBudget && (
-                                <div className="px-4 py-1.5 border-t border-border/10 bg-elevated/10">
-                                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70">
-                                    <Clock className="h-3 w-3 opacity-50" />
-                                    <span className="font-medium">{timeBudget}</span>
-                                  </div>
-                                </div>
-                              )}
-                            </Card>
-                          )
-                        })}
-                      </div>
+                                </CardContent>
+                              </Card>
+                            )
+                          })}
+                        </div>
+                      </>
                     )}
                   </TabsContent>
                 )
