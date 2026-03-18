@@ -6,7 +6,7 @@ import { createDashboardMarkdownComponents } from '@/components/markdown/dashboa
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import type { ParsedPlan, PlanItem, WeekSection } from '@/lib/parsers/plan-parser'
+import type { ParsedPlan, PlanItem } from '@/lib/parsers/plan-parser'
 import { parsePlan } from '@/lib/parsers/plan-parser'
 import { DOMAIN_COLORS } from '@/lib/theme'
 import { normalizeMarkdownContent } from '@/lib/markdown-formatting'

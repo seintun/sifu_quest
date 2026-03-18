@@ -193,14 +193,31 @@ export function parsePlan(content: string): ParsedPlan {
       const week = parseInt(weekMatch[1])
       const title = weekMatch[2].trim()
 
-      currentWeek = {
-        week,
-        title,
-        categories: {}
+      // Check if week already exists to avoid duplicates
+      let existingWeek = currentMonth.weeks.find(w => w.week === week)
+      if (existingWeek) {
+        // Update title if it changed (preserve existing categories)
+        existingWeek.title = title
+        currentWeek = existingWeek
+      } else {
+        currentWeek = {
+          week,
+          title,
+          categories: {}
+        }
+        currentMonth.weeks.push(currentWeek)
       }
-      currentMonth.weeks.push(currentWeek)
+
+      // For backward compatibility: if items appear directly under week (no subcategory),
+      // they should be added to month.categories[title] to preserve the old category shape
+      // that some tests/consumers may rely on.
       currentWeekCategory = ''
-      currentCategory = '' // Reset category since we're now in a week structure
+      currentCategory = title
+
+      // Ensure the category exists in month.categories for any direct items
+      if (!currentMonth.categories[title]) {
+        currentMonth.categories[title] = []
+      }
       continue
     }
 
