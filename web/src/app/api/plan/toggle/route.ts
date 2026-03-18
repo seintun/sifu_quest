@@ -24,12 +24,16 @@ export async function POST(request: NextRequest) {
 
     const { itemId, checked } = parsedBody.data
 
+    // TODO: This read-modify-write cycle has a last-write-wins race when
+    // multiple toggles fire concurrently (more likely now with optimistic UI).
+    // Consider compare-and-swap with a content hash or DB-level column toggle.
     const content = await readMemoryFile(userId, 'plan.md')
     const updated = togglePlanItem(content, itemId, checked)
     await writeMemoryFile(userId, 'plan.md', updated, 'plan_toggle')
 
-    await logProgressEvent(userId, 'plan_item_checked', 'plan', { itemId, checked })
-    await logAuditEvent(userId, 'update_memory', 'plan.md', { action: 'toggled_plan_item', checked })
+    // Fire logging asynchronously — don't block the response
+    void logProgressEvent(userId, 'plan_item_checked', 'plan', { itemId, checked })
+    void logAuditEvent(userId, 'update_memory', 'plan.md', { action: 'toggled_plan_item', checked })
 
     return NextResponse.json({ success: true })
   } catch (error) {
