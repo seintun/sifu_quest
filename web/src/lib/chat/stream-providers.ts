@@ -275,7 +275,12 @@ export async function streamOpenRouterWithFallback(
       }
 
       if (error instanceof ProviderStreamError) {
-        const shouldFallback = !error.streamStarted && (error.status === 429 || (error.status ?? 0) >= 500)
+        // Fallback on: rate limit (429), server errors (5xx), model not found (404)
+        const shouldFallback = !error.streamStarted && (
+          error.status === 404 ||
+          error.status === 429 ||
+          (error.status ?? 0) >= 500
+        )
         if (!shouldFallback) {
           throw error
         }
