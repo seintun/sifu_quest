@@ -1,4 +1,5 @@
-export const fetcher = async (url: string): Promise<unknown> => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- SWR requires any for flexible typing
+export const fetcher = async (url: string): Promise<any> => {
   const res = await fetch(url)
 
   const text = await res.text()
@@ -19,7 +20,8 @@ export const fetcher = async (url: string): Promise<unknown> => {
       res.statusText ||
       'Request failed'
 
-    const error = new Error(message) as Error & { status: number; data: unknown }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error augmentation pattern
+    const error: any = new Error(message)
     error.status = res.status
     error.data = data
 
